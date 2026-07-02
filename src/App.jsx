@@ -45,6 +45,7 @@ function ResizeHandle({ onDrag }) {
 }
 
 export default function App() {
+  const [mode, setMode] = useState("FM 1D");
   const [projectW, setProjectW] = useState(232);
   const [networkW, setNetworkW] = useState(232);
   const [nodes, setNodes] = useState(INIT_NODES);
@@ -98,20 +99,25 @@ export default function App() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-4)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} />
-      <ModeRibbon onBeginDrag={beginDrag} />
+      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
-        <ProjectPanel width={projectW} />
+        <ProjectPanel width={projectW} empty={mode === "Home"} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
         <GisCanvas
-          nodes={nodes} setNodes={setNodes} edges={edges} setEdges={setEdges}
+          nodes={mode === "FM 1D" ? nodes : []} setNodes={setNodes}
+          edges={mode === "FM 1D" ? edges : []} setEdges={setEdges}
           selected={selected} setSelected={setSelected}
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
           edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
           reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
         />
-        <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
-        <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
-          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
+        {mode === "FM 1D" && (
+          <>
+            <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
+            <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
+              edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
+          </>
+        )}
       </div>
 
       {ribbonDrag && (

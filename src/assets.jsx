@@ -46,6 +46,18 @@ import northStar from "./assets/north-star.svg";
 import comment from "./assets/comment.svg";
 import placeholder from "./assets/placeholder.svg";
 
+import homeLoadFile from "./assets/home-load-file.svg";
+import homeExpand from "./assets/home-expand.svg";
+import homeAddBookmark from "./assets/home-add-bookmark.svg";
+import homeNote from "./assets/home-note.svg";
+import homeMarker from "./assets/home-marker.svg";
+import homeAddGis from "./assets/home-add-gis.svg";
+import homeGoToMap from "./assets/home-go-to-map.svg";
+import homeMapView from "./assets/home-map-view.svg";
+import homeFathom from "./assets/home-fathom.svg";
+import homeOpenProject from "./assets/home-open-project.svg";
+import homeNewProject from "./assets/home-new-project.svg";
+
 export const A = {
   logo, search, add, check, minimise, dock, cancel, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
@@ -55,6 +67,8 @@ export const A = {
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
   rectangleSelect, measureTool, pointQuery, pan, zoomTool, edit, northStar, comment,
   placeholder,
+  homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
+  homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
 };
 
 // Small helper for a fixed-size icon <img>

@@ -2,7 +2,24 @@ import { useState, useRef, useEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 
 const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", "GIS", "Simulation", "Results", "Favourites"];
-const ACTIVE_MODE = "FM 1D";
+
+// Home tab's ribbon — project-level actions rather than 1D network units,
+// so none of these are draggable onto the canvas.
+export const HOME_RIBBON = [
+  { id: "saveproject",    icon: "homeLoadFile",   label: "Save project",    chevron: true },
+  { sep: true },
+  { id: "projectextents", icon: "homeExpand",     label: "Project extents", chevron: true },
+  { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks",       chevron: true },
+  { id: "notes",          icon: "homeNote",       label: "Notes",          chevron: true },
+  { id: "addcontent",     icon: "homeMarker",     label: "Add content",    chevron: true },
+  { sep: true },
+  { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true },
+  { id: "basemap",        icon: "homeGoToMap",    label: "Basemap",        chevron: true },
+  { id: "onlineservices", icon: "homeMapView",    label: "Online services",chevron: true },
+  { id: "fathom",         icon: "homeFathom",     label: "Fathom",         chevron: true },
+  { sep: true },
+  { id: "projectsettings",icon: "settingsColor",  label: "Project settings" },
+];
 
 // Ribbon groups. Leaf items with `drag:true` can be dragged onto the canvas.
 // `icon` is a key into A; items without a real uploaded asset use "placeholder".
@@ -174,9 +191,12 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag }) {
 // `onBeginDrag(e, groupItems, startIndex)` — called when a leaf item's drag
 // starts; the parent (App) owns the shared in-progress drag state so both
 // the ribbon and the canvas can see it (needed for Tab-cycling + drop).
-export default function ModeRibbon({ onBeginDrag }) {
+// `mode`/`setMode` — the active mode tab, also owned by App since it drives
+// what ProjectPanel/NetworkPanel/GisCanvas show.
+export default function ModeRibbon({ onBeginDrag, mode, setMode }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
+  const activeRibbon = mode === "Home" ? HOME_RIBBON : mode === "FM 1D" ? RIBBON : [];
 
   // Close any open menu on outside click / Escape
   useEffect(() => {
@@ -192,9 +212,9 @@ export default function ModeRibbon({ onBeginDrag }) {
       {/* Mode tabs */}
       <div style={{ display: "flex", alignItems: "center", height: 32, paddingLeft: 16 }}>
         {modes.map((m) => {
-          const active = m === ACTIVE_MODE;
+          const active = m === mode;
           return (
-            <button key={m} style={{
+            <button key={m} onClick={() => setMode(m)} style={{
               height: 32, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 8px",
               border: "none", background: "transparent", cursor: "pointer",
               borderBottom: active ? "2px solid var(--surface-brand)" : "2px solid transparent",
@@ -222,7 +242,7 @@ export default function ModeRibbon({ onBeginDrag }) {
         border: "1px solid var(--border-primary)", borderRadius: 4, background: "var(--surface-1)",
         overflowX: "visible",
       }}>
-        {RIBBON.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} />)}
+        {activeRibbon.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} />)}
       </div>
     </div>
   );

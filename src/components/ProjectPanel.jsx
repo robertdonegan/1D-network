@@ -75,7 +75,7 @@ function Toggle({ on }) {
   );
 }
 
-export default function ProjectPanel({ width = 232 }) {
+export default function ProjectPanel({ width = 232, empty = false }) {
   return (
     <div style={{
       width, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", gap: 4,
@@ -85,59 +85,89 @@ export default function ProjectPanel({ width = 232 }) {
       <SearchField placeholder="Search project" />
       <SectionHeader label="Simulation" />
 
-      {/* Simulations list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flexShrink: 0 }}>
-        {/* Active simulation with expanded IEFs */}
-        <div style={{ borderRadius: 2, overflow: "hidden" }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 4, padding: "8.5px 8px",
-            background: "var(--surface-brand)", borderRadius: 2,
-          }}>
-            <Icon src={A.keyDown} size={12} style={{ filter: "brightness(0) invert(1)" }} />
-            <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--text-invert)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              Upton_003_1D.bat
-            </span>
-            <span style={{ fontSize: "var(--fs-xxs)", fontWeight: 500, color: "var(--text-invert)", border: "1px solid var(--text-invert)", borderRadius: 2, padding: 4, lineHeight: 1 }}>
-              Active
-            </span>
-            <Toggle on />
+      {empty ? (
+        <>
+          {/* No project loaded (Home tab) — empty Simulation/Components sections with Open/New actions centred in the middle */}
+          <div style={{ flex: "1 0 0", display: "flex", flexDirection: "column" }}>
+            <div style={{ height: 1, background: "var(--border-primary)", margin: "8px 16px", flexShrink: 0 }} />
+            <SectionHeader label="Components" />
+            <div style={{ flex: "1 0 0", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <button style={{
+                display: "flex", alignItems: "center", gap: 2, height: 24, padding: "4px 6px",
+                background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2,
+                fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--text-secondary)", cursor: "pointer",
+              }}>
+                <Icon src={A.homeOpenProject} size={16} />
+                Open Project
+              </button>
+              <button style={{
+                display: "flex", alignItems: "center", gap: 2, height: 24, padding: "4px 6px",
+                background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2,
+                fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--text-secondary)", cursor: "pointer",
+              }}>
+                <Icon src={A.homeNewProject} size={16} />
+                New Project
+              </button>
+            </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "12px 8px" }}>
-            {iefs.map(f => (
-              <div key={f} style={{ display: "flex", alignItems: "center", gap: 4, height: 28, padding: 8, borderRadius: 2 }}>
-                <Icon src={A.lhs1} size={12} />
-                <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", color: "var(--text-primary-selected)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f}</span>
+        </>
+      ) : (
+        <>
+          {/* Simulations list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flexShrink: 0 }}>
+            {/* Active simulation with expanded IEFs */}
+            <div style={{ borderRadius: 2, overflow: "hidden" }}>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 4, padding: "8.5px 8px",
+                background: "var(--surface-brand)", borderRadius: 2,
+              }}>
+                <Icon src={A.keyDown} size={12} style={{ filter: "brightness(0) invert(1)" }} />
+                <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, color: "var(--text-invert)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Upton_003_1D.bat
+                </span>
+                <span style={{ fontSize: "var(--fs-xxs)", fontWeight: 500, color: "var(--text-invert)", border: "1px solid var(--text-invert)", borderRadius: 2, padding: 4, lineHeight: 1 }}>
+                  Active
+                </span>
+                <Toggle on />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "12px 8px" }}>
+                {iefs.map(f => (
+                  <div key={f} style={{ display: "flex", alignItems: "center", gap: 4, height: 28, padding: 8, borderRadius: 2 }}>
+                    <Icon src={A.lhs1} size={12} />
+                    <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", color: "var(--text-primary-selected)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Collapsed simulations */}
+            {["Upton_002_1D.bat", "Upton_001_1D.bat"].map(s => (
+              <div key={s} style={{ display: "flex", alignItems: "center", gap: 4, padding: "10px 8px", borderRadius: 2 }}>
+                <Icon src={A.keyDown} size={12} style={{ transform: "rotate(-90deg)" }} />
+                <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s}</span>
+                <Toggle on={false} />
               </div>
             ))}
           </div>
-        </div>
-        {/* Collapsed simulations */}
-        {["Upton_002_1D.bat", "Upton_001_1D.bat"].map(s => (
-          <div key={s} style={{ display: "flex", alignItems: "center", gap: 4, padding: "10px 8px", borderRadius: 2 }}>
-            <Icon src={A.keyDown} size={12} style={{ transform: "rotate(-90deg)" }} />
-            <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s}</span>
-            <Toggle on={false} />
-          </div>
-        ))}
-      </div>
 
-      <div style={{ height: 1, background: "var(--border-primary)", margin: "8px 16px", flexShrink: 0 }} />
-      <SectionHeader label="Components" />
+          <div style={{ height: 1, background: "var(--border-primary)", margin: "8px 16px", flexShrink: 0 }} />
+          <SectionHeader label="Components" />
 
-      {/* Components tree */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flex: "1 0 0", overflow: "auto" }}>
-        {components.map(c => (
-          <div key={c.label} style={{
-            display: "flex", alignItems: "center", gap: 4, padding: 8, borderRadius: 2, background: "var(--neutral-400)",
-          }}>
-            <Icon src={c.icon} size={12} />
-            <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
-            <div style={{ width: 12, height: 12, borderRadius: 2, background: "var(--neutral-600)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Icon src={A.check} size={12} />
-            </div>
+          {/* Components tree */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flex: "1 0 0", overflow: "auto" }}>
+            {components.map(c => (
+              <div key={c.label} style={{
+                display: "flex", alignItems: "center", gap: 4, padding: 8, borderRadius: 2, background: "var(--neutral-400)",
+              }}>
+                <Icon src={c.icon} size={12} />
+                <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
+                <div style={{ width: 12, height: 12, borderRadius: 2, background: "var(--neutral-600)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon src={A.check} size={12} />
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       {/* Footer tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, flexShrink: 0 }}>
