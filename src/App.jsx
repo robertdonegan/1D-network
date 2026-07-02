@@ -24,10 +24,13 @@ const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],
 export default function App() {
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
+  // Shared with NetworkPanel so a row click selects the node on the canvas.
+  const [selected, setSelected] = useState(null);
   // In-progress ribbon → canvas drag: { items, index, x, y }. Shared between
-  // ModeRibbon (starts it, cycles it with Tab) and GisCanvas (consumes it on drop).
+  // ModeRibbon/OSWindow (start it, cycle it with Tab) and GisCanvas (consumes it on drop).
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
+  const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
 
   useEffect(() => {
     if (!dragActive) return;
@@ -60,15 +63,16 @@ export default function App() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-4)", overflow: "hidden" }}>
-      <OSWindow />
-      <ModeRibbon onBeginDrag={(e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY })} />
+      <OSWindow onBeginDrag={beginDrag} />
+      <ModeRibbon onBeginDrag={beginDrag} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", gap: 8, padding: 8 }}>
         <ProjectPanel />
         <GisCanvas
           nodes={nodes} setNodes={setNodes} edges={edges} setEdges={setEdges}
+          selected={selected} setSelected={setSelected}
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
         />
-        <NetworkPanel nodes={nodes} />
+        <NetworkPanel nodes={nodes} selected={selected} setSelected={setSelected} />
       </div>
 
       {ribbonDrag && (

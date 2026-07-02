@@ -9,6 +9,8 @@ const OUTER = 28, ICONSZ = 20;
 const DIAMOND = 24;
 const PR = 5;
 const MIN_SCALE = 0.25, MAX_SCALE = 4;
+const WHEEL_ZOOM_FACTOR = 1.05;   // per wheel notch — gentle
+const KEY_ZOOM_FACTOR = 1.2;      // per +/- keypress — a deliberate step
 
 let uid = 0;
 const genId = () => "g" + (uid++);
@@ -30,6 +32,15 @@ const toWorld = (view, sx, sy) => ({ x: (sx - view.tx) / view.scale, y: (sy - vi
 const centerScreen = (n, view) => {
   const s = toScreen(view, n.x, n.y), sz = sizeOf(n);
   return { x: s.x + sz / 2, y: s.y + sz / 2 };
+};
+
+// World-space position of a chain point, whether it's a real node (centre
+// of its footprint) or a plain vertex (its raw stored point).
+const pointWorld = (id, ed, nodesArr) => {
+  const n = nodesArr.find(x => x.id === id);
+  if (n) { const sz = sizeOf(n); return { x: n.x + sz / 2, y: n.y + sz / 2 }; }
+  const v = ed.points.find(x => x.id === id);
+  return v ? { x: v.x, y: v.y } : { x: 0, y: 0 };
 };
 
 const hit = (n, view, px, py, pad = 6) => {
@@ -79,11 +90,11 @@ const btnStyle = {
   border: "1px solid var(--border-primary)", background: "var(--surface-1)", cursor: "pointer",
 };
 
-export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag, onConsumeRibbonDrag }) {
+export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, setSelected, ribbonDrag, onConsumeRibbonDrag }) {
   const [hovered, setHovered] = useState(null);
-  const [selected, setSelected] = useState(null);
   const [dragNode, setDragNode] = useState(null);
   const [dragVertex, setDragVertex] = useState(null);
+  const [dragCurve, setDragCurve] = useState(null);
   const [wire, setWire] = useState(null);
   const [snapTo, setSnapTo] = useState(null);
   const [hoverSeg, setHoverSeg] = useState(null);
@@ -111,7 +122,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
     setPicker({ x, y, ...extra });
   };
 
-  const zoomBy = (factor, center) => {
+  const zoomBy = useCallback((factor, center) => {
     const el = wrapRef.current;
     const cx = center ? center.x : (el ? el.clientWidth / 2 : 400);
     const cy = center ? center.y : (el ? el.clientHeight / 2 : 300);
@@ -120,7 +131,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
       const w = toWorld(v, cx, cy);
       return { scale: newScale, tx: cx - w.x * newScale, ty: cy - w.y * newScale };
     });
-  };
+  }, []);
 
   // Wheel = zoom, centred on the cursor. Attached natively so preventDefault
   // reliably stops page scroll (React's onWheel is passive by default).
@@ -130,11 +141,11 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
     const onWheel = (e) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12, { x: e.clientX - r.left, y: e.clientY - r.top });
+      zoomBy(e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR, { x: e.clientX - r.left, y: e.clientY - r.top });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [zoomBy]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => { if (!ribbonDrag) setDropHint(false); }, [ribbonDrag]);
@@ -158,13 +169,19 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
         ...ed, points: ed.points.map(v => v.id === dragVertex.pid ? { ...v, x: w.x, y: w.y } : v),
       }));
     }
+    if (dragCurve) {
+      const w = toWorld(view, p.x - dragCurve.ox, p.y - dragCurve.oy);
+      setEdges(es => es.map(ed => ed.id !== dragCurve.edgeId ? ed : {
+        ...ed, curves: { ...(ed.curves || {}), [dragCurve.key]: { x: w.x, y: w.y } },
+      }));
+    }
     if (wire) {
       const s = nodes.find(n => n.id !== wire.fromId && hit(n, view, p.x, p.y));
       setSnapTo(s ? s.id : null);
       const c = s ? centerScreen(s, view) : { x: p.x, y: p.y };
       setWire(w => ({ ...w, x2: c.x, y2: c.y }));
     }
-  }, [nodes, dragNode, dragVertex, wire, panDrag, view, ribbonDrag, dropHint]);
+  }, [nodes, dragNode, dragVertex, dragCurve, wire, panDrag, view, ribbonDrag, dropHint]);
 
   const onUp = useCallback(e => {
     if (ribbonDrag) {
@@ -188,11 +205,36 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
         openPicker(wire.x2, wire.y2, { mode: "create", fromId: wire.fromId, atWorld: toWorld(view, wire.x2, wire.y2) });
       }
     }
-    setDragNode(null); setDragVertex(null); setWire(null); setSnapTo(null);
+    setDragNode(null); setDragVertex(null); setDragCurve(null); setWire(null); setSnapTo(null);
   }, [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag]);
+
+  // Alt/Option+click on a node or vertex toggles a bezier handle on every
+  // reach segment touching that point (adds one at the segment midpoint if
+  // absent, removes it if present) instead of starting a position-drag.
+  const toggleCurvesAt = (pointId) => {
+    setEdges(es => es.map(ed => {
+      const chain = [ed.from, ...ed.points.map(p => p.id), ed.to];
+      if (!chain.includes(pointId)) return ed;
+      const curves = { ...(ed.curves || {}) };
+      let changed = false;
+      for (let i = 0; i < chain.length - 1; i++) {
+        if (chain[i] !== pointId && chain[i + 1] !== pointId) continue;
+        const key = chain[i] + "|" + chain[i + 1];
+        if (curves[key]) {
+          delete curves[key];
+        } else {
+          const p1 = pointWorld(chain[i], ed, nodes), p2 = pointWorld(chain[i + 1], ed, nodes);
+          curves[key] = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+        }
+        changed = true;
+      }
+      return changed ? { ...ed, curves } : ed;
+    }));
+  };
 
   const nodeDown = (e, id) => {
     e.stopPropagation();
+    if (e.altKey) { toggleCurvesAt(id); return; }
     const p = pt(e); const n = nodes.find(x => x.id === id);
     const s = toScreen(view, n.x, n.y);
     setSelected(id); setDragNode({ id, ox: p.x - s.x, oy: p.y - s.y });
@@ -201,6 +243,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
 
   const vertexDown = (e, edgeId, pid) => {
     e.stopPropagation();
+    if (e.altKey) { toggleCurvesAt(pid); return; }
     const edge = edges.find(x => x.id === edgeId);
     const v = edge.points.find(x => x.id === pid);
     const p = pt(e); const s = toScreen(view, v.x, v.y);
@@ -212,6 +255,13 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
     const v = edge.points.find(x => x.id === pid);
     const s = toScreen(view, v.x, v.y);
     openPicker(s.x, s.y, { mode: "convert", edgeId, pid });
+  };
+  const curveDown = (e, edgeId, key) => {
+    e.stopPropagation();
+    const edge = edges.find(x => x.id === edgeId);
+    const c = edge.curves[key];
+    const p = pt(e); const s = toScreen(view, c.x, c.y);
+    setDragCurve({ edgeId, key, ox: p.x - s.x, oy: p.y - s.y });
   };
   const addVertex = (edgeId, segIndex, worldMid) => {
     setEdges(es => es.map(ed => {
@@ -256,7 +306,8 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
   };
 
   // Keyboard: Delete/Backspace opens a confirm dialog (no direct delete);
-  // Escape backs out of whatever's active, in priority order; Space pans.
+  // Escape backs out of whatever's active, in priority order; Space pans;
+  // =/+ and -/_ step-zoom in/out.
   useEffect(() => {
     const isTyping = (e) => { const t = (e.target.tagName || "").toLowerCase(); return t === "input" || t === "textarea"; };
     const onKey = (e) => {
@@ -270,20 +321,31 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
         e.preventDefault(); setConfirmId(selected);
       }
       if (e.code === "Space" && !spaceHeld && !isTyping(e)) { e.preventDefault(); setSpaceHeld(true); }
+      if ((e.key === "=" || e.key === "+") && !isTyping(e)) { e.preventDefault(); zoomBy(KEY_ZOOM_FACTOR); }
+      if ((e.key === "-" || e.key === "_") && !isTyping(e)) { e.preventDefault(); zoomBy(1 / KEY_ZOOM_FACTOR); }
     };
     const onKeyUp = (e) => { if (e.code === "Space") setSpaceHeld(false); };
     document.addEventListener("keydown", onKey);
     document.addEventListener("keyup", onKeyUp);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("keyup", onKeyUp); };
-  }, [selected, confirmId, picker, wire, spaceHeld]);
+  }, [selected, confirmId, picker, wire, spaceHeld, zoomBy]);
 
+  // Middle-click, space/Pan-tool held drag always pans. A plain left-click
+  // hold on empty canvas also pans, but only while nothing is selected —
+  // otherwise it deselects (as before).
   const onWrapDown = (e) => {
     if (e.button === 1 || ((panMode || spaceHeld) && e.button === 0)) {
       e.preventDefault();
       setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
       return;
     }
-    if (e.target === e.currentTarget) { setSelected(null); setPicker(null); }
+    if (e.target === e.currentTarget) {
+      if (e.button === 0 && !selected) {
+        setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
+        return;
+      }
+      setSelected(null); setPicker(null);
+    }
   };
 
   const confirmNode = confirmId ? nodes.find(n => n.id === confirmId) : null;
@@ -299,11 +361,11 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           backgroundColor: "#eef0ec",
           border: dropHint ? "1px dashed var(--blue-700)" : "1px solid var(--border-primary)", borderRadius: 4,
-          cursor: ribbonDrag ? "copy" : panDrag ? "grabbing" : isPanning ? "grab" : (dragNode || dragVertex || wire) ? "crosshair" : "default",
+          cursor: ribbonDrag ? "copy" : panDrag ? "grabbing" : isPanning ? "grab" : (dragNode || dragVertex || dragCurve || wire) ? "crosshair" : "default",
         }}
         onMouseMove={onMove} onMouseUp={onUp}
         onMouseDown={onWrapDown}
-        onMouseLeave={() => { setDragNode(null); setDragVertex(null); setWire(null); setSnapTo(null); setHovered(null); setPanDrag(null); }}>
+        onMouseLeave={() => { setDragNode(null); setDragVertex(null); setDragCurve(null); setWire(null); setSnapTo(null); setHovered(null); setPanDrag(null); }}>
 
         {/* Left tool rail */}
         <div style={{
@@ -330,7 +392,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
         <div style={{ position: "absolute", top: 12, right: 12, zIndex: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {[
             { icon: A.northStar, name: "Reset view", onClick: () => setView({ scale: 1, tx: 0, ty: 0 }), active: false },
-            { icon: A.zoomTool,  name: "Zoom in",     onClick: () => zoomBy(1.25), active: false },
+            { icon: A.zoomTool,  name: "Zoom in (or press =)", onClick: () => zoomBy(KEY_ZOOM_FACTOR), active: false },
             { icon: A.pan,       name: "Pan",         onClick: () => setPanMode(m => !m), active: panMode },
           ].map((b) => (
             <div key={b.name} title={b.name} onClick={b.onClick} style={{
@@ -343,22 +405,42 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
           ))}
         </div>
 
-        {/* Reaches (as editable polylines) + active wire */}
+        {/* Reaches (as editable polylines, optionally curved) + active wire */}
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
           {edges.map(e => {
             const fn = nodes.find(n => n.id === e.from), tn = nodes.find(n => n.id === e.to);
             if (!fn || !tn) return null;
-            const screenPts = [centerScreen(fn, view), ...e.points.map(v => toScreen(view, v.x, v.y)), centerScreen(tn, view)];
+            const chain = [
+              { id: e.from, screen: centerScreen(fn, view) },
+              ...e.points.map(v => ({ id: v.id, screen: toScreen(view, v.x, v.y) })),
+              { id: e.to, screen: centerScreen(tn, view) },
+            ];
             return (
               <g key={e.id}>
-                {screenPts.slice(0, -1).map((p1, i) => {
-                  const p2 = screenPts[i + 1];
-                  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+                {chain.slice(0, -1).map((c1, i) => {
+                  const c2 = chain[i + 1];
+                  const key = c1.id + "|" + c2.id;
+                  const ctrl = e.curves?.[key];
+                  if (ctrl) {
+                    const cs = toScreen(view, ctrl.x, ctrl.y);
+                    return (
+                      <g key={i}>
+                        <path d={`M ${c1.screen.x} ${c1.screen.y} Q ${cs.x} ${cs.y} ${c2.screen.x} ${c2.screen.y}`}
+                          stroke="var(--reach)" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+                        <line x1={c1.screen.x} y1={c1.screen.y} x2={cs.x} y2={cs.y} stroke="var(--blue-700)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
+                        <line x1={c2.screen.x} y1={c2.screen.y} x2={cs.x} y2={cs.y} stroke="var(--blue-700)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
+                        <circle cx={cs.x} cy={cs.y} r={5} fill="var(--blue-700)" stroke="#fff" strokeWidth={1.5}
+                          style={{ pointerEvents: "all", cursor: dragCurve?.key === key ? "grabbing" : "grab" }}
+                          onMouseDown={(ev) => curveDown(ev, e.id, key)} />
+                      </g>
+                    );
+                  }
+                  const mx = (c1.screen.x + c2.screen.x) / 2, my = (c1.screen.y + c2.screen.y) / 2;
                   const segKey = e.id + ":" + i;
                   const isHov = hoverSeg === segKey;
                   return (
                     <g key={i}>
-                      <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--reach)" strokeWidth={2.5} strokeLinecap="round" />
+                      <line x1={c1.screen.x} y1={c1.screen.y} x2={c2.screen.x} y2={c2.screen.y} stroke="var(--reach)" strokeWidth={2.5} strokeLinecap="round" />
                       <circle cx={mx} cy={my} r={7} fill="transparent" style={{ pointerEvents: "all", cursor: "copy" }}
                         onMouseEnter={() => setHoverSeg(segKey)} onMouseLeave={() => setHoverSeg(null)}
                         onClick={() => addVertex(e.id, i, toWorld(view, mx, my))} />
@@ -392,7 +474,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
           const s = toScreen(view, n.x, n.y);
           const sz = sizeOf(n);
           const isHov = hovered === n.id, isSel = selected === n.id, isSnap = snapTo === n.id;
-          const showPorts = isHov && !dragNode && !dragVertex && !panDrag;
+          const showPorts = isHov && !dragNode && !dragVertex && !dragCurve && !panDrag;
           return (
             <div key={n.id}>
               {(isHov || isSel) && (
@@ -400,7 +482,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
                   {n.label}
                 </div>
               )}
-              <div onMouseDown={e => nodeDown(e, n.id)} style={{ position: "absolute", left: s.x, top: s.y, cursor: dragNode?.id === n.id ? "grabbing" : "grab" }}>
+              <div onMouseDown={e => nodeDown(e, n.id)} title="Alt/Option-click to add a curve handle" style={{ position: "absolute", left: s.x, top: s.y, cursor: dragNode?.id === n.id ? "grabbing" : "grab" }}>
                 <NodeBox iconKey={n.icon} shape={n.shape} selected={isSel} snap={isSnap} size={sz} />
               </div>
               {showPorts && ports(n, view).map(p => (
@@ -442,7 +524,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, ribbonDrag
 
         {/* Hint */}
         <div style={{ position: "absolute", left: 52, bottom: 12, fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", pointerEvents: "none" }}>
-          Drag a unit onto the canvas (hold Tab to cycle the type) · Scroll to zoom · Space/middle-drag or the Pan tool to pan · Click a reach to add a point · Double-click a point to choose a unit
+          Drag a unit onto the canvas (hold Tab to cycle the type) · Scroll or +/- to zoom · Click-hold empty canvas to pan · Click a reach to add a point · Alt/Option-click a point to curve it
         </div>
       </div>
     </div>

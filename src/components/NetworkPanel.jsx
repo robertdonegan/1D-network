@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { A, Icon } from "../assets.jsx";
 
 // Network initial conditions rows
@@ -40,19 +41,33 @@ function ColHeader({ cols }) {
   );
 }
 
-function Row({ children, zebra }) {
+function Row({ children, zebra, selected, onClick }) {
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       display: "flex", alignItems: "center", gap: 4, padding: 8, width: "100%",
-      background: zebra ? "var(--surface-3)" : "var(--surface-1)",
+      background: selected ? "rgba(70,138,243,0.14)" : zebra ? "var(--surface-3)" : "var(--surface-1)",
       borderBottom: "1px solid var(--border-primary)",
+      borderLeft: selected ? "2px solid var(--blue-700)" : "2px solid transparent",
+      cursor: onClick ? "pointer" : "default",
     }}>{children}</div>
   );
 }
 
 const cellStyle = { fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
-export default function NetworkPanel() {
+export default function NetworkPanel({ nodes, selected, setSelected }) {
+  // The divider above "Network initial conditions" drags to resize the
+  // top table's viewport height.
+  const [topH, setTopH] = useState(320);
+  const onDividerDown = (e) => {
+    e.preventDefault();
+    const startY = e.clientY, startH = topH;
+    const onMove = (ev) => setTopH(Math.max(80, Math.min(560, startH + (ev.clientY - startY))));
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
   return (
     <div style={{
       width: 232, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column",
@@ -79,27 +94,33 @@ export default function NetworkPanel() {
         </div>
       </div>
 
-      {/* Network table */}
+      {/* Network table — mirrors the live nodes on the canvas; click a row to select it there too */}
       <ColHeader cols={[
         { name: "Label", style: { width: 72 } },
         { name: "Unit", style: { flex: "1 0 0" } },
         { name: "Sub unit", style: { width: 80 } },
       ]} />
-      <div style={{ display: "flex", flexDirection: "column", overflow: "auto", flexShrink: 0, maxHeight: 320, borderBottom: "1px solid var(--border-primary)" }}>
-        {networkRows.map((r, i) => (
-          <Row key={i} zebra={i % 2 === 1}>
+      <div style={{ display: "flex", flexDirection: "column", overflow: "auto", flexShrink: 0, height: topH, borderBottom: "1px solid var(--border-primary)" }}>
+        {nodes.map((n, i) => (
+          <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, width: 72, flexShrink: 0 }}>
-              <Icon src={r.icon} size={12} />
-              <span style={{ ...cellStyle }}>{r.label}</span>
+              <Icon src={A[n.icon]} size={12} />
+              <span style={{ ...cellStyle }}>{n.label}</span>
             </div>
-            <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0 }}>{r.unit}</span>
+            <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0 }}>{n.unitLabel || n.icon}</span>
             <span style={{ ...cellStyle, width: 80, flexShrink: 0 }}>Section</span>
           </Row>
         ))}
       </div>
 
+      {/* Drag to resize the table above */}
+      <div onMouseDown={onDividerDown} title="Drag to resize"
+        style={{ height: 6, flexShrink: 0, cursor: "row-resize", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface-2)", borderBottom: "1px solid var(--border-primary)" }}>
+        <div style={{ width: 28, height: 2, borderRadius: 1, background: "var(--border-secondary)" }} />
+      </div>
+
       {/* Network initial conditions */}
-      <div style={{ display: "flex", alignItems: "center", height: 32, padding: "12px 8px", borderTop: "1px solid var(--border-primary)", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", height: 32, padding: "12px 8px", flexShrink: 0 }}>
         <span style={{ fontSize: "var(--fs-xs)", fontWeight: 500 }}>Network initial conditions</span>
       </div>
       <ColHeader cols={[
