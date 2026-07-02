@@ -4,12 +4,9 @@ import { A, Icon } from "../assets.jsx";
 const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", "GIS", "Simulation", "Results", "Favourites"];
 const ACTIVE_MODE = "FM 1D";
 
-// MIME type for ribbon → canvas drag payloads
-export const NODE_MIME = "application/fmnode";
-
 // Ribbon groups. Leaf items with `drag:true` can be dragged onto the canvas.
 // `icon` is a key into A; items without a real uploaded asset use "placeholder".
-const RIBBON = [
+export const RIBBON = [
   { id: "rivernet", icon: "load1d", label: "River Network", chevron: true, primary: true },
   { sep: true },
   { id: "river", icon: "crossSection", label: "River", selected: true, menu: [
@@ -63,18 +60,32 @@ const RIBBON = [
   { id: "settings",   icon: "settingsColor", label: "FM 1D settings" },
 ];
 
+// Flattened list of every draggable leaf unit, annotated with its ribbon
+// group / sub-group path (`group`, for display) and its top-level group
+// (`top`) — used by the canvas quick-add picker and by the ribbon's
+// press-and-hold-Tab cycle group.
+export function flattenRibbonItems() {
+  const out = [];
+  const walk = (items, group, top) => {
+    items.forEach((it) => {
+      if (it.sub) walk(it.sub, `${group} / ${it.label}`, top);
+      else if (it.drag) out.push({ icon: it.icon, shape: it.shape || "square", label: it.label, group, top });
+    });
+  };
+  RIBBON.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
+  return out;
+}
+
+const ALL_ITEMS = flattenRibbonItems();
+
 function Sep() {
   return <div style={{ width: 1, height: 32, background: "var(--border-primary)", margin: "0 4px", flexShrink: 0 }} />;
 }
 
-function beginDrag(e, item) {
-  const payload = JSON.stringify({ icon: item.icon, shape: item.shape || "square", label: item.label });
-  e.dataTransfer.setData(NODE_MIME, payload);
-  e.dataTransfer.setData("text/plain", payload); // fallback
-  e.dataTransfer.effectAllowed = "copy";
-}
-
-function MenuItem({ item, onLeafDragStart, onCloseAll }) {
+// Leaf items use a plain mousedown-driven drag (not native HTML5 DnD) so the
+// in-progress drag can respond to a held Tab key to cycle the armed unit —
+// browsers largely swallow keydown while a native drag session is active.
+function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
   const [subOpen, setSubOpen] = useState(false);
   const hasSub = !!item.sub;
   return (
@@ -84,15 +95,19 @@ function MenuItem({ item, onLeafDragStart, onCloseAll }) {
       onMouseLeave={() => hasSub && setSubOpen(false)}
     >
       <div
-        draggable={item.drag ? true : undefined}
-        onDragStart={item.drag ? (e) => { beginDrag(e, item); onCloseAll(); } : undefined}
+        onMouseDown={item.drag ? (e) => {
+          e.preventDefault();
+          onCloseAll();
+          const startIndex = Math.max(0, groupItems.findIndex((g) => g.label === item.label));
+          onBeginDrag(e, groupItems, startIndex);
+        } : undefined}
         style={{
           display: "flex", alignItems: "center", gap: 10, padding: "7px 10px",
           cursor: item.drag ? "grab" : "default", whiteSpace: "nowrap", borderRadius: 2,
         }}
         onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
         onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-        title={item.drag ? "Drag onto the canvas to place" : undefined}
+        title={item.drag ? "Drag onto the canvas to place (hold Tab to cycle the type)" : undefined}
       >
         <Icon src={A[item.icon]} size={16} />
         <span style={{ fontSize: "var(--fs-xs)", flex: "1 0 0" }}>{item.label}</span>
@@ -105,7 +120,7 @@ function MenuItem({ item, onLeafDragStart, onCloseAll }) {
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 60,
         }}>
           {item.sub.map((s) => (
-            <MenuItem key={s.label} item={s} onLeafDragStart={onLeafDragStart} onCloseAll={onCloseAll} />
+            <MenuItem key={s.label} item={s} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={onCloseAll} />
           ))}
         </div>
       )}
@@ -113,10 +128,11 @@ function MenuItem({ item, onLeafDragStart, onCloseAll }) {
   );
 }
 
-function RibbonGroup({ group, open, setOpen }) {
+function RibbonGroup({ group, open, setOpen, onBeginDrag }) {
   const ref = useRef(null);
   const hasMenu = !!group.menu;
   const isOpen = open === group.id;
+  const groupItems = hasMenu ? ALL_ITEMS.filter((it) => it.top === group.label) : [];
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
@@ -147,7 +163,7 @@ function RibbonGroup({ group, open, setOpen }) {
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 50,
         }}>
           {group.menu.map((it) => (
-            <MenuItem key={it.label} item={it} onCloseAll={() => setOpen(null)} />
+            <MenuItem key={it.label} item={it} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={() => setOpen(null)} />
           ))}
         </div>
       )}
@@ -155,7 +171,10 @@ function RibbonGroup({ group, open, setOpen }) {
   );
 }
 
-export default function ModeRibbon() {
+// `onBeginDrag(e, groupItems, startIndex)` — called when a leaf item's drag
+// starts; the parent (App) owns the shared in-progress drag state so both
+// the ribbon and the canvas can see it (needed for Tab-cycling + drop).
+export default function ModeRibbon({ onBeginDrag }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
 
@@ -203,7 +222,7 @@ export default function ModeRibbon() {
         border: "1px solid var(--border-primary)", borderRadius: 4, background: "var(--surface-1)",
         overflowX: "visible",
       }}>
-        {RIBBON.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} />)}
+        {RIBBON.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} />)}
       </div>
     </div>
   );

@@ -1,27 +1,5 @@
 import { A, Icon } from "../assets.jsx";
 
-// Network rows extracted from the Figma frame (label, unit, icon)
-const networkRows = [
-  { label: "M014",  unit: "QTBDY",      icon: A.flowTime },
-  { label: "M014",  unit: "River",      icon: A.crossSection },
-  { label: "M0145", unit: "Interpolate",icon: A.interpolate },
-  { label: "M015",  unit: "River",      icon: A.crossSection },
-  { label: "M016",  unit: "Arch Bridge",icon: A.superBridge },
-  { label: "M0165", unit: "Interpolate",icon: A.interpolate },
-  { label: "M017",  unit: "River",      icon: A.crossSection },
-  { label: "M0175", unit: "Interpolate",icon: A.interpolate },
-  { label: "M018",  unit: "River",      icon: A.crossSection },
-  { label: "M0185", unit: "Interpolate",icon: A.interpolate },
-  { label: "M019",  unit: "River",      icon: A.crossSection },
-  { label: "M020",  unit: "River",      icon: A.crossSection },
-  { label: "M0205", unit: "Interpolate",icon: A.interpolate },
-  { label: "M021",  unit: "River",      icon: A.crossSection },
-  { label: "M022",  unit: "River",      icon: A.crossSection },
-  { label: "M023",  unit: "River",      icon: A.crossSection },
-  { label: "M026",  unit: "River",      icon: A.crossSection },
-  { label: "M026",  unit: "NCDBDY",     icon: A.normalDepth },
-];
-
 // Network initial conditions rows
 const nicRows = ["M014","M016","M017","M018","M019","M020","M021","M022","M023","M024","M025","M026","M027","M028","M029"]
   .map(l => ({ label: l, y: "Y", flow: "200.000" }));
