@@ -75,10 +75,10 @@ function Toggle({ on }) {
   );
 }
 
-export default function ProjectPanel() {
+export default function ProjectPanel({ width = 232 }) {
   return (
     <div style={{
-      width: 232, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", gap: 4,
+      width, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", gap: 4,
       background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4, overflow: "hidden",
     }}>
       <PanelHeader icon={A.hierarchyLine} title="Project" />

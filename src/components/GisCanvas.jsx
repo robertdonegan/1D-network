@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 import NodePicker from "./NodePicker.jsx";
+import ReachPicker from "./ReachPicker.jsx";
+import OsmBasemap from "./OsmBasemap.jsx";
 
 // Node geometry (Figma: 28px footprint, 20px icon). Diamonds (Interpolate /
 // Replicate) keep the same 20px icon but a tighter footprint so they read
@@ -19,11 +21,21 @@ let mCounter = 30;
 const sizeOf = n => (n.shape === "diamond" ? DIAMOND : OUTER);
 
 // World <-> screen space. World coords are the node's stored x/y (pan+zoom
-// independent); screen coords are pixels inside the canvas wrap. Node boxes
-// are always drawn at their fixed screen size, so units never grow/shrink
-// with zoom, only their position does.
-const toScreen = (view, wx, wy) => ({ x: wx * view.scale + view.tx, y: wy * view.scale + view.ty });
-const toWorld = (view, sx, sy) => ({ x: (sx - view.tx) / view.scale, y: (sy - view.ty) / view.scale });
+// +rotation independent); screen coords are pixels inside the canvas wrap.
+// Node boxes are always drawn at their fixed screen size and unrotated, so
+// units never grow/shrink/tilt with the view — only their position does.
+const toScreen = (view, wx, wy) => {
+  const rad = ((view.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const rx = wx * cos - wy * sin, ry = wx * sin + wy * cos;
+  return { x: rx * view.scale + view.tx, y: ry * view.scale + view.ty };
+};
+const toWorld = (view, sx, sy) => {
+  const ux = (sx - view.tx) / view.scale, uy = (sy - view.ty) / view.scale;
+  const rad = (-(view.rotation || 0) * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  return { x: ux * cos - uy * sin, y: ux * sin + uy * cos };
+};
 
 // A node's screen-space centre. Uses the node's *fixed* on-screen size (not
 // scaled), matching how it's actually rendered — computing this by scaling
@@ -90,7 +102,10 @@ const btnStyle = {
   border: "1px solid var(--border-primary)", background: "var(--surface-1)", cursor: "pointer",
 };
 
-export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, setSelected, ribbonDrag, onConsumeRibbonDrag }) {
+export default function GisCanvas({
+  nodes, setNodes, edges, setEdges, selected, setSelected, ribbonDrag, onConsumeRibbonDrag, edgeColors, degree,
+  reachRegistry, edgesByReach, reachKeyOfEdge, onReassignReach,
+}) {
   const [hovered, setHovered] = useState(null);
   const [dragNode, setDragNode] = useState(null);
   const [dragVertex, setDragVertex] = useState(null);
@@ -100,12 +115,15 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
   const [hoverSeg, setHoverSeg] = useState(null);
   const [dropHint, setDropHint] = useState(false);
   const [activeTool, setActiveTool] = useState(0);
-  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 });
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panDrag, setPanDrag] = useState(null);
+  const [toolDrag, setToolDrag] = useState(null);
   const [picker, setPicker] = useState(null);
+  const [reachPicker, setReachPicker] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const [showBasemap, setShowBasemap] = useState(false);
   const wrapRef = useRef(null);
 
   const pt = e => {
@@ -122,6 +140,15 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     setPicker({ x, y, ...extra });
   };
 
+  const openReachPicker = (sx, sy, edgeId) => {
+    const el = wrapRef.current;
+    const w = el ? el.clientWidth : 800, h = el ? el.clientHeight : 600;
+    const pw = 200, ph = 220;
+    const x = Math.min(Math.max(8, sx), Math.max(8, w - pw - 8));
+    const y = Math.min(Math.max(8, sy), Math.max(8, h - ph - 8));
+    setReachPicker({ x, y, edgeId });
+  };
+
   const zoomBy = useCallback((factor, center) => {
     const el = wrapRef.current;
     const cx = center ? center.x : (el ? el.clientWidth / 2 : 400);
@@ -129,9 +156,21 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     setView(v => {
       const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, v.scale * factor));
       const w = toWorld(v, cx, cy);
-      return { scale: newScale, tx: cx - w.x * newScale, ty: cy - w.y * newScale };
+      return { ...v, scale: newScale, tx: cx - w.x * newScale, ty: cy - w.y * newScale };
     });
   }, []);
+
+  // Reset view helpers, pivoting around the current viewport centre so the
+  // content you're looking at doesn't jump.
+  const resetView = () => setView({ scale: 1, tx: 0, ty: 0, rotation: 0 });
+  const resetNorth = () => {
+    const el = wrapRef.current;
+    const cx = el ? el.clientWidth / 2 : 400, cy = el ? el.clientHeight / 2 : 300;
+    setView(v => {
+      const w = toWorld(v, cx, cy);
+      return { ...v, rotation: 0, tx: cx - w.x * v.scale, ty: cy - w.y * v.scale };
+    });
+  };
 
   // Wheel = zoom, centred on the cursor. Attached natively so preventDefault
   // reliably stops page scroll (React's onWheel is passive by default).
@@ -146,6 +185,47 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoomBy]);
+
+  // Click-and-hold-drag on the North Star / Zoom / Pan nav buttons: Alt
+  // inverts the direction, Shift slows it down. Releasing without moving
+  // falls back to each button's plain-click shortcut.
+  useEffect(() => {
+    if (!toolDrag) return;
+    const onMove = (e) => {
+      const dx = e.clientX - toolDrag.sx, dy = e.clientY - toolDrag.sy;
+      if (!toolDrag.moved && Math.hypot(dx, dy) > 4) setToolDrag(td => td && { ...td, moved: true });
+      const invert = e.altKey ? -1 : 1;
+      const slow = e.shiftKey ? 0.3 : 1;
+      const el = wrapRef.current;
+      const cx = el ? el.clientWidth / 2 : 400, cy = el ? el.clientHeight / 2 : 300;
+
+      if (toolDrag.tool === "rotate") {
+        const rotation = toolDrag.startView.rotation + dx * 0.5 * slow * invert;
+        const w = toWorld(toolDrag.startView, cx, cy);
+        const rad = (rotation * Math.PI) / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+        const scale = toolDrag.startView.scale;
+        setView(v => ({ ...v, rotation, tx: cx - (w.x * cos - w.y * sin) * scale, ty: cy - (w.x * sin + w.y * cos) * scale }));
+      } else if (toolDrag.tool === "zoom") {
+        const factor = Math.pow(1.01, -dy * slow * invert);
+        const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, toolDrag.startView.scale * factor));
+        const w = toWorld(toolDrag.startView, cx, cy);
+        setView(v => ({ ...v, scale: newScale, tx: cx - w.x * newScale, ty: cy - w.y * newScale }));
+      } else if (toolDrag.tool === "pan") {
+        setView(v => ({ ...v, tx: toolDrag.startView.tx + dx * slow * invert, ty: toolDrag.startView.ty + dy * slow * invert }));
+      }
+    };
+    const onUp = () => {
+      if (!toolDrag.moved) {
+        if (toolDrag.tool === "zoom") zoomBy(KEY_ZOOM_FACTOR);
+        else if (toolDrag.tool === "pan") setPanMode(m => !m);
+        else if (toolDrag.tool === "rotate") resetView();
+      }
+      setToolDrag(null);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, [toolDrag, zoomBy]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => { if (!ribbonDrag) setDropHint(false); }, [ribbonDrag]);
@@ -208,10 +288,11 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     setDragNode(null); setDragVertex(null); setDragCurve(null); setWire(null); setSnapTo(null);
   }, [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag]);
 
-  // Alt/Option+click on a node or vertex toggles a bezier handle on every
-  // reach segment touching that point (adds one at the segment midpoint if
-  // absent, removes it if present) instead of starting a position-drag.
-  const toggleCurvesAt = (pointId) => {
+  // Alt/Option+click on a node or vertex adds a bezier handle to every reach
+  // segment touching that point (at the segment midpoint) instead of
+  // starting a position-drag. Idempotent — clicking the same point again
+  // leaves an already-curved segment alone rather than flattening it back.
+  const addCurvesAt = (pointId) => {
     setEdges(es => es.map(ed => {
       const chain = [ed.from, ...ed.points.map(p => p.id), ed.to];
       if (!chain.includes(pointId)) return ed;
@@ -220,12 +301,9 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
       for (let i = 0; i < chain.length - 1; i++) {
         if (chain[i] !== pointId && chain[i + 1] !== pointId) continue;
         const key = chain[i] + "|" + chain[i + 1];
-        if (curves[key]) {
-          delete curves[key];
-        } else {
-          const p1 = pointWorld(chain[i], ed, nodes), p2 = pointWorld(chain[i + 1], ed, nodes);
-          curves[key] = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-        }
+        if (curves[key]) continue;
+        const p1 = pointWorld(chain[i], ed, nodes), p2 = pointWorld(chain[i + 1], ed, nodes);
+        curves[key] = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
         changed = true;
       }
       return changed ? { ...ed, curves } : ed;
@@ -234,7 +312,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
 
   const nodeDown = (e, id) => {
     e.stopPropagation();
-    if (e.altKey) { toggleCurvesAt(id); return; }
+    if (e.altKey) { addCurvesAt(id); return; }
     const p = pt(e); const n = nodes.find(x => x.id === id);
     const s = toScreen(view, n.x, n.y);
     setSelected(id); setDragNode({ id, ox: p.x - s.x, oy: p.y - s.y });
@@ -243,7 +321,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
 
   const vertexDown = (e, edgeId, pid) => {
     e.stopPropagation();
-    if (e.altKey) { toggleCurvesAt(pid); return; }
+    if (e.altKey) { addCurvesAt(pid); return; }
     const edge = edges.find(x => x.id === edgeId);
     const v = edge.points.find(x => x.id === pid);
     const p = pt(e); const s = toScreen(view, v.x, v.y);
@@ -313,6 +391,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     const onKey = (e) => {
       if (e.key === "Escape") {
         if (picker) return setPicker(null);
+        if (reachPicker) return setReachPicker(null);
         if (confirmId) return setConfirmId(null);
         if (wire) { setWire(null); setSnapTo(null); return; }
         return setSelected(null);
@@ -328,7 +407,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
     document.addEventListener("keydown", onKey);
     document.addEventListener("keyup", onKeyUp);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("keyup", onKeyUp); };
-  }, [selected, confirmId, picker, wire, spaceHeld, zoomBy]);
+  }, [selected, confirmId, picker, reachPicker, wire, spaceHeld, zoomBy]);
 
   // Middle-click, space/Pan-tool held drag always pans. A plain left-click
   // hold on empty canvas also pans, but only while nothing is selected —
@@ -344,7 +423,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
         setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
         return;
       }
-      setSelected(null); setPicker(null);
+      setSelected(null); setPicker(null); setReachPicker(null);
     }
   };
 
@@ -367,6 +446,8 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
         onMouseDown={onWrapDown}
         onMouseLeave={() => { setDragNode(null); setDragVertex(null); setDragCurve(null); setWire(null); setSnapTo(null); setHovered(null); setPanDrag(null); }}>
 
+        {showBasemap && <OsmBasemap view={view} width={wrapRef.current?.clientWidth} height={wrapRef.current?.clientHeight} />}
+
         {/* Left tool rail */}
         <div style={{
           position: "absolute", top: 12, left: 12, zIndex: 12,
@@ -388,19 +469,27 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
           ))}
         </div>
 
-        {/* Right nav controls: reset view / zoom in / toggle pan */}
+        {/* Right nav controls — click-and-hold + drag: North Star rotates
+            (double-click = true north, click = reset view), Zoom scrubs
+            in/out with vertical drag (click = one step in), Pan drags the
+            view directly (click = toggle the sticky Pan tool). Alt inverts
+            direction, Shift slows any of the three down. */}
         <div style={{ position: "absolute", top: 12, right: 12, zIndex: 12, display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            { icon: A.northStar, name: "Reset view", onClick: () => setView({ scale: 1, tx: 0, ty: 0 }), active: false },
-            { icon: A.zoomTool,  name: "Zoom in (or press =)", onClick: () => zoomBy(KEY_ZOOM_FACTOR), active: false },
-            { icon: A.pan,       name: "Pan",         onClick: () => setPanMode(m => !m), active: panMode },
+            { icon: A.northStar, tool: "rotate", name: "Rotate (drag) · double-click = true north · click = reset view", active: false,
+              iconStyle: { transform: `rotate(${view.rotation}deg)` } },
+            { icon: A.zoomTool,  tool: "zoom",   name: "Zoom (drag up/down) · click = zoom in", active: false },
+            { icon: A.pan,       tool: "pan",    name: "Pan (drag) · click = toggle Pan tool", active: panMode },
           ].map((b) => (
-            <div key={b.name} title={b.name} onClick={b.onClick} style={{
-              width: 34, height: 34, borderRadius: "50%", background: b.active ? "var(--surface-4)" : "var(--surface-1)",
-              border: "1px solid var(--border-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-            }}>
-              <Icon src={b.icon} size={18} />
+            <div key={b.name} title={b.name}
+              onMouseDown={(e) => { e.preventDefault(); setToolDrag({ tool: b.tool, sx: e.clientX, sy: e.clientY, startView: view, moved: false }); }}
+              onDoubleClick={b.tool === "rotate" ? resetNorth : undefined}
+              style={{
+                width: 34, height: 34, borderRadius: "50%", background: b.active ? "var(--surface-4)" : "var(--surface-1)",
+                border: "1px solid var(--border-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab",
+              }}>
+              <Icon src={b.icon} size={18} style={b.iconStyle} />
             </div>
           ))}
         </div>
@@ -415,6 +504,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
               ...e.points.map(v => ({ id: v.id, screen: toScreen(view, v.x, v.y) })),
               { id: e.to, screen: centerScreen(tn, view) },
             ];
+            const reachStroke = edgeColors?.[e.id] || "var(--reach)";
             return (
               <g key={e.id}>
                 {chain.slice(0, -1).map((c1, i) => {
@@ -426,7 +516,9 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
                     return (
                       <g key={i}>
                         <path d={`M ${c1.screen.x} ${c1.screen.y} Q ${cs.x} ${cs.y} ${c2.screen.x} ${c2.screen.y}`}
-                          stroke="var(--reach)" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+                          stroke={reachStroke} strokeWidth={2.5} fill="none" strokeLinecap="round"
+                          style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                          onClick={(ev) => { ev.stopPropagation(); const p = pt(ev); openReachPicker(p.x, p.y, e.id); }} />
                         <line x1={c1.screen.x} y1={c1.screen.y} x2={cs.x} y2={cs.y} stroke="var(--blue-700)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
                         <line x1={c2.screen.x} y1={c2.screen.y} x2={cs.x} y2={cs.y} stroke="var(--blue-700)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
                         <circle cx={cs.x} cy={cs.y} r={5} fill="var(--blue-700)" stroke="#fff" strokeWidth={1.5}
@@ -440,7 +532,9 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
                   const isHov = hoverSeg === segKey;
                   return (
                     <g key={i}>
-                      <line x1={c1.screen.x} y1={c1.screen.y} x2={c2.screen.x} y2={c2.screen.y} stroke="var(--reach)" strokeWidth={2.5} strokeLinecap="round" />
+                      <line x1={c1.screen.x} y1={c1.screen.y} x2={c2.screen.x} y2={c2.screen.y} stroke={reachStroke} strokeWidth={2.5} strokeLinecap="round"
+                        style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                        onClick={(ev) => { ev.stopPropagation(); const p = pt(ev); openReachPicker(p.x, p.y, e.id); }} />
                       <circle cx={mx} cy={my} r={7} fill="transparent" style={{ pointerEvents: "all", cursor: "copy" }}
                         onMouseEnter={() => setHoverSeg(segKey)} onMouseLeave={() => setHoverSeg(null)}
                         onClick={() => addVertex(e.id, i, toWorld(view, mx, my))} />
@@ -457,7 +551,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
                 {e.points.map(v => {
                   const s = toScreen(view, v.x, v.y);
                   return (
-                    <circle key={v.id} cx={s.x} cy={s.y} r={5} fill="#fff" stroke="var(--reach)" strokeWidth={2}
+                    <circle key={v.id} cx={s.x} cy={s.y} r={5} fill="#fff" stroke={reachStroke} strokeWidth={2}
                       style={{ pointerEvents: "all", cursor: dragVertex?.pid === v.id ? "grabbing" : "grab" }}
                       onMouseDown={(ev) => vertexDown(ev, e.id, v.id)}
                       onDoubleClick={(ev) => vertexDouble(ev, e.id, v.id)} />
@@ -474,6 +568,7 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
           const s = toScreen(view, n.x, n.y);
           const sz = sizeOf(n);
           const isHov = hovered === n.id, isSel = selected === n.id, isSnap = snapTo === n.id;
+          const isConfluence = (degree?.[n.id] || 0) >= 3;
           const showPorts = isHov && !dragNode && !dragVertex && !dragCurve && !panDrag;
           return (
             <div key={n.id}>
@@ -481,6 +576,13 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
                 <div style={{ position: "absolute", left: s.x + sz / 2, top: s.y - 16, transform: "translateX(-50%)", fontSize: "var(--fs-xxs)", color: "var(--text-secondary)", whiteSpace: "nowrap", pointerEvents: "none" }}>
                   {n.label}
                 </div>
+              )}
+              {/* Confluence/diverging-point ring — flags where 3+ reaches meet at this unit */}
+              {isConfluence && (
+                <div title="Confluence: multiple reaches meet here" style={{
+                  position: "absolute", left: s.x - 5, top: s.y - 5, width: sz + 10, height: sz + 10,
+                  borderRadius: "50%", border: "1.5px dashed var(--text-tertiary)", pointerEvents: "none",
+                }} />
               )}
               <div onMouseDown={e => nodeDown(e, n.id)} title="Alt/Option-click to add a curve handle" style={{ position: "absolute", left: s.x, top: s.y, cursor: dragNode?.id === n.id ? "grabbing" : "grab" }}>
                 <NodeBox iconKey={n.icon} shape={n.shape} selected={isSel} snap={isSnap} size={sz} />
@@ -497,6 +599,22 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
 
         {/* Quick-add picker: opened on vertex double-click or a connector dropped on empty canvas */}
         {picker && <NodePicker x={picker.x} y={picker.y} onPick={handlePick} onClose={() => setPicker(null)} />}
+
+        {/* Reach picker: opened by clicking a reach line, to reassign the whole clicked stretch */}
+        {reachPicker && (
+          <ReachPicker
+            x={reachPicker.x} y={reachPicker.y}
+            options={reachRegistry}
+            currentKey={reachKeyOfEdge?.[reachPicker.edgeId]}
+            onPick={(key) => {
+              const currentKey = reachKeyOfEdge?.[reachPicker.edgeId];
+              const groupEdgeIds = (currentKey && edgesByReach?.[currentKey]) || [reachPicker.edgeId];
+              onReassignReach(groupEdgeIds, key);
+              setReachPicker(null);
+            }}
+            onClose={() => setReachPicker(null)}
+          />
+        )}
 
         {/* Delete confirmation (replaces the old inline delete button) */}
         {confirmNode && (() => {
@@ -524,8 +642,23 @@ export default function GisCanvas({ nodes, setNodes, edges, setEdges, selected, 
 
         {/* Hint */}
         <div style={{ position: "absolute", left: 52, bottom: 12, fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", pointerEvents: "none" }}>
-          Drag a unit onto the canvas (hold Tab to cycle the type) · Scroll or +/- to zoom · Click-hold empty canvas to pan · Click a reach to add a point · Alt/Option-click a point to curve it
+          Drag a unit onto the canvas (hold Tab to cycle the type) · Scroll or +/- to zoom · Click-hold empty canvas to pan · Click reach midpoint to add a point, elsewhere to reassign it · Alt/Option-click a point to curve it
         </div>
+
+        {/* Demo-only OpenStreetMap backdrop toggle */}
+        <button onClick={() => setShowBasemap(v => !v)} title="Toggle an OpenStreetMap backdrop (demo only, not georeferenced)"
+          style={{
+            position: "absolute", right: 12, bottom: 12, zIndex: 12,
+            height: 26, padding: "0 10px", borderRadius: 13,
+            display: "flex", alignItems: "center", gap: 5,
+            background: showBasemap ? "var(--surface-brand)" : "var(--surface-1)",
+            border: "1px solid var(--border-primary)", boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            cursor: "pointer", fontSize: "var(--fs-xxs)", fontWeight: 500,
+            color: showBasemap ? "#fff" : "var(--text-primary)",
+          }}>
+          <Icon src={A.layers} size={12} style={showBasemap ? { filter: "brightness(0) invert(1)" } : undefined} />
+          OSM
+        </button>
       </div>
     </div>
   );

@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import OSWindow from "./components/OSWindow.jsx";
 import ModeRibbon from "./components/ModeRibbon.jsx";
 import ProjectPanel from "./components/ProjectPanel.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import NetworkPanel from "./components/NetworkPanel.jsx";
 import { A, Icon } from "./assets.jsx";
+import { resolveReaches } from "./reaches.js";
 
 // Nodes/edges are owned here (not inside GisCanvas) so the live network list
 // in NetworkPanel can mirror exactly what's on the canvas.
@@ -21,7 +22,31 @@ const INIT_NODES = [
 const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
 
+const PANEL_MIN = 180, PANEL_MAX = 520;
+
+// Thin vertical drag bar between a side panel and the canvas; `onDrag`
+// receives the per-move pixel delta (positive = pointer moved right).
+function ResizeHandle({ onDrag }) {
+  const onDown = (e) => {
+    e.preventDefault();
+    let lastX = e.clientX;
+    const onMove = (ev) => { onDrag(ev.clientX - lastX); lastX = ev.clientX; };
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  return (
+    <div onMouseDown={onDown} title="Drag to resize" style={{
+      width: 10, flexShrink: 0, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <div style={{ width: 2, height: 32, borderRadius: 1, background: "var(--border-secondary)" }} />
+    </div>
+  );
+}
+
 export default function App() {
+  const [projectW, setProjectW] = useState(232);
+  const [networkW, setNetworkW] = useState(232);
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Shared with NetworkPanel so a row click selects the node on the canvas.
@@ -31,6 +56,15 @@ export default function App() {
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
+
+  // Reaches (map view line colour + table grouping) computed once here so
+  // GisCanvas and NetworkPanel agree on exactly the same grouping. Users can
+  // manually reassign a stretch (edge.reach) which overrides the automatic
+  // topology-based grouping — see reaches.js.
+  const { registry, edgeColors, edgesByKey, resolvedKeyByEdge, degree } = useMemo(() => resolveReaches(nodes, edges), [nodes, edges]);
+  const reassignReach = (edgeIds, reachKey) => {
+    setEdges(es => es.map(e => edgeIds.includes(e.id) ? { ...e, reach: reachKey || undefined } : e));
+  };
 
   useEffect(() => {
     if (!dragActive) return;
@@ -65,14 +99,19 @@ export default function App() {
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-4)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} />
       <ModeRibbon onBeginDrag={beginDrag} />
-      <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", gap: 8, padding: 8 }}>
-        <ProjectPanel />
+      <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
+        <ProjectPanel width={projectW} />
+        <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
         <GisCanvas
           nodes={nodes} setNodes={setNodes} edges={edges} setEdges={setEdges}
           selected={selected} setSelected={setSelected}
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+          edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
+          reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
         />
-        <NetworkPanel nodes={nodes} selected={selected} setSelected={setSelected} />
+        <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
+        <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
+          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
       </div>
 
       {ribbonDrag && (

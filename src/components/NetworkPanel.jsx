@@ -5,6 +5,25 @@ import { A, Icon } from "../assets.jsx";
 const nicRows = ["M014","M016","M017","M018","M019","M020","M021","M022","M023","M024","M025","M026","M027","M028","M029"]
   .map(l => ({ label: l, y: "Y", flow: "200.000" }));
 
+// A solid dot for a unit on a single reach; a conic-gradient wedge marker
+// where multiple reaches meet (a diverging/converging confluence point).
+function ReachMark({ reaches }) {
+  if (reaches.length === 0) {
+    return <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--border-secondary)", flexShrink: 0 }} />;
+  }
+  if (reaches.length === 1) {
+    return <span title={reaches[0].name} style={{ width: 6, height: 6, borderRadius: "50%", background: reaches[0].color, flexShrink: 0 }} />;
+  }
+  const n = reaches.length;
+  const stops = reaches.map((r, i) => `${r.color} ${(i / n) * 100}% ${((i + 1) / n) * 100}%`).join(", ");
+  return (
+    <span title={`Confluence: ${reaches.map((r) => r.name).join(" + ")} meet here`} style={{
+      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+      background: `conic-gradient(${stops})`, boxShadow: "0 0 0 1px #fff",
+    }} />
+  );
+}
+
 function PanelHeader({ icon, title }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "4px 8px 4px 4px", flexShrink: 0 }}>
@@ -55,10 +74,21 @@ function Row({ children, zebra, selected, onClick }) {
 
 const cellStyle = { fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
-export default function NetworkPanel({ nodes, selected, setSelected }) {
+export default function NetworkPanel({ nodes, edges, selected, setSelected, reachRegistry, reachKeyOfEdge, width = 232 }) {
   // The divider above "Network initial conditions" drags to resize the
   // top table's viewport height.
   const [topH, setTopH] = useState(320);
+  const registryByKey = Object.fromEntries((reachRegistry || []).map((r) => [r.key, r]));
+  const reachesForNode = (nodeId) => {
+    const keys = new Set();
+    edges.forEach((e) => {
+      if (e.from === nodeId || e.to === nodeId) {
+        const k = reachKeyOfEdge?.[e.id];
+        if (k) keys.add(k);
+      }
+    });
+    return [...keys].map((k) => registryByKey[k]).filter(Boolean);
+  };
   const onDividerDown = (e) => {
     e.preventDefault();
     const startY = e.clientY, startH = topH;
@@ -70,7 +100,7 @@ export default function NetworkPanel({ nodes, selected, setSelected }) {
 
   return (
     <div style={{
-      width: 232, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column",
+      width, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column",
       background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4, overflow: "hidden",
     }}>
       <PanelHeader icon={A.network} title="1D Network" />
@@ -101,16 +131,23 @@ export default function NetworkPanel({ nodes, selected, setSelected }) {
         { name: "Sub unit", style: { width: 80 } },
       ]} />
       <div style={{ display: "flex", flexDirection: "column", overflow: "auto", flexShrink: 0, height: topH, borderBottom: "1px solid var(--border-primary)" }}>
-        {nodes.map((n, i) => (
-          <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)}>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, width: 72, flexShrink: 0 }}>
-              <Icon src={A[n.icon]} size={12} />
-              <span style={{ ...cellStyle }}>{n.label}</span>
-            </div>
-            <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0 }}>{n.unitLabel || n.icon}</span>
-            <span style={{ ...cellStyle, width: 80, flexShrink: 0 }}>Section</span>
-          </Row>
-        ))}
+        {nodes.map((n, i) => {
+          const reaches = reachesForNode(n.id);
+          const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
+          return (
+            <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, width: 72, flexShrink: 0 }}>
+                <Icon src={A[n.icon]} size={12} />
+                <span style={{ ...cellStyle }}>{n.label}</span>
+              </div>
+              <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                <ReachMark reaches={reaches} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{n.unitLabel || n.icon}</span>
+              </span>
+              <span style={{ ...cellStyle, width: 80, flexShrink: 0 }} title={reaches.map((r) => r.name).join(", ")}>{subLabel}</span>
+            </Row>
+          );
+        })}
       </div>
 
       {/* Drag to resize the table above */}
