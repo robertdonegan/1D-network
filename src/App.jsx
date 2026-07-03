@@ -101,23 +101,19 @@ export default function App() {
       <OSWindow onBeginDrag={beginDrag} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
-        <ProjectPanel width={projectW} empty={mode === "Home"} />
+        <ProjectPanel width={projectW} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
         <GisCanvas
-          nodes={mode === "FM 1D" ? nodes : []} setNodes={setNodes}
-          edges={mode === "FM 1D" ? edges : []} setEdges={setEdges}
+          nodes={nodes} setNodes={setNodes}
+          edges={edges} setEdges={setEdges}
           selected={selected} setSelected={setSelected}
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
           edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
           reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
         />
-        {mode === "FM 1D" && (
-          <>
-            <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
-            <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
-              edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
-          </>
-        )}
+        <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
+        <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
+          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
       </div>
 
       {ribbonDrag && (

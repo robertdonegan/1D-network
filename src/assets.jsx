@@ -58,6 +58,12 @@ import homeFathom from "./assets/home-fathom.svg";
 import homeOpenProject from "./assets/home-open-project.svg";
 import homeNewProject from "./assets/home-new-project.svg";
 
+import mouseLeft from "./assets/mouse-left.svg";
+import mouseScroll from "./assets/mouse-scroll.svg";
+import mouseRight from "./assets/mouse-right.svg";
+import mouseLeftDrag from "./assets/mouse-left-drag.svg";
+import mouseLeftDrag2 from "./assets/mouse-left-drag2.svg";
+
 export const A = {
   logo, search, add, check, minimise, dock, cancel, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
@@ -69,6 +75,7 @@ export const A = {
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
+  mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
 };
 
 // Small helper for a fixed-size icon <img>

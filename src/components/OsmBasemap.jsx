@@ -10,6 +10,11 @@ const TILE_SIZE = 256;
 const BASE_ZOOM = 15;
 const ANCHOR_LON = -2.2, ANCHOR_LAT = 52.058;
 
+// Implied ground resolution at the anchor (Web Mercator), so the GIS
+// footer's scale bar can agree with the OSM backdrop's apparent scale even
+// when the backdrop itself is toggled off.
+export const METERS_PER_WORLD_UNIT = (156543.03392 * Math.cos((ANCHOR_LAT * Math.PI) / 180)) / 2 ** BASE_ZOOM;
+
 function lonLatToTilePx(lon, lat, zoom) {
   const n = 2 ** zoom;
   const x = ((lon + 180) / 360) * n * TILE_SIZE;
@@ -54,12 +59,6 @@ export default function OsmBasemap({ view, width, height }) {
             src={`https://tile.openstreetmap.org/${BASE_ZOOM}/${wrappedX}/${ty}.png`}
             style={{ position: "absolute", left: tx * TILE_SIZE - anchorPx.x, top: ty * TILE_SIZE - anchorPx.y, opacity: 0.85 }} />
         ))}
-      </div>
-      <div style={{
-        position: "absolute", left: 6, bottom: 4, fontSize: 9, color: "#333",
-        background: "rgba(255,255,255,0.7)", padding: "0 4px", borderRadius: 2,
-      }}>
-        © OpenStreetMap contributors
       </div>
     </div>
   );

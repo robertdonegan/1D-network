@@ -34,6 +34,10 @@
   --red-700: #e1455b;
   --orange-600: #fe7e00;
 
+  /* Calculation Point component states (Flood Component Library) */
+  --node-selected-fill: #ffca8f;   /* core/orange/p3-orange */
+  --node-selected-border: #ff6100; /* core/orange/p1-orange */
+
   /* spacing scale */
   --sp-none: 0px;
   --sp-xxs: 2px;
