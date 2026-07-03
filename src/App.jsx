@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import OSWindow from "./components/OSWindow.jsx";
-import ModeRibbon from "./components/ModeRibbon.jsx";
+import ModeRibbon, { modes } from "./components/ModeRibbon.jsx";
 import ProjectPanel from "./components/ProjectPanel.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import NetworkPanel from "./components/NetworkPanel.jsx";
+import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
 
@@ -46,6 +47,7 @@ function ResizeHandle({ onDrag }) {
 
 export default function App() {
   const [mode, setMode] = useState("FM 1D");
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [projectW, setProjectW] = useState(232);
   const [networkW, setNetworkW] = useState(232);
   const [nodes, setNodes] = useState(INIT_NODES);
@@ -61,11 +63,47 @@ export default function App() {
   // Reaches (map view line colour + table grouping) computed once here so
   // GisCanvas and NetworkPanel agree on exactly the same grouping. Users can
   // manually reassign a stretch (edge.reach) which overrides the automatic
-  // topology-based grouping — see reaches.js.
-  const { registry, edgeColors, edgesByKey, resolvedKeyByEdge, degree } = useMemo(() => resolveReaches(nodes, edges), [nodes, edges]);
+  // topology-based grouping — see reaches.js. Custom names layer on top of
+  // the auto "Reach N" names, keyed by the same stable reach key.
+  const [reachNames, setReachNames] = useState({});
+  const { registry: autoRegistry, edgeColors, edgesByKey, resolvedKeyByEdge, degree } = useMemo(() => resolveReaches(nodes, edges), [nodes, edges]);
+  const registry = useMemo(
+    () => autoRegistry.map(r => reachNames[r.key] ? { ...r, name: reachNames[r.key] } : r),
+    [autoRegistry, reachNames],
+  );
   const reassignReach = (edgeIds, reachKey) => {
     setEdges(es => es.map(e => edgeIds.includes(e.id) ? { ...e, reach: reachKey || undefined } : e));
   };
+  const renameReach = (key, name) => {
+    setReachNames(rn => ({ ...rn, [key]: name }));
+  };
+
+  // Keyboard Shortcuts spec (FM v8.0): General section — mode tabs, search
+  // focus, and this shortcuts reference itself.
+  useEffect(() => {
+    const isTyping = (e) => {
+      const t = (e.target.tagName || "").toLowerCase();
+      return t === "input" || t === "textarea";
+    };
+    const onKey = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setShowShortcuts((v) => !v);
+        return;
+      }
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        document.getElementById("fm-global-search")?.focus();
+        return;
+      }
+      if (e.ctrlKey && !e.shiftKey && !isTyping(e) && /^[1-9]$/.test(e.key)) {
+        const target = modes[Number(e.key) - 1];
+        if (target) { e.preventDefault(); setMode(target); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!dragActive) return;
@@ -98,7 +136,7 @@ export default function App() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-4)", overflow: "hidden" }}>
-      <OSWindow onBeginDrag={beginDrag} />
+      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
         <ProjectPanel width={projectW} />
@@ -113,7 +151,7 @@ export default function App() {
         />
         <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
         <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
-          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} />
+          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} onRenameReach={renameReach} />
       </div>
 
       {ribbonDrag && (
@@ -132,6 +170,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }

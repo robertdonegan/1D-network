@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 
-const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", "GIS", "Simulation", "Results", "Favourites"];
+export const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", "GIS", "Simulation", "Results", "Favourites"];
 
 // Home tab's ribbon — project-level actions rather than 1D network units,
 // so none of these are draggable onto the canvas.

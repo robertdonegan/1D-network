@@ -8,7 +8,7 @@ const ALL_ITEMS = flattenRibbonItems();
 // `onBeginDrag(e, items, index)` — same signature ModeRibbon uses, so a
 // search result can be picked up and dropped onto the GIS canvas exactly
 // like a ribbon leaf item.
-export default function OSWindow({ onBeginDrag }) {
+export default function OSWindow({ onBeginDrag, onOpenShortcuts }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const boxRef = useRef(null);
@@ -37,10 +37,13 @@ export default function OSWindow({ onBeginDrag }) {
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
           {menus.map(m => (
-            <div key={m} style={{
-              height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-              padding: "0 8px", fontSize: "var(--fs-xs)", cursor: "default", whiteSpace: "nowrap",
-            }}>{m}</div>
+            <div key={m}
+              onClick={m === "Help" ? onOpenShortcuts : undefined}
+              title={m === "Help" ? "Keyboard Shortcuts (Ctrl+Shift+K)" : undefined}
+              style={{
+                height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "0 8px", fontSize: "var(--fs-xs)", cursor: m === "Help" ? "pointer" : "default", whiteSpace: "nowrap",
+              }}>{m}</div>
           ))}
         </div>
       </div>
@@ -54,10 +57,11 @@ export default function OSWindow({ onBeginDrag }) {
         }}>
           <Icon src={A.search} size={16} />
           <input
+            id="fm-global-search"
             value={q}
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder="Search tools and functions"
+            placeholder="Search tools and functions (Ctrl+K)"
             style={{
               flex: "1 0 0", minWidth: 0, border: "none", outline: "none", background: "transparent",
               font: "inherit", fontSize: "var(--fs-xs)", color: "var(--text-primary)",

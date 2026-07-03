@@ -60,10 +60,10 @@ function ColHeader({ cols }) {
   );
 }
 
-function Row({ children, zebra, selected, onClick }) {
+function Row({ children, zebra, selected, onClick, indent }) {
   return (
     <div onClick={onClick} style={{
-      display: "flex", alignItems: "center", gap: 4, padding: 8, width: "100%",
+      display: "flex", alignItems: "center", gap: 4, padding: 8, paddingLeft: 8 + (indent || 0), width: "100%",
       background: selected ? "rgba(70,138,243,0.14)" : zebra ? "var(--surface-3)" : "var(--surface-1)",
       borderBottom: "1px solid var(--border-primary)",
       borderLeft: selected ? "2px solid var(--blue-700)" : "2px solid transparent",
@@ -72,23 +72,95 @@ function Row({ children, zebra, selected, onClick }) {
   );
 }
 
+// Collapsible group header for one reach — click to expand/collapse, click
+// the name (or the edit icon) to rename it in place.
+function ReachHeader({ reach, count, collapsed, onToggle, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(reach.name);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== reach.name) onRename(trimmed);
+    setEditing(false);
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6, padding: "6px 8px", width: "100%",
+      background: "var(--surface-2)", borderBottom: "1px solid var(--border-primary)", cursor: "pointer",
+    }} onClick={() => !editing && onToggle()}>
+      <Icon src={A.keyDown} size={12} style={{ transform: collapsed ? "rotate(-90deg)" : "none", flexShrink: 0 }} />
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: reach.color, flexShrink: 0 }} />
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") { setDraft(reach.name); setEditing(false); } }}
+          style={{
+            flex: "1 0 0", minWidth: 0, font: "inherit", fontSize: "var(--fs-xs)", fontWeight: 500,
+            border: "1px solid var(--blue-700)", borderRadius: 2, padding: "1px 4px",
+          }}
+        />
+      ) : (
+        <span
+          onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}
+          title="Double-click to rename"
+          style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {reach.name}
+        </span>
+      )}
+      <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", flexShrink: 0 }}>{count}</span>
+      {!editing && (
+        <button onClick={(e) => { e.stopPropagation(); setEditing(true); }} title="Rename reach"
+          style={{ border: "none", background: "transparent", cursor: "pointer", padding: 2, display: "flex", flexShrink: 0 }}>
+          <Icon src={A.edit} size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 const cellStyle = { fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
-export default function NetworkPanel({ nodes, edges, selected, setSelected, reachRegistry, reachKeyOfEdge, width = 232 }) {
+export default function NetworkPanel({ nodes, edges, selected, setSelected, reachRegistry, reachKeyOfEdge, onRenameReach, width = 232 }) {
   // The divider above "Network initial conditions" drags to resize the
   // top table's viewport height.
   const [topH, setTopH] = useState(320);
+  const [collapsed, setCollapsed] = useState({});
   const registryByKey = Object.fromEntries((reachRegistry || []).map((r) => [r.key, r]));
+
   const reachesForNode = (nodeId) => {
-    const keys = new Set();
+    const keys = [];
     edges.forEach((e) => {
       if (e.from === nodeId || e.to === nodeId) {
         const k = reachKeyOfEdge?.[e.id];
-        if (k) keys.add(k);
+        if (k && !keys.includes(k)) keys.push(k);
       }
     });
-    return [...keys].map((k) => registryByKey[k]).filter(Boolean);
+    return keys.map((k) => registryByKey[k]).filter(Boolean);
   };
+
+  // Group nodes under the first reach they touch (a confluence node still
+  // shows every reach it's part of via its ReachMark wedge).
+  const groups = [];
+  const groupByKey = {};
+  const ungrouped = { key: null, reach: { name: "Ungrouped", color: "var(--border-secondary)" }, rows: [] };
+  nodes.forEach((n) => {
+    const reaches = reachesForNode(n.id);
+    if (reaches.length === 0) { ungrouped.rows.push({ n, reaches }); return; }
+    const primary = reaches[0];
+    if (!groupByKey[primary.key]) {
+      groupByKey[primary.key] = { key: primary.key, reach: primary, rows: [] };
+      groups.push(groupByKey[primary.key]);
+    }
+    groupByKey[primary.key].rows.push({ n, reaches });
+  });
+  if (ungrouped.rows.length) groups.push(ungrouped);
+
   const onDividerDown = (e) => {
     e.preventDefault();
     const startY = e.clientY, startH = topH;
@@ -124,28 +196,42 @@ export default function NetworkPanel({ nodes, edges, selected, setSelected, reac
         </div>
       </div>
 
-      {/* Network table — mirrors the live nodes on the canvas; click a row to select it there too */}
+      {/* Network table — mirrors the live nodes on the canvas, grouped by reach.
+          Click a group header to collapse/expand; double-click its name to rename it. */}
       <ColHeader cols={[
         { name: "Label", style: { width: 72 } },
         { name: "Unit", style: { flex: "1 0 0" } },
         { name: "Sub unit", style: { width: 80 } },
       ]} />
       <div style={{ display: "flex", flexDirection: "column", overflow: "auto", flexShrink: 0, height: topH, borderBottom: "1px solid var(--border-primary)" }}>
-        {nodes.map((n, i) => {
-          const reaches = reachesForNode(n.id);
-          const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
+        {groups.map((g) => {
+          const isCollapsed = !!collapsed[g.key ?? "__ungrouped"];
           return (
-            <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, width: 72, flexShrink: 0 }}>
-                <Icon src={A[n.icon]} size={12} />
-                <span style={{ ...cellStyle }}>{n.label}</span>
-              </div>
-              <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}>
-                <ReachMark reaches={reaches} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{n.unitLabel || n.icon}</span>
-              </span>
-              <span style={{ ...cellStyle, width: 80, flexShrink: 0 }} title={reaches.map((r) => r.name).join(", ")}>{subLabel}</span>
-            </Row>
+            <div key={g.key ?? "__ungrouped"}>
+              <ReachHeader
+                reach={g.reach}
+                count={g.rows.length}
+                collapsed={isCollapsed}
+                onToggle={() => setCollapsed((c) => ({ ...c, [g.key ?? "__ungrouped"]: !c[g.key ?? "__ungrouped"] }))}
+                onRename={(name) => g.key && onRenameReach(g.key, name)}
+              />
+              {!isCollapsed && g.rows.map(({ n, reaches }, i) => {
+                const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
+                return (
+                  <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)} indent={12}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, width: 60, flexShrink: 0 }}>
+                      <Icon src={A[n.icon]} size={12} />
+                      <span style={{ ...cellStyle }}>{n.label}</span>
+                    </div>
+                    <span style={{ ...cellStyle, flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 5 }}>
+                      <ReachMark reaches={reaches} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{n.unitLabel || n.icon}</span>
+                    </span>
+                    <span style={{ ...cellStyle, width: 80, flexShrink: 0 }} title={reaches.map((r) => r.name).join(", ")}>{subLabel}</span>
+                  </Row>
+                );
+              })}
+            </div>
           );
         })}
       </div>

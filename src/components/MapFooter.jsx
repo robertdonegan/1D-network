@@ -19,6 +19,32 @@ function fmt(value, unit) {
   return `${value.toFixed(value < 10 ? 1 : 0)}${unit}`;
 }
 
+// Simulated what3words — we have no API access, so this derives a stable
+// (not random-per-render) ///word.word.word from the world position using
+// ~3m grid cells, the same granularity the real service uses.
+const W3W_WORDS = [
+  "apple", "river", "stone", "cloud", "tiger", "willow", "bridge", "meadow",
+  "copper", "forest", "harbor", "island", "jungle", "kettle", "lantern", "marble",
+  "nectar", "orchid", "pencil", "quartz", "ribbon", "silver", "temple", "umbrella",
+  "velvet", "walnut", "canyon", "desert", "ember", "fossil", "granite", "hollow",
+  "ivory", "jasper", "kernel", "lagoon", "mantle", "needle", "opal", "pebble",
+  "quiver", "raven", "summit", "thicket", "unity", "valley", "willow2", "yonder",
+  "zephyr", "amber", "birch", "cedar", "delta", "ember2", "flint", "glacier",
+  "heron", "indigo", "juniper", "knoll", "lupine", "moss", "nutmeg", "olive",
+];
+function hash2(a, b) {
+  let h = Math.imul(a, 374761393) + Math.imul(b, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return Math.abs(h ^ (h >>> 16));
+}
+function simulatedW3W(wx, wy) {
+  const cx = Math.floor(wx / 3), cy = Math.floor(wy / 3);
+  const w1 = W3W_WORDS[hash2(cx, cy) % W3W_WORDS.length];
+  const w2 = W3W_WORDS[hash2(cy, cx + 1) % W3W_WORDS.length];
+  const w3 = W3W_WORDS[hash2(cx + 1, cy + 1) % W3W_WORDS.length];
+  return `///${w1}.${w2}.${w3}`;
+}
+
 function GuideItem({ icon, label }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
@@ -52,9 +78,12 @@ export default function MapFooter({ cursorWorld, scale, guideMode = "default", s
         background: "var(--surface-1)", borderTop: "1px solid var(--border-primary)",
         borderRadius: "0 0 4px 4px",
       }}>
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 11, fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 11, fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span>X:{cursorWorld ? cursorWorld.x.toFixed(2) : "—"}</span>
           <span>Y:{cursorWorld ? cursorWorld.y.toFixed(2) : "—"}</span>
+          <span title="Simulated — no what3words API configured" style={{ color: "var(--surface-brand)" }}>
+            {cursorWorld ? simulatedW3W(cursorWorld.x, cursorWorld.y) : "///—.—.—"}
+          </span>
         </div>
         <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 11 }}>
           {guideMode === "zoomDrag" ? (

@@ -128,10 +128,10 @@ function NodeBox({ iconKey, shape, selected, hovered, snap, size }) {
 
 // Left vertical tool rail (select / rectangle / measure / query / comment / edit)
 const railTools = [
-  { icon: A.cursorSelect, name: "Select" },
-  { icon: A.rectangleSelect, name: "Rectangle select" },
-  { icon: A.measureTool, name: "Measure" },
-  { icon: A.pointQuery, name: "Point query" },
+  { icon: A.cursorSelect, name: "Select (V)" },
+  { icon: A.rectangleSelect, name: "Group select (G)" },
+  { icon: A.measureTool, name: "Measure (M)" },
+  { icon: A.pointQuery, name: "Query (Q)" },
   { icon: A.comment, name: "Comment" },
   { icon: A.edit, name: "Edit" },
 ];
@@ -655,6 +655,29 @@ export default function GisCanvas({
         e.preventDefault();
         zoomBy(1 / KEY_ZOOM_FACTOR);
       }
+      // Keyboard Shortcuts spec (FM v8.0): View/GUI/FM 1D sections.
+      const noMods = !e.ctrlKey && !e.metaKey && !e.altKey;
+      if (e.key === "0" && noMods && !isTyping(e)) {
+        e.preventDefault();
+        resetView();
+      }
+      if (noMods && !isTyping(e)) {
+        const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
+        if (toolKey !== undefined) { e.preventDefault(); setActiveTool(toolKey); }
+        if (e.key.toLowerCase() === "x") { e.preventDefault(); setPanMode((m) => !m); }
+      }
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "d" && !isTyping(e)) {
+        e.preventDefault();
+        setSelected(null);
+      }
+      if ((e.key === "," || e.key === ".") && selected && !isTyping(e)) {
+        e.preventDefault();
+        const i = nodes.findIndex((n) => n.id === selected);
+        if (i !== -1) {
+          const next = e.key === "," ? Math.max(0, i - 1) : Math.min(nodes.length - 1, i + 1);
+          setSelected(nodes[next].id);
+        }
+      }
     };
     const onKeyUp = (e) => {
       if (e.code === "Space") setSpaceHeld(false);
@@ -665,7 +688,7 @@ export default function GisCanvas({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("keyup", onKeyUp);
     };
-  }, [selected, confirmId, picker, reachPicker, wire, spaceHeld, zoomBy]);
+  }, [selected, confirmId, picker, reachPicker, wire, spaceHeld, zoomBy, resetView, nodes]);
 
   // Middle-click, space/Pan-tool held drag always pans. A plain left-click
   // hold on empty canvas also pans, but only while nothing is selected —
@@ -704,11 +727,6 @@ export default function GisCanvas({
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        border: dropHint
-          ? "1px dashed var(--blue-700)"
-          : "1px solid var(--border-primary)",
-        borderRadius: 4,
-        overflow: "hidden",
       }}
     >
       <div
@@ -722,6 +740,10 @@ export default function GisCanvas({
           backgroundSize: `${28 * view.scale}px ${28 * view.scale}px`,
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           backgroundColor: "#eef0ec",
+          border: dropHint
+            ? "1px dashed var(--blue-700)"
+            : "1px solid var(--border-primary)",
+          borderRadius: 4,
           cursor: ribbonDrag
             ? "copy"
             : panDrag
@@ -828,7 +850,7 @@ export default function GisCanvas({
             {
               icon: A.northStar,
               tool: "rotate",
-              name: "Rotate (drag) · double-click = true north · click = reset view",
+              name: "Rotate (drag) · double-click = true north · click = reset view (0)",
               active: Math.abs(((view.rotation % 360) + 360) % 360) > 0.5,
               iconStyle: { transform: `rotate(${view.rotation}deg)` },
             },
@@ -841,7 +863,7 @@ export default function GisCanvas({
             {
               icon: A.pan,
               tool: "pan",
-              name: "Pan (drag) · click = toggle Pan tool",
+              name: "Pan (drag) · click = toggle Pan tool (X)",
               active: panMode,
             },
           ].map((b) => {
@@ -1263,23 +1285,6 @@ export default function GisCanvas({
             );
           })()}
 
-        {/* Hint */}
-        <div
-          style={{
-            position: "absolute",
-            left: 52,
-            bottom: 12,
-            fontSize: "var(--fs-xxs)",
-            color: "var(--text-tertiary)",
-            pointerEvents: "none",
-          }}
-        >
-          Drag a unit onto the canvas (hold Tab to cycle the type) · Scroll or
-          +/- to zoom · Click-hold empty canvas to pan · Click reach midpoint to
-          add a point, elsewhere to reassign it · Alt/Option-click a point to
-          curve it
-        </div>
-
         {/* Demo-only OpenStreetMap backdrop toggle */}
         <button
           onClick={() => setShowBasemap((v) => !v)}
@@ -1287,7 +1292,7 @@ export default function GisCanvas({
           style={{
             position: "absolute",
             right: 12,
-            bottom: 12,
+            bottom: 56,
             zIndex: 12,
             height: 26,
             padding: "0 10px",
@@ -1315,14 +1320,18 @@ export default function GisCanvas({
           />
           OSM
         </button>
-      </div>
 
-      <MapFooter
-        cursorWorld={cursorWorld}
-        scale={view.scale}
-        guideMode={toolDrag?.tool === "zoom" ? "zoomDrag" : "default"}
-        showAttribution={showBasemap}
-      />
+        {/* Scale bar + coordinate/guide status bar, pinned over the bottom
+            of the map rather than reserving its own layout space. */}
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 12 }}>
+          <MapFooter
+            cursorWorld={cursorWorld}
+            scale={view.scale}
+            guideMode={toolDrag?.tool === "zoom" ? "zoomDrag" : "default"}
+            showAttribution={showBasemap}
+          />
+        </div>
+      </div>
     </div>
   );
 }
