@@ -293,7 +293,10 @@ export default function GisCanvas({
   // selects the whole group and drags every member together.
   const groupBoxDown = (e, g) => {
     e.stopPropagation();
-    if (e.altKey) return;
+    if (e.altKey) {
+      setSelected((sel) => sel.filter((x) => !g.memberIds.includes(x)));
+      return;
+    }
     const p = pt(e);
     setSelected(g.memberIds);
     const startWorld = toWorld(view, p.x, p.y);
@@ -621,10 +624,11 @@ export default function GisCanvas({
     [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag, marquee, nodes],
   );
 
-  // Alt/Option+click on a node or vertex adds a bezier handle to every reach
-  // segment touching that point (at the segment midpoint) instead of
-  // starting a position-drag. Idempotent — clicking the same point again
-  // leaves an already-curved segment alone rather than flattening it back.
+  // Alt/Option+click on a vertex adds a bezier handle to every reach segment
+  // touching that point (at the segment midpoint) instead of starting a
+  // position-drag. Idempotent — clicking the same point again leaves an
+  // already-curved segment alone rather than flattening it back. (Alt+click
+  // on a node itself is reserved for deselecting it — see nodeDown.)
   const addCurvesAt = (pointId) => {
     setEdges((es) =>
       es.map((ed) => {
@@ -646,13 +650,29 @@ export default function GisCanvas({
     );
   };
 
+  // Alt/Option+click directly on a reach segment bends *that* segment,
+  // bowing toward the clicked point — idempotent, same as addCurvesAt.
+  const addCurveToSegment = (edgeId, key, screenPoint) => {
+    const w = toWorld(view, screenPoint.x, screenPoint.y);
+    setEdges((es) =>
+      es.map((ed) =>
+        ed.id !== edgeId || ed.curves?.[key]
+          ? ed
+          : { ...ed, curves: { ...(ed.curves || {}), [key]: { x: w.x, y: w.y } } },
+      ),
+    );
+  };
+
   const nodeDown = (e, id) => {
     e.stopPropagation();
+    // Alt+click deselects this specific unit (Keyboard Shortcuts spec —
+    // "Deselect: Left-click, Alt+Left-click"). Ctrl/Cmd+click and
+    // Shift+click both add-or-toggle it in the current multi-selection.
     if (e.altKey) {
-      addCurvesAt(id);
+      setSelected((sel) => sel.filter((x) => x !== id));
       return;
     }
-    if (e.ctrlKey || e.metaKey) {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
       setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
       return;
     }
@@ -940,19 +960,22 @@ export default function GisCanvas({
     if (panMode) return [{ label: "Click-drag to pan" }];
     if (selected.length > 1) return [
       { icon: "mouseRight", label: "Right-click to group" },
-      { label: "Ctrl+Click to add/remove" },
-      { label: "Ctrl+D to deselect" },
+      { label: "Shift/Ctrl+Click to add/remove" },
+      { label: "Alt+Click to deselect one" },
     ];
     if (selected.length === 1) return [
       { icon: "mouseRight", label: "Right-click for options" },
-      { label: "Alt+Click to add curve" },
-      { label: "Del to remove" },
+      { label: "Shift/Ctrl+Click to add another" },
+      { label: "Alt+Click to deselect · Del to remove" },
     ];
     if (hovered) return [
       { icon: "mouseLeft", label: "Click to select" },
-      { label: "Alt+Click to add curve" },
+      { label: "Shift/Ctrl+Click to multi-select" },
     ];
-    if (hoverLine) return [{ label: "Click midpoint to add a point" }, { label: "Click elsewhere to reassign the reach" }];
+    if (hoverLine) return [
+      { label: "Click midpoint to add a point" },
+      { label: "Alt+Click to bend · Click to reassign the reach" },
+    ];
     return null;
   })();
 
@@ -1213,6 +1236,10 @@ export default function GisCanvas({
                           onClick={(ev) => {
                             ev.stopPropagation();
                             const p = pt(ev);
+                            if (ev.altKey) {
+                              addCurveToSegment(e.id, key, p);
+                              return;
+                            }
                             openReachPicker(p.x, p.y, e.id);
                           }}
                         />
@@ -1273,6 +1300,10 @@ export default function GisCanvas({
                         onClick={(ev) => {
                           ev.stopPropagation();
                           const p = pt(ev);
+                          if (ev.altKey) {
+                            addCurveToSegment(e.id, key, p);
+                            return;
+                          }
                           openReachPicker(p.x, p.y, e.id);
                         }}
                       />
@@ -1284,9 +1315,13 @@ export default function GisCanvas({
                         style={{ pointerEvents: "all", cursor: "copy" }}
                         onMouseEnter={() => setHoverSeg(segKey)}
                         onMouseLeave={() => setHoverSeg(null)}
-                        onClick={() =>
-                          addVertex(e.id, i, toWorld(view, mx, my))
-                        }
+                        onClick={(ev) => {
+                          if (ev.altKey) {
+                            addCurveToSegment(e.id, key, { x: mx, y: my });
+                            return;
+                          }
+                          addVertex(e.id, i, toWorld(view, mx, my));
+                        }}
                       />
                       {isHov && (
                         <g style={{ pointerEvents: "none" }}>
@@ -1427,7 +1462,7 @@ export default function GisCanvas({
               <div
                 onMouseDown={(e) => nodeDown(e, n.id)}
                 onContextMenu={(e) => onNodeContext(e, n.id)}
-                title="Alt/Option-click to add a curve handle"
+                title="Shift/Ctrl-click to multi-select · Alt-click to deselect"
                 style={{
                   position: "absolute",
                   left: s.x,
