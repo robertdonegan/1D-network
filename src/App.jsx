@@ -53,7 +53,8 @@ export default function App() {
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Shared with NetworkPanel so a row click selects the node on the canvas.
-  const [selected, setSelected] = useState(null);
+  // Array of node ids — supports multi-select (Ctrl+click, box-select).
+  const [selected, setSelected] = useState([]);
   // In-progress ribbon → canvas drag: { items, index, x, y }. Shared between
   // ModeRibbon/OSWindow (start it, cycle it with Tab) and GisCanvas (consumes it on drop).
   const [ribbonDrag, setRibbonDrag] = useState(null);
@@ -135,7 +136,7 @@ export default function App() {
   }, [dragActive]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-4)", overflow: "hidden" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>

@@ -77,6 +77,131 @@ export const RIBBON = [
   { id: "settings",   icon: "settingsColor", label: "FM 1D settings" },
 ];
 
+// Remaining mode ribbons — mostly project/tool actions rather than 1D
+// network units, so (aside from the two Favourites shortcuts back to real
+// FM1D unit types) these are visual-only, matching the Home tab's treatment
+// of not-yet-wired actions. Icons without a real uploaded asset use
+// "placeholder", same convention as the FM1D ribbon above.
+export const FM_2D_RIBBON = [
+  { id: "activearea", icon: "ribbonActiveArea", label: "Active area", chevron: true },
+  { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition" },
+  { id: "definetopo", icon: "ribbonDefineTopo", label: "Define topography" },
+  { sep: true },
+  { id: "1dstructure", icon: "ribbon1dEmbed", label: "1D structure" },
+  { sep: true },
+  { id: "1d2dlink", icon: "ribbon1d2dLink", label: "1D-2D link", chevron: true },
+  { sep: true },
+  { id: "polyline2d", icon: "ribbonPolyline", label: "Polyline", chevron: true },
+  { id: "zmod", icon: "ribbonZmod", label: "Z-mod", chevron: true },
+  { sep: true },
+  { id: "genimesh", icon: "ribbonGenImesh", label: "Generate iMesh" },
+  { id: "modimesh", icon: "ribbonModImesh", label: "Modify iMesh", chevron: true },
+];
+
+export const TUFLOW_RIBBON = [
+  { id: "codelayer", icon: "ribbonActiveArea", label: "Code layer" },
+  { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
+  { id: "topomod", icon: "ribbonDefineTopo", label: "Topographic modification", chevron: true },
+  { sep: true },
+  { id: "estry1d", icon: "ribbon1dEmbed", label: "Estry 1D", chevron: true },
+  { sep: true },
+  { id: "1dtuflowlink", icon: "ribbon1d2dLink", label: "1D-TUFLOW link", chevron: true },
+  { sep: true },
+  { id: "importtf", icon: "ribbonImport", label: "Import", chevron: true },
+  { sep: true },
+  { id: "polylinetf", icon: "ribbonPolyline", label: "Polyline" },
+  { id: "polygontf", icon: "ribbonPolygon", label: "Polygon" },
+  { id: "pointstf", icon: "ribbonPoint", label: "Points" },
+  { sep: true },
+  { id: "tuflowtools", icon: "ribbonTools", label: "Tools", chevron: true },
+];
+
+export const SWMM_RIBBON = [
+  { id: "loadswmm", icon: "homeLoadFile", label: "Load SWMM Network", chevron: true },
+  { sep: true },
+  { id: "swmm1dlink", icon: "ribbonSwmm1dLink", label: "FM 1D-SWMM link" },
+  { id: "swmm2dlink", icon: "ribbonSwmm2dLink", label: "SWMM-2D link" },
+  { sep: true },
+  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View labels", chevron: true },
+  { sep: true },
+  { id: "editnodes", icon: "ribbonEditNode", label: "Edit nodes", chevron: true },
+  { sep: true },
+  { id: "selectionmode", icon: "ribbonSelectionMode", label: "Selection mode" },
+  { sep: true },
+  { id: "addlink", icon: "ribbonAddLink", label: "Add link" },
+  { sep: true },
+  { id: "swmmnodes", icon: "ribbonSwmmNode", label: "SWMM nodes", chevron: true },
+];
+
+export const HYDROLOGY_RIBBON = [
+  { id: "hplusproject", icon: "placeholder", label: "Hydrology+ project", chevron: true },
+  { id: "refhtools", icon: "placeholder", label: "ReFH tools", chevron: true },
+  { id: "fsuportal", icon: "placeholder", label: "FSU Portal" },
+  { id: "riverstations", icon: "placeholder", label: "View river stations", chevron: true },
+  { id: "fehcatchments", icon: "placeholder", label: "FEH Catchment Descriptors", chevron: true },
+  { id: "calcpoints", icon: "interpolate", label: "Calculation points" },
+  { id: "hplussettings", icon: "settingsColor", label: "Hydrology+ settings" },
+];
+
+export const GIS_RIBBON = [
+  { id: "rastertools", icon: "placeholder", label: "Raster tools (TBC)", chevron: true },
+  { id: "vectortools", icon: "placeholder", label: "Vector tools (TBC)", chevron: true },
+];
+
+export const SIMULATION_RIBBON = [
+  { id: "new1dsim", icon: "placeholder", label: "New 1D simulation", chevron: true },
+  { id: "newqualsim", icon: "placeholder", label: "New Quality simulation" },
+  { id: "new2dsim", icon: "placeholder", label: "New 2D simulation", chevron: true },
+  { id: "newtuflowsim", icon: "placeholder", label: "New TUFLOW simulation", chevron: true },
+  { id: "loadsim", icon: "homeLoadFile", label: "Load simulation" },
+  { sep: true },
+  { id: "simbuilder", icon: "placeholder", label: "Simulation Builder", chevron: true },
+  { id: "runsim", icon: "placeholder", label: "Run simulation" },
+  { id: "runbatch", icon: "placeholder", label: "Run Batch" },
+];
+
+export const RESULTS_RIBBON = [
+  { id: "1dresults", icon: "placeholder", label: "1D results", chevron: true },
+  { id: "1dfloodmap", icon: "placeholder", label: "1D flood map", chevron: true },
+  { id: "tabularcsv", icon: "placeholder", label: "Tabular CSV" },
+  { id: "load2dresults", icon: "placeholder", label: "Load 2D results" },
+  { id: "2danalysis", icon: "placeholder", label: "2D analysis", chevron: true },
+  { id: "2dfloodmap", icon: "placeholder", label: "2D flood map" },
+  { id: "damagecalc", icon: "placeholder", label: "Damage calculator" },
+  { sep: true },
+  { id: "comments", icon: "comment", label: "Comments", chevron: true },
+  { id: "spatialdiag", icon: "placeholder", label: "Spatial diagnostics" },
+];
+
+// Two of these link straight back to real FM1D unit types (same
+// icon/shape), so — unlike the rest of this tab — they're genuinely
+// draggable onto the canvas, not just visual chrome.
+export const FAVOURITES_RIBBON = [
+  { id: "1d2dmodelbuild", icon: "placeholder", label: "1D/2D Model Build", chevron: true },
+  { id: "favriversection", icon: "crossSection", label: "River section", menu: [
+    { label: "River Section", icon: "crossSection", shape: "square", drag: true },
+  ] },
+  { id: "favinterpolate", icon: "interpolate", label: "Interpolate", menu: [
+    { label: "Interpolate", icon: "interpolate", shape: "diamond", drag: true },
+  ] },
+  { id: "favheadtime", icon: "placeholder", label: "Head-time" },
+  { id: "favactivearea", icon: "ribbonActiveArea", label: "Active area" },
+  { id: "fav1d2dlink", icon: "ribbon1d2dLink", label: "1D-2D link" },
+];
+
+const RIBBON_BY_MODE = {
+  "Home": HOME_RIBBON,
+  "FM 1D": RIBBON,
+  "FM 2D": FM_2D_RIBBON,
+  "TUFLOW": TUFLOW_RIBBON,
+  "SWMM": SWMM_RIBBON,
+  "Hydrology+": HYDROLOGY_RIBBON,
+  "GIS": GIS_RIBBON,
+  "Simulation": SIMULATION_RIBBON,
+  "Results": RESULTS_RIBBON,
+  "Favourites": FAVOURITES_RIBBON,
+};
+
 // Flattened list of every draggable leaf unit, annotated with its ribbon
 // group / sub-group path (`group`, for display) and its top-level group
 // (`top`) — used by the canvas quick-add picker and by the ribbon's
@@ -89,7 +214,11 @@ export function flattenRibbonItems() {
       else if (it.drag) out.push({ icon: it.icon, shape: it.shape || "square", label: it.label, group, top });
     });
   };
-  RIBBON.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
+  // FAVOURITES_RIBBON also has a couple of draggable leaves (shortcuts back
+  // to real FM1D unit types), so its groups resolve correctly too.
+  [RIBBON, FAVOURITES_RIBBON].forEach((ribbon) => {
+    ribbon.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
+  });
   return out;
 }
 
@@ -196,7 +325,7 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag }) {
 export default function ModeRibbon({ onBeginDrag, mode, setMode }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
-  const activeRibbon = mode === "Home" ? HOME_RIBBON : mode === "FM 1D" ? RIBBON : [];
+  const activeRibbon = RIBBON_BY_MODE[mode] || [];
 
   // Close any open menu on outside click / Escape
   useEffect(() => {

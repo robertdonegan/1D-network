@@ -1,9 +1,21 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { A, Icon } from "../assets.jsx";
 import NodePicker from "./NodePicker.jsx";
 import ReachPicker from "./ReachPicker.jsx";
 import OsmBasemap from "./OsmBasemap.jsx";
 import MapFooter from "./MapFooter.jsx";
+import ContextMenu from "./ContextMenu.jsx";
+
+// Grouped-unit visuals (Figma "1D Grouped Units" — Group select box / Grouped
+// state): dashed orange bounding box + translucent orange fill, reused for
+// the box-select marquee, an expanded group's bounding box, and a collapsed
+// group's single representative box.
+const GROUP_BOX_STYLE = {
+  border: "1.5px dashed #ce4c00",
+  background: "rgba(255,217,177,0.2)",
+  borderRadius: 1,
+};
+const GROUP_PAD = 16; // px, screen-space padding around member nodes for the expanded bbox
 
 // Node geometry (Figma: 28px footprint, 20px icon). Diamonds (Interpolate /
 // Replicate) keep the same 20px icon but a tighter footprint so they read
@@ -175,6 +187,7 @@ export default function GisCanvas({
   const [navHover, setNavHover] = useState(null);
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
+  const [zoomMode, setZoomMode] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [panDrag, setPanDrag] = useState(null);
   const [toolDrag, setToolDrag] = useState(null);
@@ -183,11 +196,113 @@ export default function GisCanvas({
   const [confirmId, setConfirmId] = useState(null);
   const [showBasemap, setShowBasemap] = useState(false);
   const [cursorWorld, setCursorWorld] = useState(null);
+  const [groups, setGroups] = useState([]); // { id, name, memberIds, collapsed }
+  const [marquee, setMarquee] = useState(null); // { x0,y0,x1,y1, mode: 'add'|'subtract'|'replace' }
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, items }
   const wrapRef = useRef(null);
 
   const pt = (e) => {
     const r = wrapRef.current.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+
+  // Node id -> the group it currently belongs to (a node is a member of at
+  // most one group at a time).
+  const groupOfNode = {};
+  for (const g of groups) for (const id of g.memberIds) groupOfNode[id] = g;
+
+  const groupCentroidWorld = (g) => {
+    const members = nodes.filter((n) => g.memberIds.includes(n.id));
+    if (!members.length) return { x: 0, y: 0 };
+    const cx = members.reduce((s, n) => s + n.x + sizeOf(n) / 2, 0) / members.length;
+    const cy = members.reduce((s, n) => s + n.y + sizeOf(n) / 2, 0) / members.length;
+    return { x: cx, y: cy };
+  };
+
+  // A chain endpoint's effective screen position — substitutes a collapsed
+  // group's single representative position for any hidden member node.
+  const resolveEndpoint = (nodeId) => {
+    const g = groupOfNode[nodeId];
+    if (g && g.collapsed) {
+      const c = groupCentroidWorld(g);
+      return { screen: toScreen(view, c.x, c.y), groupId: g.id };
+    }
+    const n = nodes.find((x) => x.id === nodeId);
+    return n ? { screen: centerScreen(n, view), groupId: null } : null;
+  };
+
+  // Create a group from a multi-selection — members already in another
+  // group are pulled out of it first (a node belongs to only one group).
+  const createGroup = (ids) => {
+    if (ids.length < 2) return;
+    setGroups((gs) => {
+      const cleaned = gs
+        .map((g) => ({ ...g, memberIds: g.memberIds.filter((id) => !ids.includes(id)) }))
+        .filter((g) => g.memberIds.length > 1);
+      return [...cleaned, { id: genId(), name: "Group " + (gs.length + 1), memberIds: ids, collapsed: false }];
+    });
+    setSelected(ids);
+  };
+  const toggleGroupCollapsed = (groupId) => {
+    setGroups((gs) => gs.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)));
+  };
+  const ungroup = (groupId) => {
+    setGroups((gs) => gs.filter((g) => g.id !== groupId));
+  };
+
+  // Right-click menu contents for a resolved set of node ids — Create Group
+  // when they're a plain multi-selection, or Collapse/Expand + Ungroup when
+  // the whole selection sits inside one existing group.
+  const buildMenuItems = (ids) => {
+    const items = [];
+    const touchedGroupIds = [...new Set(ids.map((id) => groupOfNode[id]?.id).filter(Boolean))];
+    if (touchedGroupIds.length === 1 && ids.every((id) => groupOfNode[id]?.id === touchedGroupIds[0])) {
+      const g = groups.find((x) => x.id === touchedGroupIds[0]);
+      items.push({
+        label: g.collapsed ? "Expand Group" : "Collapse Group",
+        onClick: () => toggleGroupCollapsed(g.id),
+      });
+      items.push({ label: "Ungroup", onClick: () => ungroup(g.id) });
+    } else if (ids.length > 1) {
+      items.push({ label: "Create Group", onClick: () => createGroup(ids) });
+    }
+    if (ids.length === 1 && !groupOfNode[ids[0]]) {
+      items.push({ label: "Delete", danger: true, onClick: () => setConfirmId(ids[0]) });
+    }
+    return items;
+  };
+
+  const onNodeContext = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const ids = selected.includes(id) && selected.length > 1 ? selected : [id];
+    if (!(selected.includes(id) && selected.length > 1)) setSelected([id]);
+    const p = pt(e);
+    setContextMenu({ x: p.x, y: p.y, items: buildMenuItems(ids) });
+  };
+
+  const onGroupContext = (e, g) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelected(g.memberIds);
+    const p = pt(e);
+    setContextMenu({ x: p.x, y: p.y, items: buildMenuItems(g.memberIds) });
+  };
+
+  // Mousedown on a group's box (expanded bbox or collapsed representative)
+  // selects the whole group and drags every member together.
+  const groupBoxDown = (e, g) => {
+    e.stopPropagation();
+    if (e.altKey) return;
+    const p = pt(e);
+    setSelected(g.memberIds);
+    const startWorld = toWorld(view, p.x, p.y);
+    const startPositions = {};
+    g.memberIds.forEach((nid) => {
+      const n = nodes.find((x) => x.id === nid);
+      if (n) startPositions[nid] = { x: n.x, y: n.y };
+    });
+    setDragNode({ ids: g.memberIds, startWorld, startPositions });
   };
 
   const openPicker = (sx, sy, extra) => {
@@ -234,6 +349,10 @@ export default function GisCanvas({
   // Reset view helpers, pivoting around the current viewport centre so the
   // content you're looking at doesn't jump.
   const resetView = () => setView({ scale: 1, tx: 0, ty: 0, rotation: 0 });
+  // Pan and Zoom are mutually exclusive persistent tools — turning one on
+  // turns the other off, like a normal tool selector.
+  const togglePanMode = () => setPanMode((m) => { const next = !m; if (next) setZoomMode(false); return next; });
+  const toggleZoomMode = () => setZoomMode((m) => { const next = !m; if (next) setPanMode(false); return next; });
   const resetNorth = () => {
     const el = wrapRef.current;
     const cx = el ? el.clientWidth / 2 : 400,
@@ -251,14 +370,16 @@ export default function GisCanvas({
 
   // Wheel = zoom, centred on the cursor. Attached natively so preventDefault
   // reliably stops page scroll (React's onWheel is passive by default).
-  // Shift slows it down, matching the nav-button drag gestures below.
+  // Shift slows it down and Alt inverts it, matching the nav-button drag
+  // gestures below.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const onWheel = (e) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const base = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
+      const zoomingIn = (e.deltaY < 0) !== e.altKey;
+      const base = zoomingIn ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
       const factor = e.shiftKey ? Math.pow(base, 0.3) : base;
       zoomBy(factor, { x: e.clientX - r.left, y: e.clientY - r.top });
     };
@@ -318,8 +439,8 @@ export default function GisCanvas({
     };
     const onUp = () => {
       if (!toolDrag.moved) {
-        if (toolDrag.tool === "zoom") zoomBy(KEY_ZOOM_FACTOR);
-        else if (toolDrag.tool === "pan") setPanMode((m) => !m);
+        if (toolDrag.tool === "zoom") toggleZoomMode();
+        else if (toolDrag.tool === "pan") togglePanMode();
         else if (toolDrag.tool === "rotate") resetView();
       }
       setToolDrag(null);
@@ -330,7 +451,7 @@ export default function GisCanvas({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [toolDrag, zoomBy]);
+  }, [toolDrag, zoomBy, resetView, togglePanMode, toggleZoomMode]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => {
@@ -342,21 +463,32 @@ export default function GisCanvas({
       const p = pt(e);
       setCursorWorld(toWorld(view, p.x, p.y));
       if (ribbonDrag && !dropHint) setDropHint(true);
+      if (marquee) {
+        setMarquee((m) => m && { ...m, x1: p.x, y1: p.y });
+        return;
+      }
       if (panDrag) {
         const slow = e.shiftKey ? 0.3 : 1;
+        const invert = e.altKey ? -1 : 1;
         setView((v) => ({
           ...v,
-          tx: panDrag.tx0 + (e.clientX - panDrag.sx) * slow,
-          ty: panDrag.ty0 + (e.clientY - panDrag.sy) * slow,
+          tx: panDrag.tx0 + (e.clientX - panDrag.sx) * slow * invert,
+          ty: panDrag.ty0 + (e.clientY - panDrag.sy) * slow * invert,
         }));
         return;
       }
       const h = nodes.find((n) => hit(n, view, p.x, p.y));
       setHovered(h ? h.id : null);
       if (dragNode) {
-        const w = toWorld(view, p.x - dragNode.ox, p.y - dragNode.oy);
+        const w = toWorld(view, p.x, p.y);
+        const dx = w.x - dragNode.startWorld.x,
+          dy = w.y - dragNode.startWorld.y;
         setNodes((ns) =>
-          ns.map((n) => (n.id === dragNode.id ? { ...n, x: w.x, y: w.y } : n)),
+          ns.map((n) =>
+            dragNode.ids.includes(n.id)
+              ? { ...n, x: dragNode.startPositions[n.id].x + dx, y: dragNode.startPositions[n.id].y + dy }
+              : n,
+          ),
         );
       }
       if (dragVertex) {
@@ -406,6 +538,7 @@ export default function GisCanvas({
       dragCurve,
       wire,
       panDrag,
+      marquee,
       view,
       ribbonDrag,
       dropHint,
@@ -414,6 +547,23 @@ export default function GisCanvas({
 
   const onUp = useCallback(
     (e) => {
+      if (marquee) {
+        const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
+        const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
+        const hitIds = nodes
+          .filter((n) => {
+            const s = toScreen(view, n.x, n.y), sz = sizeOf(n);
+            return s.x + sz >= x0 && s.x <= x1 && s.y + sz >= y0 && s.y <= y1;
+          })
+          .map((n) => n.id);
+        setSelected((sel) => {
+          if (marquee.mode === "add") return Array.from(new Set([...sel, ...hitIds]));
+          if (marquee.mode === "subtract") return sel.filter((id) => !hitIds.includes(id));
+          return hitIds;
+        });
+        setMarquee(null);
+        return;
+      }
       if (ribbonDrag) {
         const p = pt(e);
         const w = toWorld(view, p.x, p.y);
@@ -433,7 +583,7 @@ export default function GisCanvas({
             unitLabel: item.label,
           },
         ]);
-        setSelected(id);
+        setSelected([id]);
         setDropHint(false);
         onConsumeRibbonDrag();
         return;
@@ -468,7 +618,7 @@ export default function GisCanvas({
       setWire(null);
       setSnapTo(null);
     },
-    [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag],
+    [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag, marquee, nodes],
   );
 
   // Alt/Option+click on a node or vertex adds a bezier handle to every reach
@@ -502,11 +652,22 @@ export default function GisCanvas({
       addCurvesAt(id);
       return;
     }
+    if (e.ctrlKey || e.metaKey) {
+      setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
+      return;
+    }
     const p = pt(e);
-    const n = nodes.find((x) => x.id === id);
-    const s = toScreen(view, n.x, n.y);
-    setSelected(id);
-    setDragNode({ id, ox: p.x - s.x, oy: p.y - s.y });
+    // Clicking an already-multi-selected node keeps the whole selection (so
+    // dragging moves the group); otherwise it replaces the selection.
+    const dragIds = selected.includes(id) && selected.length > 1 ? selected : [id];
+    if (!(selected.includes(id) && selected.length > 1)) setSelected([id]);
+    const startWorld = toWorld(view, p.x, p.y);
+    const startPositions = {};
+    dragIds.forEach((nid) => {
+      const n = nodes.find((x) => x.id === nid);
+      if (n) startPositions[nid] = { x: n.x, y: n.y };
+    });
+    setDragNode({ ids: dragIds, startWorld, startPositions });
   };
   const portDown = (e, fromId, px, py) => {
     e.stopPropagation();
@@ -554,7 +715,8 @@ export default function GisCanvas({
   const delNode = (id) => {
     setNodes((ns) => ns.filter((n) => n.id !== id));
     setEdges((es) => es.filter((e) => e.from !== id && e.to !== id));
-    setSelected(null);
+    setGroups((gs) => gs.map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => m !== id) })).filter((g) => g.memberIds.length > 1));
+    setSelected([]);
   };
 
   const handlePick = (item) => {
@@ -580,7 +742,7 @@ export default function GisCanvas({
         ...es,
         { id: genId(), from: picker.fromId, to: id, points: [] },
       ]);
-      setSelected(id);
+      setSelected([id]);
     } else if (picker.mode === "convert") {
       const edge = edges.find((x) => x.id === picker.edgeId);
       if (edge) {
@@ -607,7 +769,7 @@ export default function GisCanvas({
         setEdges((es) =>
           es.filter((x) => x.id !== picker.edgeId).concat([e1, e2]),
         );
-        setSelected(id);
+        setSelected([id]);
       }
     }
     setPicker(null);
@@ -623,6 +785,7 @@ export default function GisCanvas({
     };
     const onKey = (e) => {
       if (e.key === "Escape") {
+        if (contextMenu) return setContextMenu(null);
         if (picker) return setPicker(null);
         if (reachPicker) return setReachPicker(null);
         if (confirmId) return setConfirmId(null);
@@ -631,17 +794,17 @@ export default function GisCanvas({
           setSnapTo(null);
           return;
         }
-        return setSelected(null);
+        return setSelected([]);
       }
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
-        selected &&
+        selected.length === 1 &&
         !confirmId &&
         !picker &&
         !isTyping(e)
       ) {
         e.preventDefault();
-        setConfirmId(selected);
+        setConfirmId(selected[0]);
       }
       if (e.code === "Space" && !spaceHeld && !isTyping(e)) {
         e.preventDefault();
@@ -664,18 +827,28 @@ export default function GisCanvas({
       if (noMods && !isTyping(e)) {
         const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
         if (toolKey !== undefined) { e.preventDefault(); setActiveTool(toolKey); }
-        if (e.key.toLowerCase() === "x") { e.preventDefault(); setPanMode((m) => !m); }
+        if (e.key.toLowerCase() === "x") { e.preventDefault(); togglePanMode(); }
+        if (e.key.toLowerCase() === "z") { e.preventDefault(); toggleZoomMode(); }
+      }
+      // Selection shortcuts (Keyboard Shortcuts spec — GUI section).
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "a" && !isTyping(e)) {
+        e.preventDefault();
+        setSelected(nodes.map((n) => n.id));
       }
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "d" && !isTyping(e)) {
         e.preventDefault();
-        setSelected(null);
+        setSelected([]);
       }
-      if ((e.key === "," || e.key === ".") && selected && !isTyping(e)) {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "i" && !isTyping(e)) {
         e.preventDefault();
-        const i = nodes.findIndex((n) => n.id === selected);
+        setSelected((sel) => nodes.filter((n) => !sel.includes(n.id)).map((n) => n.id));
+      }
+      if ((e.key === "," || e.key === ".") && selected.length === 1 && !isTyping(e)) {
+        e.preventDefault();
+        const i = nodes.findIndex((n) => n.id === selected[0]);
         if (i !== -1) {
           const next = e.key === "," ? Math.max(0, i - 1) : Math.min(nodes.length - 1, i + 1);
-          setSelected(nodes[next].id);
+          setSelected([nodes[next].id]);
         }
       }
     };
@@ -688,19 +861,45 @@ export default function GisCanvas({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("keyup", onKeyUp);
     };
-  }, [selected, confirmId, picker, reachPicker, wire, spaceHeld, zoomBy, resetView, nodes]);
+  }, [selected, confirmId, picker, reachPicker, wire, spaceHeld, contextMenu, zoomBy, resetView, nodes, togglePanMode, toggleZoomMode]);
 
-  // Middle-click, space/Pan-tool held drag always pans. A plain left-click
-  // hold on empty canvas also pans, but only while nothing is selected —
-  // otherwise it deselects (as before).
+  // Middle-click, space/Pan-tool held drag always pans. While the Zoom
+  // tool is persistently selected, a plain click on the canvas zooms in
+  // (Alt+click zooms out) centred on the click, instead of panning. A
+  // plain left-click hold on empty canvas otherwise pans, but only while
+  // nothing is selected — otherwise it deselects (as before).
   const onWrapDown = (e) => {
+    setContextMenu(null);
     if (e.button === 1 || ((panMode || spaceHeld) && e.button === 0)) {
       e.preventDefault();
       setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
       return;
     }
+    if (zoomMode && e.button === 0 && e.target === e.currentTarget) {
+      e.preventDefault();
+      zoomBy(e.altKey ? 1 / KEY_ZOOM_FACTOR : KEY_ZOOM_FACTOR, pt(e));
+      return;
+    }
+    // Box-select (marquee): Ctrl/Shift+drag adds to the selection, Alt+drag
+    // removes from it, and the Group select tool (G) starts a fresh
+    // (replacing) box-select on a plain drag.
+    if (e.target === e.currentTarget && e.button === 0) {
+      const p = pt(e);
+      if (e.ctrlKey || e.shiftKey) {
+        setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, mode: "add" });
+        return;
+      }
+      if (e.altKey) {
+        setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, mode: "subtract" });
+        return;
+      }
+      if (activeTool === 1) {
+        setMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y, mode: "replace" });
+        return;
+      }
+    }
     if (e.target === e.currentTarget) {
-      if (e.button === 0 && !selected) {
+      if (e.button === 0 && !selected.length) {
         setPanDrag({
           sx: e.clientX,
           sy: e.clientY,
@@ -709,7 +908,7 @@ export default function GisCanvas({
         });
         return;
       }
-      setSelected(null);
+      setSelected([]);
       setPicker(null);
       setReachPicker(null);
     }
@@ -717,6 +916,45 @@ export default function GisCanvas({
 
   const confirmNode = confirmId ? nodes.find((n) => n.id === confirmId) : null;
   const isPanning = panMode || spaceHeld;
+
+  // Footer guide: reflects whatever the user is actually doing right now,
+  // most-specific state first. Falls through to MapFooter's own baseline
+  // (Select/Zoom/Options) when nothing below applies.
+  const guideItems = (() => {
+    if (confirmId) return [{ label: "Click Delete to confirm" }, { label: "Esc to cancel" }];
+    if (picker || reachPicker) return [{ label: "Click an item to choose" }, { label: "Esc to cancel" }];
+    if (ribbonDrag) return [{ label: "Tab to cycle the unit type" }, { label: "Drop on the canvas to place" }];
+    if (toolDrag?.tool === "zoom") return [
+      { icon: "mouseLeftDrag", label: "Drag up to zoom in, down to zoom out" },
+      { label: "Alt inverts · Shift slows" },
+    ];
+    if (toolDrag?.tool === "rotate") return [{ label: "Drag to rotate" }, { label: "Alt inverts · Shift slows" }];
+    if (toolDrag?.tool === "pan") return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
+    if (panDrag) return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
+    if (marquee) return [{ label: marquee.mode === "subtract" ? "Release to remove from selection" : "Release to select" }];
+    if (wire) return [{ label: "Drop on a node to connect" }, { label: "Release elsewhere to choose a unit" }];
+    if (dragNode) return [{ label: "Drag to reposition" }, { label: "Release to drop" }];
+    if (dragVertex) return [{ label: "Drag to move the point" }, { label: "Double-click to convert to a unit" }];
+    if (dragCurve) return [{ label: "Drag to bend the curve" }];
+    if (zoomMode) return [{ label: "Click to zoom in" }, { label: "Alt+Click to zoom out" }];
+    if (panMode) return [{ label: "Click-drag to pan" }];
+    if (selected.length > 1) return [
+      { icon: "mouseRight", label: "Right-click to group" },
+      { label: "Ctrl+Click to add/remove" },
+      { label: "Ctrl+D to deselect" },
+    ];
+    if (selected.length === 1) return [
+      { icon: "mouseRight", label: "Right-click for options" },
+      { label: "Alt+Click to add curve" },
+      { label: "Del to remove" },
+    ];
+    if (hovered) return [
+      { icon: "mouseLeft", label: "Click to select" },
+      { label: "Alt+Click to add curve" },
+    ];
+    if (hoverLine) return [{ label: "Click midpoint to add a point" }, { label: "Click elsewhere to reassign the reach" }];
+    return null;
+  })();
 
   return (
     <div
@@ -750,13 +988,16 @@ export default function GisCanvas({
               ? "grabbing"
               : isPanning
                 ? "grab"
-                : dragNode || dragVertex || dragCurve || wire
-                  ? "crosshair"
-                  : "default",
+                : zoomMode
+                  ? "zoom-in"
+                  : dragNode || dragVertex || dragCurve || wire
+                    ? "crosshair"
+                    : "default",
         }}
         onMouseMove={onMove}
         onMouseUp={onUp}
         onMouseDown={onWrapDown}
+        onContextMenu={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); setContextMenu(null); } }}
         onMouseLeave={() => {
           setDragNode(null);
           setDragVertex(null);
@@ -766,6 +1007,7 @@ export default function GisCanvas({
           setHovered(null);
           setHoverLine(null);
           setPanDrag(null);
+          setMarquee(null);
           setCursorWorld(null);
         }}
       >
@@ -781,13 +1023,13 @@ export default function GisCanvas({
         <div
           style={{
             position: "absolute",
-            top: 12,
-            left: 12,
+            top: 4,
+            left: 4,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
-            gap: 2,
-            padding: 4,
+            gap: 8,
+            padding: 8,
             background: "var(--surface-1)",
             border: "1px solid var(--border-primary)",
             borderRadius: 4,
@@ -798,34 +1040,39 @@ export default function GisCanvas({
             const isSel = activeTool === i;
             const isHov = navHover === "rail" + i;
             return (
-              <button
-                key={t.name}
-                title={t.name}
-                onClick={() => setActiveTool(i)}
-                onMouseEnter={() => setNavHover("rail" + i)}
-                onMouseLeave={() => setNavHover(null)}
-                style={{
-                  width: 24,
-                  height: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "none",
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  background: isSel
-                    ? "var(--surface-brand)"
-                    : isHov
-                      ? "var(--surface-3)"
-                      : "var(--surface-1)",
-                }}
-              >
-                <Icon
-                  src={t.icon}
-                  size={16}
-                  style={isSel ? { filter: "brightness(0) invert(1)" } : undefined}
-                />
-              </button>
+              <Fragment key={t.name}>
+                {i === 5 && (
+                  <div style={{ height: 1, background: "var(--border-primary)" }} />
+                )}
+                <button
+                  key={t.name}
+                  title={t.name}
+                  onClick={() => setActiveTool(i)}
+                  onMouseEnter={() => setNavHover("rail" + i)}
+                  onMouseLeave={() => setNavHover(null)}
+                  style={{
+                    width: 24,
+                    height: 24,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "none",
+                    borderRadius: 2,
+                    cursor: "pointer",
+                    background: isSel
+                      ? "var(--surface-brand)"
+                      : isHov
+                        ? "var(--surface-3)"
+                        : "var(--surface-1)",
+                  }}
+                >
+                  <Icon
+                    src={t.icon}
+                    size={16}
+                    style={isSel ? { filter: "brightness(0) invert(1)" } : undefined}
+                  />
+                </button>
+              </Fragment>
             );
           })}
         </div>
@@ -838,12 +1085,12 @@ export default function GisCanvas({
         <div
           style={{
             position: "absolute",
-            top: 12,
-            right: 12,
+            top: 4,
+            right: 4,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: 4,
           }}
         >
           {[
@@ -857,8 +1104,8 @@ export default function GisCanvas({
             {
               icon: A.zoomTool,
               tool: "zoom",
-              name: "Zoom (drag up/down) · click = zoom in",
-              active: false,
+              name: "Zoom (drag up/down) · click = toggle Zoom tool (Z) · while active, click canvas to zoom in, Alt+click to zoom out",
+              active: zoomMode,
             },
             {
               icon: A.pan,
@@ -928,16 +1175,19 @@ export default function GisCanvas({
           }}
         >
           {edges.map((e) => {
-            const fn = nodes.find((n) => n.id === e.from),
-              tn = nodes.find((n) => n.id === e.to);
-            if (!fn || !tn) return null;
+            const fEnd = resolveEndpoint(e.from),
+              tEnd = resolveEndpoint(e.to);
+            if (!fEnd || !tEnd) return null;
+            // Both ends resolve into the same collapsed group — this reach
+            // is entirely internal to it, so it's hidden while collapsed.
+            if (fEnd.groupId && fEnd.groupId === tEnd.groupId) return null;
             const chain = [
-              { id: e.from, screen: centerScreen(fn, view) },
+              { id: e.from, screen: fEnd.screen },
               ...e.points.map((v) => ({
                 id: v.id,
                 screen: toScreen(view, v.x, v.y),
               })),
-              { id: e.to, screen: centerScreen(tn, view) },
+              { id: e.to, screen: tEnd.screen },
             ];
             const reachStroke = edgeColors?.[e.id] || "var(--reach)";
             return (
@@ -1104,12 +1354,38 @@ export default function GisCanvas({
           )}
         </svg>
 
+        {/* Expanded groups' bounding boxes — sit beneath the node layer so
+            member nodes visually read as "inside" the tinted box. */}
+        {groups.filter((g) => !g.collapsed).map((g) => {
+          const members = nodes.filter((n) => g.memberIds.includes(n.id));
+          if (!members.length) return null;
+          const rects = members.map((n) => ({ s: toScreen(view, n.x, n.y), sz: sizeOf(n) }));
+          const left = Math.min(...rects.map((r) => r.s.x)) - GROUP_PAD;
+          const top = Math.min(...rects.map((r) => r.s.y)) - GROUP_PAD;
+          const right = Math.max(...rects.map((r) => r.s.x + r.sz)) + GROUP_PAD;
+          const bottom = Math.max(...rects.map((r) => r.s.y + r.sz)) + GROUP_PAD;
+          return (
+            <div key={g.id}
+              onMouseDown={(e) => groupBoxDown(e, g)}
+              onContextMenu={(e) => onGroupContext(e, g)}
+              style={{
+                position: "absolute",
+                left, top, width: right - left, height: bottom - top,
+                cursor: dragNode?.ids?.includes(g.memberIds[0]) ? "grabbing" : "grab",
+                ...GROUP_BOX_STYLE,
+              }}
+            />
+          );
+        })}
+
         {/* Nodes */}
         {nodes.map((n) => {
+          const memberGroup = groupOfNode[n.id];
+          if (memberGroup && memberGroup.collapsed) return null; // rendered as the group's own representative box instead
           const s = toScreen(view, n.x, n.y);
           const sz = sizeOf(n);
           const isHov = hovered === n.id,
-            isSel = selected === n.id,
+            isSel = selected.includes(n.id) || Boolean(memberGroup && !memberGroup.collapsed),
             isSnap = snapTo === n.id;
           const isConfluence = (degree?.[n.id] || 0) >= 3;
           const showPorts =
@@ -1150,12 +1426,13 @@ export default function GisCanvas({
               )}
               <div
                 onMouseDown={(e) => nodeDown(e, n.id)}
+                onContextMenu={(e) => onNodeContext(e, n.id)}
                 title="Alt/Option-click to add a curve handle"
                 style={{
                   position: "absolute",
                   left: s.x,
                   top: s.y,
-                  cursor: dragNode?.id === n.id ? "grabbing" : "grab",
+                  cursor: dragNode?.ids?.includes(n.id) ? "grabbing" : "grab",
                 }}
               >
                 <NodeBox
@@ -1199,6 +1476,98 @@ export default function GisCanvas({
             </div>
           );
         })}
+
+        {/* Collapsed groups — a single representative box standing in for
+            every hidden member, draggable/selectable as one unit. */}
+        {groups.filter((g) => g.collapsed).map((g) => {
+          const c = groupCentroidWorld(g);
+          const s = toScreen(view, c.x, c.y); // screen-space centre of the group
+          const sz = OUTER;
+          const half = (sz + GROUP_PAD) / 2;
+          const rep = nodes.find((n) => g.memberIds.includes(n.id)) || {};
+          return (
+            <div key={g.id}
+              onMouseDown={(e) => groupBoxDown(e, g)}
+              onContextMenu={(e) => onGroupContext(e, g)}
+              style={{
+                position: "absolute",
+                left: s.x - half,
+                top: s.y - half,
+                width: sz + GROUP_PAD,
+                height: sz + GROUP_PAD,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: dragNode?.ids?.includes(g.memberIds[0]) ? "grabbing" : "grab",
+                ...GROUP_BOX_STYLE,
+              }}
+            >
+              {rep.icon && <Icon src={A[rep.icon]} size={ICONSZ} />}
+            </div>
+          );
+        })}
+
+        {/* Group expand/collapse counter badges — "−N" collapses an
+            expanded group, "+N" expands a collapsed one. */}
+        {groups.map((g) => {
+          let anchorX, anchorY;
+          if (g.collapsed) {
+            const c = groupCentroidWorld(g);
+            const s = toScreen(view, c.x, c.y);
+            const half = (OUTER + GROUP_PAD) / 2;
+            anchorX = s.x + half;
+            anchorY = s.y - half;
+          } else {
+            const members = nodes.filter((n) => g.memberIds.includes(n.id));
+            if (!members.length) return null;
+            const rects = members.map((n) => ({ s: toScreen(view, n.x, n.y), sz: sizeOf(n) }));
+            anchorX = Math.max(...rects.map((r) => r.s.x + r.sz)) + GROUP_PAD;
+            anchorY = Math.min(...rects.map((r) => r.s.y)) - GROUP_PAD;
+          }
+          return (
+            <div key={g.id}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); toggleGroupCollapsed(g.id); }}
+              title={g.collapsed ? "Expand group" : "Collapse group"}
+              style={{
+                position: "absolute",
+                left: anchorX, top: anchorY,
+                transform: "translate(-50%, -50%)",
+                zIndex: 13,
+                background: "var(--node-selected-border)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                lineHeight: "20px",
+                borderRadius: 16,
+                padding: "4.5px 5px",
+                cursor: "pointer",
+                userSelect: "none",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+              }}
+            >
+              {(g.collapsed ? "+" : "−") + g.memberIds.length}
+            </div>
+          );
+        })}
+
+        {/* Box-select marquee */}
+        {marquee && (() => {
+          const left = Math.min(marquee.x0, marquee.x1), top = Math.min(marquee.y0, marquee.y1);
+          const width = Math.abs(marquee.x1 - marquee.x0), height = Math.abs(marquee.y1 - marquee.y0);
+          return (
+            <div style={{ position: "absolute", left, top, width, height, zIndex: 20, pointerEvents: "none", ...GROUP_BOX_STYLE }} />
+          );
+        })()}
+
+        {/* Right-click menu for the current selection (multi-select → Create
+            Group; existing group → Collapse/Expand + Ungroup) */}
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={contextMenu.items}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
 
         {/* Quick-add picker: opened on vertex double-click or a connector dropped on empty canvas */}
         {picker && (
@@ -1327,7 +1696,7 @@ export default function GisCanvas({
           <MapFooter
             cursorWorld={cursorWorld}
             scale={view.scale}
-            guideMode={toolDrag?.tool === "zoom" ? "zoomDrag" : "default"}
+            guideItems={guideItems}
             showAttribution={showBasemap}
           />
         </div>

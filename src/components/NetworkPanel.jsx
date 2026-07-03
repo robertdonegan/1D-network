@@ -218,7 +218,7 @@ export default function NetworkPanel({ nodes, edges, selected, setSelected, reac
               {!isCollapsed && g.rows.map(({ n, reaches }, i) => {
                 const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
                 return (
-                  <Row key={n.id} zebra={i % 2 === 1} selected={selected === n.id} onClick={() => setSelected(n.id)} indent={12}>
+                  <Row key={n.id} zebra={i % 2 === 1} selected={selected.includes(n.id)} onClick={(e) => setSelected(sel => e.ctrlKey || e.metaKey ? (sel.includes(n.id) ? sel.filter(id => id !== n.id) : [...sel, n.id]) : [n.id])} indent={12}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, width: 60, flexShrink: 0 }}>
                       <Icon src={A[n.icon]} size={12} />
                       <span style={{ ...cellStyle }}>{n.label}</span>

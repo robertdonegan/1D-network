@@ -64,6 +64,27 @@ import mouseRight from "./assets/mouse-right.svg";
 import mouseLeftDrag from "./assets/mouse-left-drag.svg";
 import mouseLeftDrag2 from "./assets/mouse-left-drag2.svg";
 
+import ribbonActiveArea from "./assets/ribbon-active-area.svg";
+import ribbonBoundaryCondition from "./assets/ribbon-boundary-condition.svg";
+import ribbonDefineTopo from "./assets/ribbon-define-topo.svg";
+import ribbon1dEmbed from "./assets/ribbon-1d-embed.svg";
+import ribbon1d2dLink from "./assets/ribbon-1d2d-link.svg";
+import ribbonPolyline from "./assets/ribbon-polyline.svg";
+import ribbonZmod from "./assets/ribbon-zmod.svg";
+import ribbonGenImesh from "./assets/ribbon-gen-imesh.svg";
+import ribbonModImesh from "./assets/ribbon-mod-imesh.svg";
+import ribbonImport from "./assets/ribbon-import.svg";
+import ribbonPolygon from "./assets/ribbon-polygon.svg";
+import ribbonPoint from "./assets/ribbon-point.svg";
+import ribbonTools from "./assets/ribbon-tools.svg";
+import ribbonSwmm1dLink from "./assets/ribbon-swmm-1d-link.svg";
+import ribbonSwmm2dLink from "./assets/ribbon-swmm-2d-link.svg";
+import ribbonViewLabels from "./assets/ribbon-view-labels.svg";
+import ribbonEditNode from "./assets/ribbon-edit-node.svg";
+import ribbonSelectionMode from "./assets/ribbon-selection-mode.svg";
+import ribbonAddLink from "./assets/ribbon-add-link.svg";
+import ribbonSwmmNode from "./assets/ribbon-swmm-node.svg";
+
 export const A = {
   logo, search, add, check, minimise, dock, cancel, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
@@ -76,6 +97,10 @@ export const A = {
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
   mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
+  ribbonActiveArea, ribbonBoundaryCondition, ribbonDefineTopo, ribbon1dEmbed, ribbon1d2dLink,
+  ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,
+  ribbonPoint, ribbonTools, ribbonSwmm1dLink, ribbonSwmm2dLink, ribbonViewLabels,
+  ribbonEditNode, ribbonSelectionMode, ribbonAddLink, ribbonSwmmNode,
 };
 
 // Small helper for a fixed-size icon <img>

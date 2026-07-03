@@ -112,7 +112,7 @@ const SECTIONS = [
       { fn: "Snapping on/off", keys: "S", desc: "Toggle on/off Snapping" },
       { fn: "Tracing on/off", keys: "T", desc: "Toggle on/off Tracing" },
       { fn: "North star tool", keys: "N", desc: "Persistently rotate view around the north axis" },
-      { fn: "Zoom tool", keys: "Z", desc: "Persistently zoom in/out of screen using left-click and drag" },
+      { fn: "Zoom tool", keys: "Z", desc: "Persistently zoom in/out of screen using left-click and drag", live: true },
       { fn: "Zoom in (25%)", keys: "=", desc: "Zoom in to screen using increments", live: true },
       { fn: "Zoom in (50%)", keys: "Ctrl+=", desc: "Zoom in to screen using increments" },
       { fn: "Zoom out (25%)", keys: "-", desc: "Zoom out of screen using increments", live: true },

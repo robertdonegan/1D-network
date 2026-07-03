@@ -1,0 +1,22 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="FM 16x16px icon" clip-path="url(#clip0_0_6709)">
+<g id="guides">
+<path id="Ellipse 1" opacity="0.25" d="M8 2.0498C11.2861 2.0498 13.9502 4.71391 13.9502 8C13.9502 11.2861 11.2861 13.9502 8 13.9502C4.71391 13.9502 2.0498 11.2861 2.0498 8C2.0498 4.71391 4.71391 2.0498 8 2.0498Z" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+<rect id="Rectangle 1" opacity="0.25" x="2.05" y="0.05" width="11.9" height="15.9" rx="0.95" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+<rect id="Rectangle 2" opacity="0.25" x="1.05" y="1.05" width="13.9" height="13.9" rx="0.95" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+<rect id="Rectangle 3" opacity="0.25" x="0.05" y="2.05" width="15.9" height="11.9" rx="0.95" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+<path id="Vector 1" opacity="0.25" d="M0 8H16" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+<path id="Vector 2" opacity="0.25" d="M8 0L8 16" stroke="var(--stroke-0, #D72850)" stroke-width="0.1"/>
+</g>
+<g id="icon">
+<path d="M6 6H4V4H6V6Z" fill="var(--fill-0, #0A7DFF)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M8 6H6V8H4V10H6V12H8V10H10V12H12V10H10V8H12V6H10V4H8V6ZM8 8H6V10H8V8ZM8 8V6H10V8H8Z" fill="var(--fill-0, #0A7DFF)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M2 0H0V2H2V4H0V6H2V8H0V10H2V12H0V14H2V16H4V14H6V16H8V14H10V16H12V14H14V16H16V14H14V12H16V10H14V8H16V6H14V4L16 4V2L14 2V0H12V2L10 2V0H8V2L6 2V0H4V2H2V0ZM4 4H2V6H4V8H2V10H4V12H2V14H4V12H6V14H8V12H10V14H12V12H14V10H12V8H14V6H12V4L14 4V2L12 2V4L10 4V2H8V4L6 4V2H4V4Z" fill="var(--fill-0, #0A7DFF)"/>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_0_6709">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

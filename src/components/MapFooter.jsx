@@ -48,16 +48,25 @@ function simulatedW3W(wx, wy) {
 function GuideItem({ icon, label }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-      <Icon src={icon} size={12} />
+      {icon && <Icon src={icon} size={12} />}
       <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap" }}>{label}</span>
     </div>
   );
 }
 
+const DEFAULT_GUIDE = [
+  { icon: "mouseLeft", label: "Select" },
+  { icon: "mouseScroll", label: "Zoom" },
+  { icon: "mouseRight", label: "Options" },
+];
+
 // GIS view status bar — scale bar + live cursor coordinates + a contextual
-// mouse-control hint + basemap attribution. `guideMode` switches the middle
-// hint set to match whichever nav tool is actively being drag-scrubbed.
-export default function MapFooter({ cursorWorld, scale, guideMode = "default", showAttribution }) {
+// mouse-control hint + basemap attribution. `guideItems` is a priority-
+// ordered hint (icon optional) reflecting whatever the user is currently
+// doing — hovering/selecting a unit, dragging, an open picker, etc. Falls
+// back to the baseline Select/Zoom/Options guide when nothing is active.
+export default function MapFooter({ cursorWorld, scale, guideItems, showAttribution }) {
+  const items = guideItems && guideItems.length ? guideItems : DEFAULT_GUIDE;
   const metersPerPx = METERS_PER_WORLD_UNIT / scale;
   const meters = pickScale(metersPerPx);
   const barPx = meters / metersPerPx;
@@ -85,19 +94,10 @@ export default function MapFooter({ cursorWorld, scale, guideMode = "default", s
             {cursorWorld ? simulatedW3W(cursorWorld.x, cursorWorld.y) : "///—.—.—"}
           </span>
         </div>
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 11 }}>
-          {guideMode === "zoomDrag" ? (
-            <>
-              <GuideItem icon={A.mouseLeftDrag} label="Hold and drag up to zoom in" />
-              <GuideItem icon={A.mouseLeftDrag2} label="Hold and drag down to zoom out" />
-            </>
-          ) : (
-            <>
-              <GuideItem icon={A.mouseLeft} label="Select" />
-              <GuideItem icon={A.mouseScroll} label="Zoom" />
-              <GuideItem icon={A.mouseRight} label="Options" />
-            </>
-          )}
+        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 11, overflow: "hidden" }}>
+          {items.map((it, i) => (
+            <GuideItem key={i} icon={it.icon ? A[it.icon] : undefined} label={it.label} />
+          ))}
         </div>
         <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
           {showAttribution && (
