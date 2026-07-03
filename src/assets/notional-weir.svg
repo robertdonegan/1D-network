@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/weirs/notional-weir" clip-path="url(#clip0_0_324)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 249" d="M0 0H16V9H2H0L0 0Z" fill="var(--fill-0, #D7D7D7)"/>
+<path id="Rectangle 250" d="M10.25 5.75V16.75H3.25V5.75H10.25Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 246" d="M3.25 5.75V16.75H-0.75V5.75H3.25Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 251" d="M16.75 8.75V16.75H10.25V8.75H16.75Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_324">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

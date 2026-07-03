@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/hydro/subarea" clip-path="url(#clip0_0_255)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.75 -0.75V16.75H-0.75V-0.75H16.75Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Polygon 2" d="M7.125 2.63867C7.66634 2.32623 8.33366 2.32623 8.875 2.63867L12.2051 4.56152C12.7465 4.8741 13.08 5.45201 13.0801 6.07715V9.92285C13.08 10.548 12.7465 11.1259 12.2051 11.4385L8.875 13.3613C8.33366 13.6738 7.66634 13.6738 7.125 13.3613L3.79492 11.4385C3.25353 11.1259 2.91999 10.548 2.91992 9.92285V6.07715C2.91999 5.45201 3.25353 4.8741 3.79492 4.56152L7.125 2.63867Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_255">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

@@ -1,0 +1,19 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/weirs/Bernoulli-loss" clip-path="url(#clip0_0_333)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 251" d="M0 0H16V10H0L0 0Z" fill="var(--fill-0, #D7D7D7)"/>
+<path id="Rectangle 167" d="M8.75 6.75V9.75H16.75V13.25H-0.75V6.75H8.75Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 161" x="-0.75" y="-0.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 162" x="2.75" y="-0.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 163" x="6.25" y="-0.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 164" x="6.25" y="2.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 165" x="9.75" y="2.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<rect id="Rectangle 166" x="13.25" y="2.75" width="3.5" height="3.5" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 250" d="M16.75 13.25V16.75H-0.75V13.25H16.75Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_333">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

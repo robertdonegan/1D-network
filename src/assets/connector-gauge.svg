@@ -1,0 +1,14 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/connectors/gauge" clip-path="url(#clip0_0_190)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.5 -0.5V16.5H-0.5V-0.5H16.5Z" fill="var(--fill-0, white)" stroke="var(--stroke-0, white)"/>
+<path id="Ellipse 171" d="M8.75 1.7959C9.91394 1.93513 10.9785 2.39444 11.8555 3.08301L11.0049 3.93457L12.0654 4.99512L12.916 4.14355C13.605 5.02066 14.0638 6.08563 14.2031 7.25H12V8.75H14.2031C14.0639 9.9141 13.6048 10.9785 12.916 11.8555L12.0654 11.0049L11.0049 12.0654L11.8555 12.916C10.9785 13.6048 9.9141 14.0639 8.75 14.2031V12H7.25V14.2031C6.08563 14.0638 5.02066 13.605 4.14355 12.916L4.99512 12.0654L3.93457 11.0049L3.08301 11.8555C2.39446 10.9786 1.93612 9.91389 1.79688 8.75H4V7.25H1.79688C1.93615 6.08584 2.3942 5.02057 3.08301 4.14355L3.96973 5.03027L5.03027 3.96973L4.14355 3.08301C5.0206 2.39417 6.0858 1.93516 7.25 1.7959V4H8.75V1.7959Z" stroke="var(--stroke-0, #333333)" stroke-width="1.5"/>
+<circle id="Ellipse 172" cx="8" cy="8" r="1.25" stroke="var(--stroke-0, #468AF3)" stroke-width="1.5"/>
+<path id="Vector 168" d="M7 7L4.5 4.5" stroke="var(--stroke-0, #468AF3)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_190">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

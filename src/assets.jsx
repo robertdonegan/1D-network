@@ -30,6 +30,70 @@ import labelsColor from "./assets/labels-color.svg";
 import rulesColor from "./assets/rules-color.svg";
 import settingsColor from "./assets/settings-color.svg";
 
+import conduitFullArch from "./assets/conduit-full-arch.svg";
+import conduitSprungArch from "./assets/conduit-sprung-arch.svg";
+import conduitRectangular from "./assets/conduit-rectangular.svg";
+import conduitSymmetrical from "./assets/conduit-symmetrical.svg";
+import conduitAsymmetrical from "./assets/conduit-asymmetrical.svg";
+import orifice from "./assets/orifice.svg";
+import invertedSyphon from "./assets/inverted-syphon.svg";
+import outfall from "./assets/outfall.svg";
+import floodReliefArch from "./assets/flood-relief-arch.svg";
+import culvertBend from "./assets/culvert-bend.svg";
+import culvertInlet from "./assets/culvert-inlet.svg";
+import culvertOutlet from "./assets/culvert-outlet.svg";
+import radialSluice from "./assets/radial-sluice.svg";
+import verticalSluice from "./assets/vertical-sluice.svg";
+import bernoulliLoss from "./assets/bernoulli-loss.svg";
+import leakyDam from "./assets/leaky-dam.svg";
+import crumpWeir from "./assets/crump-weir.svg";
+import flowHeadControl from "./assets/flow-head-control.svg";
+import flatVWeir from "./assets/flat-v-weir.svg";
+import gatedWeir from "./assets/gated-weir.svg";
+import labyrinthWeir from "./assets/labyrinth-weir.svg";
+import notionalWeir from "./assets/notional-weir.svg";
+import sharpCrestedWeir from "./assets/sharp-crested-weir.svg";
+import syphonWeir from "./assets/syphon-weir.svg";
+import generalWeir from "./assets/general-weir.svg";
+
+import replicateNode from "./assets/replicate-node.svg";
+import boundaryHeadtime from "./assets/boundary-headtime.svg";
+import boundaryRainfallEvap from "./assets/boundary-rainfall-evap.svg";
+import boundaryAbstraction from "./assets/boundary-abstraction.svg";
+import boundaryTidal from "./assets/boundary-tidal.svg";
+import boundaryFlowHead from "./assets/boundary-flow-head.svg";
+import hydrographGenRainfall from "./assets/hydrograph-gen-rainfall.svg";
+import hydrographFeh from "./assets/hydrograph-feh.svg";
+import hydrographRefh from "./assets/hydrograph-refh.svg";
+import hydrographFrqsim from "./assets/hydrograph-frqsim.svg";
+import hydrographFssr from "./assets/hydrograph-fssr.svg";
+import connectorEnergyJunction from "./assets/connector-energy-junction.svg";
+import connectorLateral from "./assets/connector-lateral.svg";
+import connectorManhole from "./assets/connector-manhole.svg";
+import connectorGauge from "./assets/connector-gauge.svg";
+import fm2dPolyline from "./assets/fm2d-polyline.svg";
+import fm2dPolyArea from "./assets/fm2d-poly-area.svg";
+import guiPolyPoint from "./assets/gui-poly-point.svg";
+import zmodPolygon from "./assets/zmod-polygon.svg";
+import zmodPolyline from "./assets/zmod-polyline.svg";
+import zmodPoints from "./assets/zmod-points.svg";
+import zmodVertice from "./assets/zmod-vertice.svg";
+import zmodImport from "./assets/zmod-import.svg";
+import settingsOutline from "./assets/settings-outline.svg";
+import swmmJunction from "./assets/swmm-junction.svg";
+import swmmOutfall from "./assets/swmm-outfall.svg";
+import swmmRaingauge from "./assets/swmm-raingauge.svg";
+import swmmStorage from "./assets/swmm-storage.svg";
+import swmmSubcatchment from "./assets/swmm-subcatchment.svg";
+import mergeUnion from "./assets/merge-union.svg";
+import mergeDivide from "./assets/merge-divide.svg";
+import mergeSubtract from "./assets/merge-subtract.svg";
+import sim1dRiver from "./assets/sim-1d-river.svg";
+import sim1dSwmm from "./assets/sim-1d-swmm.svg";
+import simTuflow from "./assets/sim-tuflow.svg";
+import simEstry from "./assets/sim-estry.svg";
+import resultEmbeddedStructures from "./assets/result-embedded-structures.svg";
+
 import cursorSelect from "./assets/cursor-select.svg";
 import calcPointWeir from "./assets/calc-point-weir.svg";
 import lhs0 from "./assets/lhs-0.svg";
@@ -91,6 +155,23 @@ export const A = {
   load1d, crossSection, interpolate, circularArch, flowTime, normalDepth,
   broadWeir, superBridge, spill, openJunction, blockage,
   labelsColor, rulesColor, settingsColor,
+  conduitFullArch, conduitSprungArch, conduitRectangular, conduitSymmetrical, conduitAsymmetrical,
+  orifice, invertedSyphon, outfall, floodReliefArch,
+  culvertBend, culvertInlet, culvertOutlet,
+  radialSluice, verticalSluice, bernoulliLoss, leakyDam,
+  crumpWeir, flowHeadControl, flatVWeir, gatedWeir, labyrinthWeir, notionalWeir,
+  sharpCrestedWeir, syphonWeir, generalWeir,
+  replicateNode,
+  boundaryHeadtime, boundaryRainfallEvap, boundaryAbstraction, boundaryTidal, boundaryFlowHead,
+  hydrographGenRainfall, hydrographFeh, hydrographRefh, hydrographFrqsim, hydrographFssr,
+  connectorEnergyJunction, connectorLateral, connectorManhole, connectorGauge,
+  fm2dPolyline, fm2dPolyArea, guiPolyPoint,
+  zmodPolygon, zmodPolyline, zmodPoints, zmodVertice, zmodImport,
+  settingsOutline,
+  swmmJunction, swmmOutfall, swmmRaingauge, swmmStorage, swmmSubcatchment,
+  mergeUnion, mergeDivide, mergeSubtract,
+  sim1dRiver, sim1dSwmm, simTuflow, simEstry,
+  resultEmbeddedStructures,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
   rectangleSelect, measureTool, pointQuery, pan, zoomTool, edit, northStar, comment,
   placeholder,

@@ -7,10 +7,13 @@ const ALL_ITEMS = flattenRibbonItems();
 
 // `onBeginDrag(e, items, index)` — same signature ModeRibbon uses, so a
 // search result can be picked up and dropped onto the GIS canvas exactly
-// like a ribbon leaf item.
-export default function OSWindow({ onBeginDrag, onOpenShortcuts }) {
+// like a ribbon leaf item. `onGoToLocation(lat, lon)` — a place result was
+// picked instead, so pan/zoom the canvas there (see App's `goToLocation`).
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [places, setPlaces] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
   const boxRef = useRef(null);
 
   useEffect(() => {
@@ -18,6 +21,32 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts }) {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
+
+  // Real-world place lookup (e.g. "One Glass Wharf, Bristol"), debounced
+  // against OpenStreetMap's public Nominatim geocoder — same "real OSM data,
+  // no API key, demo only" spirit as the OSM basemap tiles. Only fires for
+  // queries that don't already match a known tool/unit, and only once the
+  // query looks like it could be a place (3+ chars).
+  useEffect(() => {
+    const query = q.trim();
+    if (query.length < 3) { setPlaces([]); return; }
+    let cancelled = false;
+    setPlacesLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&q=${encodeURIComponent(query)}`,
+        );
+        const data = await res.json();
+        if (!cancelled) setPlaces(data);
+      } catch {
+        if (!cancelled) setPlaces([]);
+      } finally {
+        if (!cancelled) setPlacesLoading(false);
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [q]);
 
   const query = q.trim().toLowerCase();
   const results = query
@@ -68,11 +97,12 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts }) {
             }}
           />
         </div>
-        {open && results.length > 0 && (
+        {open && (results.length > 0 || places.length > 0 || placesLoading) && (
           <div style={{
-            position: "absolute", top: "100%", left: 0, marginTop: 2, width: 260, color: "var(--text-primary)",
+            position: "absolute", top: "100%", left: 0, marginTop: 2, width: 280, color: "var(--text-primary)",
             background: "var(--surface-1)", border: "1px solid var(--border-primary)",
             borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.16)", padding: 4, zIndex: 80,
+            maxHeight: 320, overflowY: "auto",
           }}>
             {results.map((it) => (
               <div key={it.group + "/" + it.label}
@@ -86,6 +116,23 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts }) {
                   <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
                   <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>
                 </div>
+              </div>
+            ))}
+            {results.length > 0 && (places.length > 0 || placesLoading) && (
+              <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
+            )}
+            {placesLoading && places.length === 0 && (
+              <div style={{ padding: "6px 8px", fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)" }}>Searching locations…</div>
+            )}
+            {places.map((p) => (
+              <div key={p.place_id}
+                onClick={() => { setOpen(false); onGoToLocation(Number(p.lat), Number(p.lon)); }}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: "pointer" }}
+                onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                title="Go to this location on the map">
+                <Icon src={A.homeMarker} size={16} />
+                <span style={{ fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.display_name}</span>
               </div>
             ))}
           </div>

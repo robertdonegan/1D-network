@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/conduits/outlet" clip-path="url(#clip0_0_163)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 249" d="M8.04663e-07 0H16V8H8.04663e-07V0Z" fill="var(--fill-0, #D7D7D7)"/>
+<path id="Rectangle 251" d="M7.22754 5.25L7.41602 5.37598L8.40039 6.03223C9.59124 6.82613 10.9907 7.24993 12.4219 7.25H16.75V12.75H-0.75V5.25H7.22754Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 247" d="M17 13V17H-1V13H17Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="2"/>
+<path id="Rectangle 250" d="M16.75 12.25V16.75H-0.75V12.25H16.75Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 159" d="M7.75 -0.75V5.75H-0.75V-0.75H7.75Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_163">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

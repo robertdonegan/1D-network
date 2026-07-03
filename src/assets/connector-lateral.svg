@@ -1,0 +1,13 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/connectors/lateral" clip-path="url(#clip0_0_261)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.5 -0.5V16.5H-0.5V-0.5H16.5Z" fill="var(--fill-0, #D7D7D7)" stroke="var(--stroke-0, white)"/>
+<path id="Rectangle 260" d="M13.75 5.25H16.75V10.75H13.75V14.3105L7.43945 8L13.75 1.68945V5.25Z" fill="var(--fill-0, #333333)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Rectangle 160" d="M5.75 16.75L-0.75 16.75L-0.749999 -0.75L5.75 -0.75L5.75 16.75Z" fill="var(--fill-0, #468AF3)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_261">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

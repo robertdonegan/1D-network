@@ -24,6 +24,14 @@ function lonLatToTilePx(lon, lat, zoom) {
 }
 const anchorPx = lonLatToTilePx(ANCHOR_LON, ANCHOR_LAT, BASE_ZOOM);
 
+// Same demo-only anchor used to convert a real-world lon/lat (e.g. a
+// geocoding search result) into this app's world-coordinate space, so the
+// top-bar location search can pan the canvas there.
+export function lonLatToWorld(lon, lat) {
+  const p = lonLatToTilePx(lon, lat, BASE_ZOOM);
+  return { x: p.x - anchorPx.x, y: p.y - anchorPx.y };
+}
+
 export default function OsmBasemap({ view, width, height }) {
   const tiles = useMemo(() => {
     const w = width || 800, h = height || 600;

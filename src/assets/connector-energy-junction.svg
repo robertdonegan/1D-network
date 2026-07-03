@@ -1,0 +1,20 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="jbs/fm1d/connectors/energy-junction" clip-path="url(#clip0_0_282)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.5 -0.5V16.5H-0.5V-0.5H16.5Z" fill="var(--fill-0, #D7D7D7)" stroke="var(--stroke-0, white)"/>
+<path id="Vector 95" d="M1.25 -0.75L6.75 -0.75L6.75 1.75L1.25 1.75L1.25 -0.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 96" d="M1.25 1.75L6.75 1.75L6.75 4.25L1.25 4.25L1.25 1.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 97" d="M10.25 -0.75L15.75 -0.75L15.75 1.75L10.25 1.75L10.25 -0.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 98" d="M9.25 1.75L14.75 1.75L14.75 4.25L9.25 4.25L9.25 1.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 99" d="M4.25 4.25L13.75 4.25L13.75 6.75L4.25 6.75L4.25 4.25Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 100" d="M5.25 6.75L12.75 6.75L12.75 9.25L5.25 9.25L5.25 6.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 101" d="M5.25 9.25L10.75 9.25L10.75 11.75L5.25 11.75L5.25 9.25Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 102" d="M4.25 11.75L9.75 11.75L9.75 14.25L4.25 14.25L4.25 11.75Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+<path id="Vector 103" d="M1.25 14.25L6.75 14.25L6.75 16.75L1.25 16.75L1.25 14.25Z" fill="var(--fill-0, #E1455B)" stroke="var(--stroke-0, white)" stroke-width="1.5"/>
+</g>
+<defs>
+<clipPath id="clip0_0_282">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

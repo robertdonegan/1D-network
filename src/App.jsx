@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import OSWindow from "./components/OSWindow.jsx";
 import ModeRibbon, { modes } from "./components/ModeRibbon.jsx";
 import ProjectPanel from "./components/ProjectPanel.jsx";
@@ -55,6 +55,25 @@ export default function App() {
   // Shared with NetworkPanel so a row click selects the node on the canvas.
   // Array of node ids — supports multi-select (Ctrl+click, box-select).
   const [selected, setSelected] = useState([]);
+  // Basemap selection ("none" | "osm" | ...), driven by the Home tab's
+  // Basemap dropdown and read by GisCanvas to render the backdrop. Only
+  // "none"/"osm" are real; `lastBasemap` remembers the last non-none pick so
+  // the B shortcut can toggle Grid <-> that basemap.
+  const [basemap, setBasemapRaw] = useState("none");
+  const lastBasemapRef = useRef("osm");
+  const setBasemap = (id) => {
+    if (id !== "none") lastBasemapRef.current = id;
+    setBasemapRaw(id);
+  };
+  const toggleBasemap = () => setBasemapRaw((b) => (b === "none" ? lastBasemapRef.current : "none"));
+  // One-shot "pan/zoom here" request from the top-bar location search — same
+  // consume-once pattern as ribbonDrag. Turning on the OSM backdrop when a
+  // location is picked gives the jump somewhere to actually land visually.
+  const [flyTo, setFlyTo] = useState(null);
+  const goToLocation = (lat, lon) => {
+    setFlyTo({ lat, lon, key: Date.now() });
+    if (basemap === "none") setBasemap("osm");
+  };
   // In-progress ribbon → canvas drag: { items, index, x, y }. Shared between
   // ModeRibbon/OSWindow (start it, cycle it with Tab) and GisCanvas (consumes it on drop).
   const [ribbonDrag, setRibbonDrag] = useState(null);
@@ -101,6 +120,14 @@ export default function App() {
         const target = modes[Number(e.key) - 1];
         if (target) { e.preventDefault(); setMode(target); }
       }
+      // Toggle the map backdrop between the grid and the last-selected
+      // basemap — same bare-letter convention as the canvas's V/G/M/Q/X/Z
+      // tool shortcuts (see GisCanvas), so it lives here rather than there
+      // since the basemap selection itself is owned by App.
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleBasemap();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -137,8 +164,8 @@ export default function App() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
-      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} />
-      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} />
+      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation} />
+      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
         <ProjectPanel width={projectW} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
@@ -146,6 +173,8 @@ export default function App() {
           nodes={nodes} setNodes={setNodes}
           edges={edges} setEdges={setEdges}
           selected={selected} setSelected={setSelected}
+          basemap={basemap}
+          flyTo={flyTo} onConsumeFlyTo={() => setFlyTo(null)}
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
           edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
           reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
