@@ -5,6 +5,7 @@ import ProjectPanel from "./components/ProjectPanel.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import NetworkPanel from "./components/NetworkPanel.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
+import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
 
@@ -79,6 +80,20 @@ export default function App() {
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
+
+  // Home tab's Add Content annotation tools: `annotateTool` is armed from
+  // the ribbon and read by GisCanvas, which owns the actual draw/place
+  // interactions; `annotations` is the persisted list (text/marker/
+  // highlighter/arrow), `annotationStyle` the default colour/width for the
+  // next stroke, editable via the Annotation settings modal.
+  const [annotateTool, setAnnotateTool] = useState(null);
+  const [annotations, setAnnotations] = useState([]);
+  const [annotationStyle, setAnnotationStyle] = useState({
+    markerColor: "#2f6fed", markerWidth: 3,
+    highlighterColor: "#ff6100", highlighterWidth: 14,
+    arrowColor: "#e1455b",
+  });
+  const [showAnnotationSettings, setShowAnnotationSettings] = useState(false);
 
   // Reaches (map view line colour + table grouping) computed once here so
   // GisCanvas and NetworkPanel agree on exactly the same grouping. Users can
@@ -165,7 +180,9 @@ export default function App() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation} />
-      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap} />
+      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
+        annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
+        onOpenAnnotationSettings={() => setShowAnnotationSettings(true)} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
         <ProjectPanel width={projectW} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
@@ -178,6 +195,8 @@ export default function App() {
           ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
           edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
           reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
+          annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
+          annotations={annotations} setAnnotations={setAnnotations} annotationStyle={annotationStyle}
         />
         <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
         <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
@@ -202,6 +221,13 @@ export default function App() {
       )}
 
       {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+      {showAnnotationSettings && (
+        <AnnotationSettings
+          style={annotationStyle}
+          onChange={(patch) => setAnnotationStyle((s) => ({ ...s, ...patch }))}
+          onClose={() => setShowAnnotationSettings(false)}
+        />
+      )}
     </div>
   );
 }

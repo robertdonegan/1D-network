@@ -6,17 +6,38 @@ export const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", 
 // Home tab's ribbon — project-level actions rather than 1D network units,
 // so none of these are draggable onto the canvas.
 export const HOME_RIBBON = [
-  { id: "saveproject",    icon: "homeLoadFile",   label: "Save project",    chevron: true },
+  { id: "saveproject",    icon: "homeLoadFile",   label: "Save project",    chevron: true, menu: [
+    { label: "New project",      icon: "homeNewProject" },
+    { label: "Load project",     icon: "homeOpenProject" },
+    { label: "Save project",     icon: "homeLoadFile" },
+    { label: "Save as project",  icon: "homeLoadFile" },
+  ] },
   { sep: true },
-  { id: "projectextents", icon: "homeExpand",     label: "Project extents", chevron: true },
-  { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks",       chevron: true },
-  { id: "notes",          icon: "homeNote",       label: "Notes",          chevron: true },
+  { id: "projectextents", icon: "homeExpand",     label: "Project extents", chevron: true, menu: [
+    { label: "Go to X, Y",   icon: "placeholder" },
+    { label: "3D Viewer",    icon: "placeholder" },
+    { menuSep: true },
+    { label: "Properties",  icon: "placeholder" },
+  ] },
+  { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks (TBC)" },
+  { id: "notes",          icon: "homeNote",       label: "Notes (TBC)" },
   { id: "addcontent",     icon: "homeMarker",     label: "Add content",    chevron: true },
   { sep: true },
-  { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true },
+  { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true, menu: [
+    { label: "Add GIS data", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  ] },
   { id: "basemap",        icon: "homeGoToMap",    label: "Basemap",        chevron: true },
-  { id: "onlineservices", icon: "homeMapView",    label: "Online services",chevron: true },
-  { id: "fathom",         icon: "homeFathom",     label: "Fathom",         chevron: true },
+  { id: "onlineservices", icon: "homeMapView",    label: "Online services",chevron: true, menu: [
+    { label: "WMS",          icon: "placeholder" },
+    { label: "WFS",          icon: "placeholder" },
+    { label: "Data Library", icon: "placeholder" },
+  ] },
+  { id: "fathom",         icon: "homeFathom",     label: "Fathom",         chevron: true, menu: [
+    { label: "Download FATHOM data", icon: "placeholder" },
+    { label: "Load FATHOM data",     icon: "placeholder" },
+    { menuSep: true },
+    { label: "Fathom settings",      icon: "settingsColor" },
+  ] },
   { sep: true },
   { id: "projectsettings",icon: "settingsColor",  label: "Project settings" },
 ];
@@ -407,9 +428,10 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
           display: "flex", alignItems: "center", gap: 10, padding: "7px 10px",
           cursor: item.disabled ? "default" : (item.drag || item.onClick) ? "pointer" : "default",
           whiteSpace: "nowrap", borderRadius: 2, opacity: item.disabled ? 0.4 : 1,
+          background: item.active ? "var(--surface-4)" : "transparent",
         }}
         onMouseOver={(e) => !item.disabled && (e.currentTarget.style.background = "var(--surface-3)")}
-        onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+        onMouseOut={(e) => (e.currentTarget.style.background = item.active ? "var(--surface-4)" : "transparent")}
         title={item.disabled ? item.disabledReason : item.drag ? "Drag onto the canvas to place (hold Tab to cycle the type)" : undefined}
       >
         {hasCheck
@@ -500,7 +522,7 @@ const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this d
 // what ProjectPanel/NetworkPanel/GisCanvas show. `basemap`/`setBasemap` —
 // also owned by App (GisCanvas reads it to render the backdrop), driven here
 // by the Home tab's Basemap dropdown.
-export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap }) {
+export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
 
@@ -558,8 +580,20 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     { label: "Import comments", icon: "placeholder" },
     { label: "Export comments", icon: "placeholder" },
   ];
+  // Add Content (Home tab): picking a tool arms it on the canvas (owned by
+  // App/GisCanvas) and stays armed for multiple placements until Escape or
+  // picking another — clicking the already-armed tool disarms it.
+  const addContentMenu = [
+    { label: "Text box",    icon: "homeTextBox",    active: annotateTool === "textbox",     onClick: () => setAnnotateTool(annotateTool === "textbox" ? null : "textbox") },
+    { label: "Marker",      icon: "homeMarker",     active: annotateTool === "marker",       onClick: () => setAnnotateTool(annotateTool === "marker" ? null : "marker") },
+    { label: "Highlighter", icon: "homeHighlighter",active: annotateTool === "highlighter",  onClick: () => setAnnotateTool(annotateTool === "highlighter" ? null : "highlighter") },
+    { label: "Arrows",      icon: "homeArrowTool",  active: annotateTool === "arrow",        onClick: () => setAnnotateTool(annotateTool === "arrow" ? null : "arrow") },
+    { menuSep: true },
+    { label: "Annotation settings", icon: "settingsColor", onClick: onOpenAnnotationSettings },
+  ];
   const activeRibbon = (RIBBON_BY_MODE[mode] || []).map((g) => {
     if (mode === "Home" && g.id === "basemap") return { ...g, menu: basemapMenu };
+    if (mode === "Home" && g.id === "addcontent") return { ...g, menu: addContentMenu };
     if (mode === "FM 1D" && g.id === "viewlabels") return { ...g, menu: viewLabelsMenu };
     if (mode === "SWMM" && g.id === "viewlabelsswmm") return { ...g, menu: swmmViewLabelsMenu };
     if (mode === "GIS" && g.id === "snapping") return { ...g, menu: snappingMenu };

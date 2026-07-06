@@ -101,6 +101,8 @@ import lhs1 from "./assets/lhs-1.svg";
 import lhs2 from "./assets/lhs-2.svg";
 import lhs3 from "./assets/lhs-3.svg";
 import rectangleSelect from "./assets/rectangle-select.svg";
+import ellipticalSelect from "./assets/elliptical-select.svg";
+import freeformSelect from "./assets/freeform-select.svg";
 import measureTool from "./assets/measure-tool.svg";
 import pointQuery from "./assets/point-query.svg";
 import pan from "./assets/pan.svg";
@@ -121,6 +123,9 @@ import homeMapView from "./assets/home-map-view.svg";
 import homeFathom from "./assets/home-fathom.svg";
 import homeOpenProject from "./assets/home-open-project.svg";
 import homeNewProject from "./assets/home-new-project.svg";
+import homeTextBox from "./assets/home-text-box.svg";
+import homeHighlighter from "./assets/home-highlighter.svg";
+import homeArrowTool from "./assets/home-arrow-tool.svg";
 
 import mouseLeft from "./assets/mouse-left.svg";
 import mouseScroll from "./assets/mouse-scroll.svg";
@@ -173,10 +178,11 @@ export const A = {
   sim1dRiver, sim1dSwmm, simTuflow, simEstry,
   resultEmbeddedStructures,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
-  rectangleSelect, measureTool, pointQuery, pan, zoomTool, edit, northStar, comment,
+  rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, northStar, comment,
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
+  homeTextBox, homeHighlighter, homeArrowTool,
   mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
   ribbonActiveArea, ribbonBoundaryCondition, ribbonDefineTopo, ribbon1dEmbed, ribbon1d2dLink,
   ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,
