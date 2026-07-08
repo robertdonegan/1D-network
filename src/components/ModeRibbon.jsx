@@ -45,18 +45,23 @@ export const HOME_RIBBON = [
 // Ribbon groups. Leaf items with `drag:true` can be dragged onto the canvas.
 // `icon` is a key into A; items without a real uploaded asset use "placeholder".
 export const RIBBON = [
-  { id: "rivernet", icon: "load1d", label: "River Network", chevron: true, primary: true },
+  { id: "rivernet", icon: "load1d", label: "River Network", primary: true, menu: [
+    { label: "Load 1D network", icon: "loadRiverNetwork" },
+    { label: "New 1D network",  icon: "newRiverNetwork" },
+    { label: "Save 1D network", icon: "saveRiverNetwork" },
+    { label: "Save network as", icon: "saveAsRiverNetwork" },
+  ] },
   { sep: true },
   { id: "river", icon: "crossSection", label: "River", selected: true, menu: [
     { label: "River Section", icon: "crossSection",     shape: "square", drag: true },
-    { label: "CES Section",   icon: "placeholder",        shape: "square", drag: true },
+    { label: "CES Section",   icon: "cesSection",        shape: "square", drag: true },
     { label: "Interpolate",   icon: "interpolate",       shape: "diamond", drag: true },
     { label: "Replicate",     icon: "replicateNode",     shape: "diamond", drag: true },
-    { label: "Muskingum",     icon: "placeholder",  sub: [
-      { label: "Muskingum",   icon: "placeholder", shape: "square", drag: true },
-      { label: "Muskingum R", icon: "placeholder", shape: "square", drag: true },
-      { label: "Muskingum V", icon: "placeholder", shape: "square", drag: true },
-      { label: "Muskingum X", icon: "placeholder", shape: "square", drag: true },
+    { label: "Muskingum",     icon: "muskingum",  sub: [
+      { label: "Muskingum",   icon: "muskingum",   shape: "square", drag: true },
+      { label: "Muskingum R", icon: "muskingumR",  shape: "square", drag: true },
+      { label: "Muskingum V", icon: "muskingumV",  shape: "square", drag: true },
+      { label: "Muskingum X", icon: "muskingumX",  shape: "square", drag: true },
     ] },
   ] },
   { sep: true },
@@ -86,7 +91,7 @@ export const RIBBON = [
       { label: "Generic Rainfall/Runoff",icon: "hydrographGenRainfall", shape: "square", drag: true },
       { label: "FEH",                    icon: "hydrographFeh",         shape: "square", drag: true },
       { label: "ReFH",                   icon: "hydrographRefh",        shape: "square", drag: true },
-      { label: "ReFH2",                  icon: "placeholder",       shape: "square", drag: true },
+      { label: "ReFH2",                  icon: "refh2",             shape: "square", drag: true },
       { label: "FRQSIM",                 icon: "hydrographFrqsim",      shape: "square", drag: true },
       { label: "FSSR",                   icon: "hydrographFssr",        shape: "square", drag: true },
     ] },
@@ -121,13 +126,35 @@ export const RIBBON = [
     { label: "Leaky Dam",      icon: "leakyDam",      shape: "square", drag: true },
   ] },
   { sep: true },
-  { id: "bridges", icon: "superBridge",  label: "Bridges",  menu: [{ label: "Super Bridge",       icon: "superBridge",  shape: "square", drag: true }] },
+  { id: "bridges", icon: "superBridge",  label: "Bridges",  menu: [
+    { label: "Bridge",    icon: "superBridge",    shape: "square", drag: true },
+    { menuSep: true },
+    { label: "USBPR",     icon: "usbprBridge",    shape: "square", drag: true },
+    { label: "Arch",      icon: "archBridge",     shape: "square", drag: true },
+    { label: "Pier-loss", icon: "pierLossBridge", shape: "square", drag: true },
+  ] },
   { sep: true },
-  { id: "storage", icon: "spill",        label: "Storage",  menu: [{ label: "Spill",              icon: "spill",        shape: "square", drag: true }] },
+  { id: "storage", icon: "spill",        label: "Storage",  menu: [
+    { label: "Spill",       icon: "spill",       shape: "rect", drag: true },
+    { label: "Floodplain",  icon: "floodplain",  shape: "square", drag: true },
+    { label: "Online Pond", icon: "onlinePond",  shape: "square", drag: true },
+    { label: "Reservoir",   icon: "reservoir",   shape: "square", drag: true },
+  ] },
   { sep: true },
-  { id: "junction",icon: "openJunction", label: "Junction", menu: [{ label: "Open Junction",      icon: "openJunction", shape: "square", drag: true }] },
+  { id: "junction",icon: "openJunction", label: "Junction", menu: [
+    { label: "Open Junction",   icon: "openJunction",           shape: "square", drag: true },
+    { label: "Energy Junction", icon: "connectorEnergyJunction",shape: "square", drag: true },
+    { label: "Lateral",         icon: "connectorLateral",       shape: "square", drag: true },
+    { label: "Manhole",         icon: "connectorManhole",       shape: "square", drag: true },
+    { label: "Gauge",           icon: "connectorGaugeV2",       shape: "square", drag: true },
+  ] },
   { sep: true },
-  { id: "advanced",icon: "blockage",     label: "Advanced", menu: [{ label: "Blockage",           icon: "blockage",     shape: "square", drag: true }] },
+  { id: "advanced",icon: "blockage",     label: "Advanced", menu: [
+    { label: "Blockage",     icon: "blockage",    shape: "square", drag: true },
+    { label: "Breach",       icon: "breach",      shape: "square", drag: true },
+    { label: "Pump",         icon: "pump",        shape: "square", drag: true },
+    { label: "General loss", icon: "generalLoss", shape: "square", drag: true },
+  ] },
   { sep: true },
   { id: "viewlabels", icon: "labelsColor", label: "View labels", chevron: true },
   { id: "rules",      icon: "rulesColor",  label: "Rules" },
@@ -442,7 +469,7 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
       </div>
       {hasSub && subOpen && (
         <div style={{
-          position: "absolute", top: -5, left: "100%", minWidth: 190,
+          position: "absolute", top: -5, left: "100%", width: "max-content",
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 60,
         }}>
@@ -460,16 +487,20 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag }) {
   const hasMenu = !!group.menu;
   const isOpen = open === group.id;
   const groupItems = hasMenu ? ALL_ITEMS.filter((it) => it.top === group.label) : [];
+  const isSelected = isOpen;
+  const [hover, setHover] = useState(false);
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
       <button
         onClick={() => hasMenu ? setOpen(isOpen ? null : group.id) : undefined}
+        onMouseOver={() => setHover(true)}
+        onMouseOut={() => setHover(false)}
         style={{
           display: "flex", alignItems: "center", gap: 4, height: 32, padding: "0 8px",
           border: "none", borderRadius: 2, cursor: "pointer",
-          background: (group.selected || isOpen) ? "var(--surface-4)" : "transparent",
-          color: (group.selected || group.primary) ? "var(--text-primary-selected)" : "var(--text-primary)",
+          background: isSelected ? "var(--neutral-400)" : hover ? "var(--neutral-200)" : "transparent",
+          color: group.primary ? "var(--text-primary-selected)" : "var(--text-primary)",
         }}
       >
         <Icon src={A[group.icon]} size={16} />
@@ -478,14 +509,16 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag }) {
       {(hasMenu || group.chevron) && (
         <div
           onClick={() => hasMenu ? setOpen(isOpen ? null : group.id) : undefined}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 32, padding: "0 4px", cursor: "pointer", background: isOpen ? "var(--surface-4)" : "transparent", borderRadius: 2 }}
+          onMouseOver={(e) => { if (!isOpen) e.currentTarget.style.background = "var(--neutral-200)"; }}
+          onMouseOut={(e) => { e.currentTarget.style.background = isOpen ? "var(--neutral-400)" : "transparent"; }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 32, padding: "0 4px", cursor: "pointer", background: isOpen ? "var(--neutral-400)" : "transparent", borderRadius: 2 }}
         >
           <Icon src={A.keyDown} size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} />
         </div>
       )}
       {hasMenu && isOpen && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, marginTop: 2, minWidth: 210,
+          position: "absolute", top: "100%", left: 0, marginTop: 2, width: "max-content",
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 50,
         }}>

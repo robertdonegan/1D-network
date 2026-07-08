@@ -1,0 +1,22 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="16" height="16" fill="#1E1E1E"/>
+<g id="Flood Iconography">
+<g id="Ribbon">
+<path d="M-88 -642C-88 -644.209 -86.2091 -646 -84 -646H548C550.209 -646 552 -644.209 552 -642V1523C552 1525.21 550.209 1527 548 1527H-84C-86.2091 1527 -88 1525.21 -88 1523V-642Z" fill="white"/>
+<g id="Advanced dropdown">
+<g id="jbs/fm1d/advanced/pump" clip-path="url(#clip0_1_136)">
+<rect width="16" height="16" fill="white"/>
+<path id="Subtract" fill-rule="evenodd" clip-rule="evenodd" d="M16 0H0V11H2V8C2 4.68629 4.68629 2 8 2H14H16V0ZM16 5H14V8C14 11.3137 11.3137 14 8 14H2H0V16H16V5Z" fill="#333333"/>
+<circle id="Ellipse 170" cx="8" cy="8" r="3" fill="#999999"/>
+<rect id="Rectangle 257" x="12" y="5" width="9.94976" height="1.41421" transform="rotate(135 12 5)" fill="#999999"/>
+<rect id="Rectangle 258" x="11" y="12.0355" width="9.94976" height="1.41421" transform="rotate(-135 11 12.0355)" fill="#999999"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_136">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

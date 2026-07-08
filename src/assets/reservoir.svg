@@ -1,0 +1,20 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="16" height="16" fill="#1E1E1E"/>
+<g id="Flood Iconography">
+<g id="Ribbon">
+<path d="M-120 -508C-120 -510.209 -118.209 -512 -116 -512H516C518.209 -512 520 -510.209 520 -508V1657C520 1659.21 518.209 1661 516 1661H-116C-118.209 1661 -120 1659.21 -120 1657V-508Z" fill="white"/>
+<g id="Storage dropdown">
+<g id="jbs/fm1d/storage/reservoir" clip-path="url(#clip0_1_136)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.5 -0.5V16.5H-0.5V-0.5H16.5Z" fill="#D7D7D7" stroke="white"/>
+<path id="Rectangle 160" d="M15.083 12.3447C15.2243 12.9588 15.1011 13.6045 14.7432 14.123C14.2373 14.8557 13.3459 15.2204 12.4717 15.0518L8.58398 14.3008C5.57853 13.7204 3.13579 11.5335 2.22754 8.61035L1.00098 4.66309C0.802526 4.02428 0.867872 3.33244 1.18262 2.74219C1.68226 1.80526 2.71881 1.28557 3.76855 1.44531L9.11328 2.25879L9.14746 2.26367L9.18164 2.27246C11.8905 2.94966 13.8935 5.23969 14.2031 8.01465L14.3115 8.9873L15.083 12.3447Z" fill="#468AF3" stroke="white" stroke-width="1.5"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_136">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

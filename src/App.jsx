@@ -77,7 +77,7 @@ function BottomRevealHandle({ height, setHeight }) {
   };
   return (
     <div onMouseDown={onDown} title="Drag up to reveal the Global Animator panel" style={{
-      position: "absolute", left: 0, right: 0, bottom: height, height: 6, cursor: "row-resize", zIndex: 15,
+      position: "absolute", left: 0, right: 0, bottom: height, height: 8, cursor: "row-resize", zIndex: 15,
     }} />
   );
 }
@@ -299,7 +299,7 @@ export default function App() {
         {/* Canvas column: map + (optionally) the bottom-docked panel below
             it. The corner grip lives here so it tracks the canvas's actual
             top-right corner regardless of how wide the mid panel gets. */}
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", flexDirection: "column", position: "relative", gap: 8 }}>
           <GisCanvas
             nodes={nodes} setNodes={setNodes}
             edges={edges} setEdges={setEdges}

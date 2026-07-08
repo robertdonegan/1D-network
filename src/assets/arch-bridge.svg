@@ -1,0 +1,21 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="16" height="16" fill="#1E1E1E"/>
+<g id="Flood Iconography">
+<g id="Ribbon">
+<path d="M-120 -449C-120 -451.209 -118.209 -453 -116 -453H516C518.209 -453 520 -451.209 520 -449V1716C520 1718.21 518.209 1720 516 1720H-116C-118.209 1720 -120 1718.21 -120 1716V-449Z" fill="white"/>
+<g id="Bridges dropdown">
+<g id="jbs/fm1d/bridges/arch-bridge" clip-path="url(#clip0_1_136)">
+<rect width="16" height="16" fill="white"/>
+<path id="Vector 160" d="M14 16H2V12H14V16Z" fill="#468AF3"/>
+<path id="Rectangle 249" d="M0 0H16V3H0V0Z" fill="#D7D7D7"/>
+<path id="Subtract" d="M16.75 3.25V16.75H13.25V12C13.25 9.10051 10.8995 6.75 8 6.75C5.10051 6.75 2.75 9.10051 2.75 12V16.75H-0.75V3.25H16.75Z" fill="#333333" stroke="white" stroke-width="1.5"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_136">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

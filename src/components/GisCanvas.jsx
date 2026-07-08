@@ -2,7 +2,10 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { A, Icon } from "../assets.jsx";
 import NodePicker from "./NodePicker.jsx";
 import ReachPicker from "./ReachPicker.jsx";
-import OsmBasemap, { lonLatToWorld, METERS_PER_WORLD_UNIT } from "./OsmBasemap.jsx";
+import OsmBasemap, {
+  lonLatToWorld,
+  METERS_PER_WORLD_UNIT,
+} from "./OsmBasemap.jsx";
 import MapFooter from "./MapFooter.jsx";
 import TransectPopup from "./TransectPopup.jsx";
 import ContextMenu from "./ContextMenu.jsx";
@@ -20,11 +23,20 @@ const GROUP_BOX_STYLE = {
 const GROUP_PAD = 16; // px, screen-space padding around member nodes for the expanded bbox
 
 // Node geometry (Figma: 28px footprint, 20px icon). Diamonds (Interpolate /
-// Replicate) keep the same 20px icon but a tighter footprint so they read
-// as compact as the square units instead of floating inside extra padding.
+// Replicate) use a smaller footprint + icon so the rotated box hugs its
+// glyph tightly instead of ballooning past the square units' size — a 24px
+// square rotated 45° has a ~34px tip-to-tip footprint, which read as
+// noticeably *larger* than the 28px squares, backwards from the Figma spec.
 const OUTER = 28,
   ICONSZ = 20;
-const DIAMOND = 24;
+const DIAMOND = 16,
+  DIAMOND_ICONSZ = 14;
+// Rect-shaped units (e.g. Spill) render wider-than-tall so they stay visually
+// distinct from square/diamond units, but keep the same OUTER logical
+// footprint as squares (for line-attachment/hit-testing/ports math) — the
+// box is just recentred within that footprint via a render-only offset.
+const RECT_W = 32,
+  RECT_H = 18;
 const PR = 5;
 const MIN_SCALE = 0.25,
   MAX_SCALE = 4;
@@ -118,12 +130,15 @@ const ports = (n, view) => {
 
 function NodeBox({ iconKey, shape, selected, hovered, snap, size }) {
   const diamond = shape === "diamond";
+  const rect = shape === "rect";
   const borderWidth = hovered ? 3 : 2;
+  const boxW = rect ? RECT_W : size;
+  const boxH = rect ? RECT_H : size;
   return (
     <div
       style={{
-        width: size,
-        height: size,
+        width: boxW,
+        height: boxH,
         boxSizing: "border-box",
         background: selected ? "var(--node-selected-fill)" : "#fff",
         borderRadius: diamond ? 2 : 4,
@@ -131,7 +146,11 @@ function NodeBox({ iconKey, shape, selected, hovered, snap, size }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        transform: diamond ? "rotate(45deg)" : "none",
+        transform: rect
+          ? `translate(${(size - RECT_W) / 2}px, ${(size - RECT_H) / 2}px)`
+          : diamond
+            ? "rotate(45deg)"
+            : "none",
         boxShadow: snap ? "0 0 0 3px rgba(70,138,243,0.5)" : "none",
       }}
     >
@@ -140,8 +159,9 @@ function NodeBox({ iconKey, shape, selected, hovered, snap, size }) {
         alt=""
         draggable={false}
         style={{
-          width: ICONSZ,
-          height: ICONSZ,
+          width: diamond ? DIAMOND_ICONSZ : rect ? RECT_W - 8 : ICONSZ,
+          height: diamond ? DIAMOND_ICONSZ : rect ? RECT_H - 4 : ICONSZ,
+          objectFit: "contain",
           display: "block",
           transform: diamond ? "rotate(-45deg)" : "none",
           pointerEvents: "none",
@@ -173,8 +193,12 @@ const GROUP_SELECT_SHAPES = [
 function pointInPolygon(px, py, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
-    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    const xi = poly[i].x,
+      yi = poly[i].y,
+      xj = poly[j].x,
+      yj = poly[j].y;
+    const intersect =
+      yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
     if (intersect) inside = !inside;
   }
   return inside;
@@ -286,7 +310,10 @@ export default function GisCanvas({
   // themselves, so this only fires for genuine outside clicks).
   useEffect(() => {
     if (!groupSelectMenuOpen && !measureMenuOpen) return;
-    const onDown = () => { setGroupSelectMenuOpen(false); setMeasureMenuOpen(false); };
+    const onDown = () => {
+      setGroupSelectMenuOpen(false);
+      setMeasureMenuOpen(false);
+    };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [groupSelectMenuOpen, measureMenuOpen]);
@@ -295,7 +322,10 @@ export default function GisCanvas({
   // mid-draw for that tool, matching how other tools reset when you leave them.
   useEffect(() => {
     if (activeTool !== 1) setMarquee(null);
-    if (activeTool !== 2) { setMeasure(null); setFinishedMeasure(null); }
+    if (activeTool !== 2) {
+      setMeasure(null);
+      setFinishedMeasure(null);
+    }
   }, [activeTool]);
 
   const pt = (e) => {
@@ -321,7 +351,10 @@ export default function GisCanvas({
       edges.forEach((e) => {
         if (e.to === nodeId && !ids.has(e.id)) {
           ids.add(e.id);
-          if (!seenNodes.has(e.from)) { seenNodes.add(e.from); queue.push(e.from); }
+          if (!seenNodes.has(e.from)) {
+            seenNodes.add(e.from);
+            queue.push(e.from);
+          }
         }
       });
     }
@@ -331,8 +364,10 @@ export default function GisCanvas({
   const groupCentroidWorld = (g) => {
     const members = nodes.filter((n) => g.memberIds.includes(n.id));
     if (!members.length) return { x: 0, y: 0 };
-    const cx = members.reduce((s, n) => s + n.x + sizeOf(n) / 2, 0) / members.length;
-    const cy = members.reduce((s, n) => s + n.y + sizeOf(n) / 2, 0) / members.length;
+    const cx =
+      members.reduce((s, n) => s + n.x + sizeOf(n) / 2, 0) / members.length;
+    const cy =
+      members.reduce((s, n) => s + n.y + sizeOf(n) / 2, 0) / members.length;
     return { x: cx, y: cy };
   };
 
@@ -354,14 +389,27 @@ export default function GisCanvas({
     if (ids.length < 2) return;
     setGroups((gs) => {
       const cleaned = gs
-        .map((g) => ({ ...g, memberIds: g.memberIds.filter((id) => !ids.includes(id)) }))
+        .map((g) => ({
+          ...g,
+          memberIds: g.memberIds.filter((id) => !ids.includes(id)),
+        }))
         .filter((g) => g.memberIds.length > 1);
-      return [...cleaned, { id: genId(), name: "Group " + (gs.length + 1), memberIds: ids, collapsed: false }];
+      return [
+        ...cleaned,
+        {
+          id: genId(),
+          name: "Group " + (gs.length + 1),
+          memberIds: ids,
+          collapsed: false,
+        },
+      ];
     });
     setSelected(ids);
   };
   const toggleGroupCollapsed = (groupId) => {
-    setGroups((gs) => gs.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)));
+    setGroups((gs) =>
+      gs.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)),
+    );
   };
   const ungroup = (groupId) => {
     setGroups((gs) => gs.filter((g) => g.id !== groupId));
@@ -372,8 +420,13 @@ export default function GisCanvas({
   // the whole selection sits inside one existing group.
   const buildMenuItems = (ids) => {
     const items = [];
-    const touchedGroupIds = [...new Set(ids.map((id) => groupOfNode[id]?.id).filter(Boolean))];
-    if (touchedGroupIds.length === 1 && ids.every((id) => groupOfNode[id]?.id === touchedGroupIds[0])) {
+    const touchedGroupIds = [
+      ...new Set(ids.map((id) => groupOfNode[id]?.id).filter(Boolean)),
+    ];
+    if (
+      touchedGroupIds.length === 1 &&
+      ids.every((id) => groupOfNode[id]?.id === touchedGroupIds[0])
+    ) {
       const g = groups.find((x) => x.id === touchedGroupIds[0]);
       items.push({
         label: g.collapsed ? "Expand Group" : "Collapse Group",
@@ -384,7 +437,11 @@ export default function GisCanvas({
       items.push({ label: "Create Group", onClick: () => createGroup(ids) });
     }
     if (ids.length === 1 && !groupOfNode[ids[0]]) {
-      items.push({ label: "Delete", danger: true, onClick: () => setConfirmId(ids[0]) });
+      items.push({
+        label: "Delete",
+        danger: true,
+        onClick: () => setConfirmId(ids[0]),
+      });
     }
     return items;
   };
@@ -472,8 +529,18 @@ export default function GisCanvas({
   const resetView = () => setView({ scale: 1, tx: 0, ty: 0, rotation: 0 });
   // Pan and Zoom are mutually exclusive persistent tools — turning one on
   // turns the other off, like a normal tool selector.
-  const togglePanMode = () => setPanMode((m) => { const next = !m; if (next) setZoomMode(false); return next; });
-  const toggleZoomMode = () => setZoomMode((m) => { const next = !m; if (next) setPanMode(false); return next; });
+  const togglePanMode = () =>
+    setPanMode((m) => {
+      const next = !m;
+      if (next) setZoomMode(false);
+      return next;
+    });
+  const toggleZoomMode = () =>
+    setZoomMode((m) => {
+      const next = !m;
+      if (next) setPanMode(false);
+      return next;
+    });
   const resetNorth = () => {
     const el = wrapRef.current;
     const cx = el ? el.clientWidth / 2 : 400,
@@ -497,7 +564,12 @@ export default function GisCanvas({
     const cx = el ? el.clientWidth / 2 : 400,
       cy = el ? el.clientHeight / 2 : 300;
     const w = lonLatToWorld(flyTo.lon, flyTo.lat);
-    setView({ scale: FLY_TO_SCALE, rotation: 0, tx: cx - w.x * FLY_TO_SCALE, ty: cy - w.y * FLY_TO_SCALE });
+    setView({
+      scale: FLY_TO_SCALE,
+      rotation: 0,
+      tx: cx - w.x * FLY_TO_SCALE,
+      ty: cy - w.y * FLY_TO_SCALE,
+    });
     onConsumeFlyTo();
   }, [flyTo, onConsumeFlyTo]);
 
@@ -509,7 +581,7 @@ export default function GisCanvas({
     const onWheel = (e) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
-      const zoomingIn = (e.deltaY < 0) !== e.altKey;
+      const zoomingIn = e.deltaY < 0 !== e.altKey;
       const base = zoomingIn ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
       const factor = e.shiftKey ? Math.pow(base, 0.3) : base;
       zoomBy(factor, { x: e.clientX - r.left, y: e.clientY - r.top });
@@ -607,7 +679,9 @@ export default function GisCanvas({
         return;
       }
       if (marquee) {
-        setMarquee((m) => m && { ...m, x1: p.x, y1: p.y, path: [...m.path, p] });
+        setMarquee(
+          (m) => m && { ...m, x1: p.x, y1: p.y, path: [...m.path, p] },
+        );
         return;
       }
       if (measure) {
@@ -646,7 +720,14 @@ export default function GisCanvas({
               tEnd.screen,
             ];
             for (let i = 0; i < chain.length - 1; i++) {
-              const c = closestOnSegment(p.x, p.y, chain[i].x, chain[i].y, chain[i + 1].x, chain[i + 1].y);
+              const c = closestOnSegment(
+                p.x,
+                p.y,
+                chain[i].x,
+                chain[i].y,
+                chain[i + 1].x,
+                chain[i + 1].y,
+              );
               if (c.dist < bestDist) {
                 bestDist = c.dist;
                 best = { edgeId: ed.id, segIndex: i, x: c.x, y: c.y };
@@ -663,7 +744,11 @@ export default function GisCanvas({
         setNodes((ns) =>
           ns.map((n) =>
             dragNode.ids.includes(n.id)
-              ? { ...n, x: dragNode.startPositions[n.id].x + dx, y: dragNode.startPositions[n.id].y + dy }
+              ? {
+                  ...n,
+                  x: dragNode.startPositions[n.id].x + dx,
+                  y: dragNode.startPositions[n.id].y + dy,
+                }
               : n,
           ),
         );
@@ -730,11 +815,18 @@ export default function GisCanvas({
     (e) => {
       if (annotateDraft) {
         if (annotateDraft.type === "arrow") {
-          const dx = annotateDraft.to.x - annotateDraft.from.x, dy = annotateDraft.to.y - annotateDraft.from.y;
+          const dx = annotateDraft.to.x - annotateDraft.from.x,
+            dy = annotateDraft.to.y - annotateDraft.from.y;
           if (Math.hypot(dx, dy) * view.scale > 3) {
             setAnnotations((a) => [
               ...a,
-              { id: genId(), type: "arrow", from: annotateDraft.from, to: annotateDraft.to, color: annotationStyle.arrowColor },
+              {
+                id: genId(),
+                type: "arrow",
+                from: annotateDraft.from,
+                to: annotateDraft.to,
+                color: annotationStyle.arrowColor,
+              },
             ]);
           }
         } else if (annotateDraft.points.length > 1) {
@@ -744,8 +836,14 @@ export default function GisCanvas({
               id: genId(),
               type: annotateDraft.type,
               points: annotateDraft.points,
-              color: annotateDraft.type === "marker" ? annotationStyle.markerColor : annotationStyle.highlighterColor,
-              width: annotateDraft.type === "marker" ? annotationStyle.markerWidth : annotationStyle.highlighterWidth,
+              color:
+                annotateDraft.type === "marker"
+                  ? annotationStyle.markerColor
+                  : annotationStyle.highlighterColor,
+              width:
+                annotateDraft.type === "marker"
+                  ? annotationStyle.markerWidth
+                  : annotationStyle.highlighterWidth,
             },
           ]);
         }
@@ -753,24 +851,31 @@ export default function GisCanvas({
         return;
       }
       if (marquee) {
-        const x0 = Math.min(marquee.x0, marquee.x1), x1 = Math.max(marquee.x0, marquee.x1);
-        const y0 = Math.min(marquee.y0, marquee.y1), y1 = Math.max(marquee.y0, marquee.y1);
+        const x0 = Math.min(marquee.x0, marquee.x1),
+          x1 = Math.max(marquee.x0, marquee.x1);
+        const y0 = Math.min(marquee.y0, marquee.y1),
+          y1 = Math.max(marquee.y0, marquee.y1);
         const hitIds = nodes
           .filter((n) => {
             const c = centerScreen(n, view);
             if (marquee.shape === "ellipse") {
-              const rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
+              const rx = (x1 - x0) / 2,
+                ry = (y1 - y0) / 2;
               if (rx <= 0 || ry <= 0) return false;
-              const cx = x0 + rx, cy = y0 + ry;
+              const cx = x0 + rx,
+                cy = y0 + ry;
               return ((c.x - cx) / rx) ** 2 + ((c.y - cy) / ry) ** 2 <= 1;
             }
-            if (marquee.shape === "freeform") return pointInPolygon(c.x, c.y, marquee.path);
+            if (marquee.shape === "freeform")
+              return pointInPolygon(c.x, c.y, marquee.path);
             return c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1;
           })
           .map((n) => n.id);
         setSelected((sel) => {
-          if (marquee.mode === "add") return Array.from(new Set([...sel, ...hitIds]));
-          if (marquee.mode === "subtract") return sel.filter((id) => !hitIds.includes(id));
+          if (marquee.mode === "add")
+            return Array.from(new Set([...sel, ...hitIds]));
+          if (marquee.mode === "subtract")
+            return sel.filter((id) => !hitIds.includes(id));
           return hitIds;
         });
         setMarquee(null);
@@ -792,7 +897,10 @@ export default function GisCanvas({
           if (edge) {
             const beforePoints = edge.points.slice(0, hoverSplice.segIndex);
             const afterPoints = edge.points.slice(hoverSplice.segIndex);
-            const e1Ids = new Set([edge.from, ...beforePoints.map((v) => v.id)]);
+            const e1Ids = new Set([
+              edge.from,
+              ...beforePoints.map((v) => v.id),
+            ]);
             const e2Ids = new Set([...afterPoints.map((v) => v.id), edge.to]);
             const splitCurves = (idSet) => {
               if (!edge.curves) return undefined;
@@ -806,13 +914,37 @@ export default function GisCanvas({
             const w = toWorld(view, hoverSplice.x, hoverSplice.y);
             setNodes((ns) => [
               ...ns,
-              { id, icon: item.icon, shape: item.shape, x: w.x - sz / 2, y: w.y - sz / 2, label, unitLabel: item.label },
+              {
+                id,
+                icon: item.icon,
+                shape: item.shape,
+                x: w.x - sz / 2,
+                y: w.y - sz / 2,
+                label,
+                unitLabel: item.label,
+              },
             ]);
             setEdges((es) =>
-              es.filter((x) => x.id !== hoverSplice.edgeId).concat([
-                { id: genId(), from: edge.from, to: id, points: beforePoints, curves: splitCurves(e1Ids), reach: edge.reach },
-                { id: genId(), from: id, to: edge.to, points: afterPoints, curves: splitCurves(e2Ids), reach: edge.reach },
-              ]),
+              es
+                .filter((x) => x.id !== hoverSplice.edgeId)
+                .concat([
+                  {
+                    id: genId(),
+                    from: edge.from,
+                    to: id,
+                    points: beforePoints,
+                    curves: splitCurves(e1Ids),
+                    reach: edge.reach,
+                  },
+                  {
+                    id: genId(),
+                    from: id,
+                    to: edge.to,
+                    points: afterPoints,
+                    curves: splitCurves(e2Ids),
+                    reach: edge.reach,
+                  },
+                ]),
             );
             setSelected([id]);
             setDropHint(false);
@@ -870,7 +1002,19 @@ export default function GisCanvas({
       setWire(null);
       setSnapTo(null);
     },
-    [ribbonDrag, wire, snapTo, edges, view, onConsumeRibbonDrag, marquee, nodes, hoverSplice, annotateDraft, annotationStyle],
+    [
+      ribbonDrag,
+      wire,
+      snapTo,
+      edges,
+      view,
+      onConsumeRibbonDrag,
+      marquee,
+      nodes,
+      hoverSplice,
+      annotateDraft,
+      annotationStyle,
+    ],
   );
 
   // Alt/Option+click on a node or vertex adds a bezier handle to every reach
@@ -906,7 +1050,10 @@ export default function GisCanvas({
       es.map((ed) =>
         ed.id !== edgeId || ed.curves?.[key]
           ? ed
-          : { ...ed, curves: { ...(ed.curves || {}), [key]: { x: w.x, y: w.y } } },
+          : {
+              ...ed,
+              curves: { ...(ed.curves || {}), [key]: { x: w.x, y: w.y } },
+            },
       ),
     );
   };
@@ -922,13 +1069,16 @@ export default function GisCanvas({
       return;
     }
     if (e.ctrlKey || e.metaKey || e.shiftKey) {
-      setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
+      setSelected((sel) =>
+        sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id],
+      );
       return;
     }
     const p = pt(e);
     // Clicking an already-multi-selected node keeps the whole selection (so
     // dragging moves the group); otherwise it replaces the selection.
-    const dragIds = selected.includes(id) && selected.length > 1 ? selected : [id];
+    const dragIds =
+      selected.includes(id) && selected.length > 1 ? selected : [id];
     if (!(selected.includes(id) && selected.length > 1)) setSelected([id]);
     const startWorld = toWorld(view, p.x, p.y);
     const startPositions = {};
@@ -974,7 +1124,9 @@ export default function GisCanvas({
         let curves = ed.curves;
         if (curves) {
           curves = Object.fromEntries(
-            Object.entries(curves).filter(([key]) => !key.split("|").includes(pid)),
+            Object.entries(curves).filter(
+              ([key]) => !key.split("|").includes(pid),
+            ),
           );
           if (!Object.keys(curves).length) curves = undefined;
         }
@@ -1005,7 +1157,11 @@ export default function GisCanvas({
   const delNode = (id) => {
     setNodes((ns) => ns.filter((n) => n.id !== id));
     setEdges((es) => es.filter((e) => e.from !== id && e.to !== id));
-    setGroups((gs) => gs.map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => m !== id) })).filter((g) => g.memberIds.length > 1));
+    setGroups((gs) =>
+      gs
+        .map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => m !== id) }))
+        .filter((g) => g.memberIds.length > 1),
+    );
     setSelected([]);
   };
 
@@ -1014,11 +1170,21 @@ export default function GisCanvas({
   // stray empty annotation.
   const commitTextEditing = () => {
     if (textEditing && textEditing.value.trim()) {
-      setAnnotations((a) => [...a, { id: textEditing.id, type: "text", x: textEditing.x, y: textEditing.y, value: textEditing.value }]);
+      setAnnotations((a) => [
+        ...a,
+        {
+          id: textEditing.id,
+          type: "text",
+          x: textEditing.x,
+          y: textEditing.y,
+          value: textEditing.value,
+        },
+      ]);
     }
     setTextEditing(null);
   };
-  const deleteAnnotation = (id) => setAnnotations((a) => a.filter((an) => an.id !== id));
+  const deleteAnnotation = (id) =>
+    setAnnotations((a) => a.filter((an) => an.id !== id));
 
   // Segment distances + running total, in metres (same ground scale as the
   // footer's scale bar) — used for both the live in-progress readout and the
@@ -1027,7 +1193,8 @@ export default function GisCanvas({
     const segs = [];
     let total = 0;
     for (let i = 0; i < points.length - 1; i++) {
-      const dx = points[i + 1].x - points[i].x, dy = points[i + 1].y - points[i].y;
+      const dx = points[i + 1].x - points[i].x,
+        dy = points[i + 1].y - points[i].y;
       const m = Math.hypot(dx, dy) * METERS_PER_WORLD_UNIT;
       total += m;
       segs.push(m);
@@ -1118,7 +1285,10 @@ export default function GisCanvas({
     };
     const onKey = (e) => {
       if (e.key === "Escape") {
-        if (textEditing) { commitTextEditing(); return; }
+        if (textEditing) {
+          commitTextEditing();
+          return;
+        }
         if (annotateDraft) return setAnnotateDraft(null);
         if (contextMenu) return setContextMenu(null);
         if (picker) return setPicker(null);
@@ -1136,7 +1306,11 @@ export default function GisCanvas({
         if (annotateTool) return setAnnotateTool(null);
         return setSelected([]);
       }
-      if ((e.key === "Enter" || e.key === "NumpadEnter") && measure && !isTyping(e)) {
+      if (
+        (e.key === "Enter" || e.key === "NumpadEnter") &&
+        measure &&
+        !isTyping(e)
+      ) {
         e.preventDefault();
         finishMeasure();
         return;
@@ -1181,28 +1355,61 @@ export default function GisCanvas({
       }
       if (noMods && !isTyping(e)) {
         const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
-        if (toolKey !== undefined) { e.preventDefault(); setActiveTool(toolKey); }
-        if (e.key.toLowerCase() === "x") { e.preventDefault(); togglePanMode(); }
-        if (e.key.toLowerCase() === "z") { e.preventDefault(); toggleZoomMode(); }
+        if (toolKey !== undefined) {
+          e.preventDefault();
+          setActiveTool(toolKey);
+        }
+        if (e.key.toLowerCase() === "x") {
+          e.preventDefault();
+          togglePanMode();
+        }
+        if (e.key.toLowerCase() === "z") {
+          e.preventDefault();
+          toggleZoomMode();
+        }
       }
       // Selection shortcuts (Keyboard Shortcuts spec — GUI section).
-      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "a" && !isTyping(e)) {
+      if (
+        e.ctrlKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "a" &&
+        !isTyping(e)
+      ) {
         e.preventDefault();
         setSelected(nodes.map((n) => n.id));
       }
-      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "d" && !isTyping(e)) {
+      if (
+        e.ctrlKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "d" &&
+        !isTyping(e)
+      ) {
         e.preventDefault();
         setSelected([]);
       }
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "i" && !isTyping(e)) {
+      if (
+        e.ctrlKey &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "i" &&
+        !isTyping(e)
+      ) {
         e.preventDefault();
-        setSelected((sel) => nodes.filter((n) => !sel.includes(n.id)).map((n) => n.id));
+        setSelected((sel) =>
+          nodes.filter((n) => !sel.includes(n.id)).map((n) => n.id),
+        );
       }
-      if ((e.key === "," || e.key === ".") && selected.length === 1 && !isTyping(e)) {
+      if (
+        (e.key === "," || e.key === ".") &&
+        selected.length === 1 &&
+        !isTyping(e)
+      ) {
         e.preventDefault();
         const i = nodes.findIndex((n) => n.id === selected[0]);
         if (i !== -1) {
-          const next = e.key === "," ? Math.max(0, i - 1) : Math.min(nodes.length - 1, i + 1);
+          const next =
+            e.key === ","
+              ? Math.max(0, i - 1)
+              : Math.min(nodes.length - 1, i + 1);
           setSelected([nodes[next].id]);
         }
       }
@@ -1216,7 +1423,28 @@ export default function GisCanvas({
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("keyup", onKeyUp);
     };
-  }, [selected, selectedVertex, confirmId, picker, reachPicker, wire, spaceHeld, zoomBy, resetView, nodes, togglePanMode, toggleZoomMode, measure, marquee, transectPopup, contextMenu, textEditing, annotateDraft, annotateTool, setAnnotateTool]);
+  }, [
+    selected,
+    selectedVertex,
+    confirmId,
+    picker,
+    reachPicker,
+    wire,
+    spaceHeld,
+    zoomBy,
+    resetView,
+    nodes,
+    togglePanMode,
+    toggleZoomMode,
+    measure,
+    marquee,
+    transectPopup,
+    contextMenu,
+    textEditing,
+    annotateDraft,
+    annotateTool,
+    setAnnotateTool,
+  ]);
 
   // Middle-click, space/Pan-tool held drag always pans. A plain left-click
   // hold on empty canvas also pans, but only while nothing is selected —
@@ -1258,7 +1486,15 @@ export default function GisCanvas({
     if (activeTool === 1 && e.target === e.currentTarget && e.button === 0) {
       const p = pt(e);
       const mode = e.shiftKey ? "add" : e.altKey ? "subtract" : "replace";
-      setMarquee({ mode, shape: groupSelectShape, x0: p.x, y0: p.y, x1: p.x, y1: p.y, path: [p] });
+      setMarquee({
+        mode,
+        shape: groupSelectShape,
+        x0: p.x,
+        y0: p.y,
+        x1: p.x,
+        y1: p.y,
+        path: [p],
+      });
       return;
     }
     if (activeTool === 2 && e.target === e.currentTarget && e.button === 0) {
@@ -1276,11 +1512,27 @@ export default function GisCanvas({
     if (e.target === e.currentTarget && e.button === 0) {
       const p = pt(e);
       if (e.ctrlKey || e.shiftKey) {
-        setMarquee({ mode: "add", shape: "rect", x0: p.x, y0: p.y, x1: p.x, y1: p.y, path: [p] });
+        setMarquee({
+          mode: "add",
+          shape: "rect",
+          x0: p.x,
+          y0: p.y,
+          x1: p.x,
+          y1: p.y,
+          path: [p],
+        });
         return;
       }
       if (e.altKey) {
-        setMarquee({ mode: "subtract", shape: "rect", x0: p.x, y0: p.y, x1: p.x, y1: p.y, path: [p] });
+        setMarquee({
+          mode: "subtract",
+          shape: "rect",
+          x0: p.x,
+          y0: p.y,
+          x1: p.x,
+          y1: p.y,
+          path: [p],
+        });
         return;
       }
     }
@@ -1308,52 +1560,108 @@ export default function GisCanvas({
   // most-specific state first. Falls through to MapFooter's own baseline
   // (Select/Zoom/Options) when nothing below applies.
   const guideItems = (() => {
-    if (confirmId) return [{ label: "Click Delete to confirm" }, { label: "Esc to cancel" }];
-    if (textEditing) return [{ label: "Type your note" }, { label: "Click away or Esc to finish" }];
-    if (annotateTool === "textbox") return [{ label: "Click to place a text box" }, { label: "Esc to stop" }];
-    if (annotateTool === "marker" || annotateTool === "highlighter") return [{ label: "Drag to draw" }, { label: "Esc to stop" }];
-    if (annotateTool === "arrow") return [{ label: "Drag from start to end" }, { label: "Esc to stop" }];
-    if (picker || reachPicker) return [{ label: "Click an item to choose" }, { label: "Esc to cancel" }];
-    if (ribbonDrag) return hoverSplice
-      ? [{ label: "Tab to cycle the unit type" }, { label: "Release to insert into the reach" }]
-      : [{ label: "Tab to cycle the unit type" }, { label: "Drop on the canvas to place, or on a line to insert" }];
-    if (toolDrag?.tool === "zoom") return [
-      { icon: "mouseLeftDrag", label: "Drag up to zoom in, down to zoom out" },
-      { label: "Alt inverts · Shift slows" },
-    ];
-    if (toolDrag?.tool === "rotate") return [{ label: "Drag to rotate" }, { label: "Alt inverts · Shift slows" }];
-    if (toolDrag?.tool === "pan") return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
-    if (panDrag) return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
-    if (marquee) return [{ label: marquee.mode === "subtract" ? "Release to remove from selection" : "Release to select" }];
-    if (measure) return [{ label: "Click to add a point" }, { label: "Enter/double-click to finish" }];
-    if (wire) return [{ label: "Drop on a node to connect" }, { label: "Release elsewhere to choose a unit" }];
-    if (dragNode) return [{ label: "Drag to reposition" }, { label: "Release to drop" }];
-    if (dragVertex) return [{ label: "Drag to move the point" }, { label: "Double-click to convert to a unit" }];
+    if (confirmId)
+      return [{ label: "Click Delete to confirm" }, { label: "Esc to cancel" }];
+    if (textEditing)
+      return [
+        { label: "Type your note" },
+        { label: "Click away or Esc to finish" },
+      ];
+    if (annotateTool === "textbox")
+      return [{ label: "Click to place a text box" }, { label: "Esc to stop" }];
+    if (annotateTool === "marker" || annotateTool === "highlighter")
+      return [{ label: "Drag to draw" }, { label: "Esc to stop" }];
+    if (annotateTool === "arrow")
+      return [{ label: "Drag from start to end" }, { label: "Esc to stop" }];
+    if (picker || reachPicker)
+      return [{ label: "Click an item to choose" }, { label: "Esc to cancel" }];
+    if (ribbonDrag)
+      return hoverSplice
+        ? [
+            { label: "Tab to cycle the unit type" },
+            { label: "Release to insert into the reach" },
+          ]
+        : [
+            { label: "Tab to cycle the unit type" },
+            { label: "Drop on the canvas to place, or on a line to insert" },
+          ];
+    if (toolDrag?.tool === "zoom")
+      return [
+        {
+          icon: "mouseLeftDrag",
+          label: "Drag up to zoom in, down to zoom out",
+        },
+        { label: "Alt inverts · Shift slows" },
+      ];
+    if (toolDrag?.tool === "rotate")
+      return [
+        { label: "Drag to rotate" },
+        { label: "Alt inverts · Shift slows" },
+      ];
+    if (toolDrag?.tool === "pan")
+      return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
+    if (panDrag)
+      return [{ label: "Drag to pan" }, { label: "Alt inverts · Shift slows" }];
+    if (marquee)
+      return [
+        {
+          label:
+            marquee.mode === "subtract"
+              ? "Release to remove from selection"
+              : "Release to select",
+        },
+      ];
+    if (measure)
+      return [
+        { label: "Click to add a point" },
+        { label: "Enter/double-click to finish" },
+      ];
+    if (wire)
+      return [
+        { label: "Drop on a node to connect" },
+        { label: "Release elsewhere to choose a unit" },
+      ];
+    if (dragNode)
+      return [{ label: "Drag to reposition" }, { label: "Release to drop" }];
+    if (dragVertex)
+      return [
+        { label: "Drag to move the point" },
+        { label: "Double-click to convert to a unit" },
+      ];
     if (dragCurve) return [{ label: "Drag to bend the curve" }];
-    if (zoomMode) return [{ label: "Click to zoom in" }, { label: "Alt+Click to zoom out" }];
+    if (zoomMode)
+      return [
+        { label: "Click to zoom in" },
+        { label: "Alt+Click to zoom out" },
+      ];
     if (panMode) return [{ label: "Click-drag to pan" }];
-    if (selected.length > 1) return [
-      { icon: "mouseRight", label: "Right-click to group" },
-      { label: "Shift/Ctrl+Click to add/remove" },
-      { label: "Alt+Click to deselect one" },
-    ];
-    if (selected.length === 1) return [
-      { icon: "mouseRight", label: "Right-click for options" },
-      { label: "Shift/Ctrl+Click to add another" },
-      { label: "Alt+Click to deselect · Del to remove" },
-    ];
-    if (selectedVertex) return [
-      { label: "Double-click to convert to a unit" },
-      { label: "Del to remove" },
-    ];
-    if (hovered) return [
-      { icon: "mouseLeft", label: "Click to select" },
-      { label: "Shift/Ctrl+Click to multi-select" },
-    ];
-    if (hoverLine) return [
-      { label: "Click midpoint to add a point" },
-      { label: "Alt+Click to bend · Click to reassign the reach" },
-    ];
+    if (selected.length > 1)
+      return [
+        { icon: "mouseRight", label: "Right-click to group" },
+        { label: "Shift/Ctrl+Click to add/remove" },
+        { label: "Alt+Click to deselect one" },
+      ];
+    if (selected.length === 1)
+      return [
+        { icon: "mouseRight", label: "Right-click for options" },
+        { label: "Shift/Ctrl+Click to add another" },
+        { label: "Alt+Click to deselect · Del to remove" },
+      ];
+    if (selectedVertex)
+      return [
+        { label: "Double-click to convert to a unit" },
+        { label: "Del to remove" },
+      ];
+    if (hovered)
+      return [
+        { icon: "mouseLeft", label: "Click to select" },
+        { label: "Shift/Ctrl+Click to multi-select" },
+      ];
+    if (hoverLine)
+      return [
+        { label: "Click midpoint to add a point" },
+        { label: "Alt+Click to bend · Click to reassign the reach" },
+      ];
     return null;
   })();
 
@@ -1403,7 +1711,12 @@ export default function GisCanvas({
         onMouseUp={onUp}
         onMouseDown={onWrapDown}
         onDoubleClick={() => measure && finishMeasure()}
-        onContextMenu={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); setContextMenu(null); } }}
+        onContextMenu={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            setContextMenu(null);
+          }
+        }}
         onMouseLeave={() => {
           setDragNode(null);
           setDragVertex(null);
@@ -1444,7 +1757,11 @@ export default function GisCanvas({
           {railTools.map((t, i) => {
             // The group-select rail icon reflects whichever shape (rect/
             // ellipse/freeform) is currently armed via its submenu.
-            const icon = i === 1 ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape).icon : t.icon;
+            const icon =
+              i === 1
+                ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape)
+                    .icon
+                : t.icon;
             return (
               <div key={t.name} style={{ position: "relative" }}>
                 <button
@@ -1464,7 +1781,7 @@ export default function GisCanvas({
                     borderRadius: 2,
                     cursor: "pointer",
                     background:
-                      activeTool === i ? "var(--surface-4)" : "transparent",
+                      activeTool === i ? "var(--surface-brand)" : "transparent",
                   }}
                   onMouseOver={(e) => {
                     if (activeTool !== i)
@@ -1475,7 +1792,15 @@ export default function GisCanvas({
                       e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <Icon src={icon} size={16} />
+                  <Icon
+                    src={icon}
+                    size={16}
+                    style={
+                      activeTool === i
+                        ? { filter: "brightness(0) invert(1)" }
+                        : undefined
+                    }
+                  />
                   {t.hasMenu && (
                     <div
                       style={{
@@ -1496,21 +1821,46 @@ export default function GisCanvas({
                   <div
                     onMouseDown={(e) => e.stopPropagation()}
                     style={{
-                      position: "absolute", left: "100%", top: 0, marginLeft: 4, zIndex: 30, width: 150,
-                      background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-                      borderRadius: 2, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", padding: 4,
-                      display: "flex", flexDirection: "column", gap: 2,
+                      position: "absolute",
+                      left: "100%",
+                      top: 0,
+                      marginLeft: 4,
+                      zIndex: 30,
+                      width: 150,
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-primary)",
+                      borderRadius: 2,
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      padding: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
                     }}
                   >
                     {GROUP_SELECT_SHAPES.map((s) => (
                       <button
                         key={s.id}
-                        onClick={() => { setGroupSelectShape(s.id); setActiveTool(1); setGroupSelectMenuOpen(false); }}
+                        onClick={() => {
+                          setGroupSelectShape(s.id);
+                          setActiveTool(1);
+                          setGroupSelectMenuOpen(false);
+                        }}
                         style={{
-                          display: "flex", alignItems: "center", gap: 4, height: 24, padding: 4,
-                          border: "none", borderRadius: 2, cursor: "pointer", textAlign: "left",
-                          background: groupSelectShape === s.id ? "var(--surface-3)" : "transparent",
-                          fontSize: "var(--fs-xs)", color: "var(--text-primary)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          height: 24,
+                          padding: 4,
+                          border: "none",
+                          borderRadius: 2,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          background:
+                            groupSelectShape === s.id
+                              ? "var(--surface-3)"
+                              : "transparent",
+                          fontSize: "var(--fs-xs)",
+                          color: "var(--text-primary)",
                         }}
                       >
                         <Icon src={s.icon} size={16} />
@@ -1524,31 +1874,71 @@ export default function GisCanvas({
                   <div
                     onMouseDown={(e) => e.stopPropagation()}
                     style={{
-                      position: "absolute", left: "100%", top: 0, marginLeft: 4, zIndex: 30, width: 150,
-                      background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-                      borderRadius: 2, boxShadow: "0 2px 4px rgba(0,0,0,0.1)", padding: 4,
-                      display: "flex", flexDirection: "column", gap: 2,
+                      position: "absolute",
+                      left: "100%",
+                      top: 0,
+                      marginLeft: 4,
+                      zIndex: 30,
+                      width: 150,
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--border-primary)",
+                      borderRadius: 2,
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                      padding: 4,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
                     }}
                   >
                     <button
-                      onClick={() => { setMeasureArmedMode("measure"); setActiveTool(2); setMeasureMenuOpen(false); }}
+                      onClick={() => {
+                        setMeasureArmedMode("measure");
+                        setActiveTool(2);
+                        setMeasureMenuOpen(false);
+                      }}
                       style={{
-                        display: "flex", alignItems: "center", gap: 4, height: 24, padding: 4,
-                        border: "none", borderRadius: 2, cursor: "pointer", textAlign: "left",
-                        background: measureArmedMode === "measure" ? "var(--surface-3)" : "transparent",
-                        fontSize: "var(--fs-xs)", color: "var(--text-primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        height: 24,
+                        padding: 4,
+                        border: "none",
+                        borderRadius: 2,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        background:
+                          measureArmedMode === "measure"
+                            ? "var(--surface-3)"
+                            : "transparent",
+                        fontSize: "var(--fs-xs)",
+                        color: "var(--text-primary)",
                       }}
                     >
                       <Icon src={A.measureTool} size={16} />
                       Measure
                     </button>
                     <button
-                      onClick={() => { setMeasureArmedMode("transect"); setActiveTool(2); setMeasureMenuOpen(false); }}
+                      onClick={() => {
+                        setMeasureArmedMode("transect");
+                        setActiveTool(2);
+                        setMeasureMenuOpen(false);
+                      }}
                       style={{
-                        display: "flex", alignItems: "center", gap: 4, height: 24, padding: 4,
-                        border: "none", borderRadius: 2, cursor: "pointer", textAlign: "left",
-                        background: measureArmedMode === "transect" ? "var(--surface-3)" : "transparent",
-                        fontSize: "var(--fs-xs)", color: "var(--text-primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        height: 24,
+                        padding: 4,
+                        border: "none",
+                        borderRadius: 2,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        background:
+                          measureArmedMode === "transect"
+                            ? "var(--surface-3)"
+                            : "transparent",
+                        fontSize: "var(--fs-xs)",
+                        color: "var(--text-primary)",
                       }}
                     >
                       <Icon src={A.measureTool} size={16} />
@@ -1616,8 +2006,10 @@ export default function GisCanvas({
                 width: 34,
                 height: 34,
                 borderRadius: "50%",
-                background: b.active ? "var(--surface-4)" : "var(--surface-1)",
-                border: "1px solid var(--border-primary)",
+                background: b.active
+                  ? "var(--surface-brand)"
+                  : "var(--surface-1)",
+                border: b.active ? "none" : "1px solid var(--border-primary)",
                 boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
                 display: "flex",
                 alignItems: "center",
@@ -1625,7 +2017,14 @@ export default function GisCanvas({
                 cursor: "grab",
               }}
             >
-              <Icon src={b.icon} size={18} style={b.iconStyle} />
+              <Icon
+                src={b.icon}
+                size={18}
+                style={{
+                  ...b.iconStyle,
+                  ...(b.active ? { filter: "brightness(0) invert(1)" } : null),
+                }}
+              />
             </div>
           ))}
         </div>
@@ -1796,7 +2195,9 @@ export default function GisCanvas({
                 })}
                 {e.points.map((v) => {
                   const s = toScreen(view, v.x, v.y);
-                  const isVertexSel = selectedVertex?.edgeId === e.id && selectedVertex?.pid === v.id;
+                  const isVertexSel =
+                    selectedVertex?.edgeId === e.id &&
+                    selectedVertex?.pid === v.id;
                   return (
                     <circle
                       key={v.id}
@@ -1804,7 +2205,11 @@ export default function GisCanvas({
                       cy={s.y}
                       r={5}
                       fill={isVertexSel ? "var(--node-selected-fill)" : "#fff"}
-                      stroke={isVertexSel ? "var(--node-selected-border)" : reachStroke}
+                      stroke={
+                        isVertexSel
+                          ? "var(--node-selected-border)"
+                          : reachStroke
+                      }
                       strokeWidth={2}
                       style={{
                         pointerEvents: "all",
@@ -1820,21 +2225,44 @@ export default function GisCanvas({
           })}
           {/* Splice preview — while dragging a ribbon unit over a reach
               line, highlight that segment and mark where it'll be inserted. */}
-          {hoverSplice && (() => {
-            const edge = edges.find((x) => x.id === hoverSplice.edgeId);
-            if (!edge) return null;
-            const fEnd = resolveEndpoint(edge.from), tEnd = resolveEndpoint(edge.to);
-            if (!fEnd || !tEnd) return null;
-            const chain = [fEnd.screen, ...edge.points.map((v) => toScreen(view, v.x, v.y)), tEnd.screen];
-            const c1 = chain[hoverSplice.segIndex], c2 = chain[hoverSplice.segIndex + 1];
-            if (!c1 || !c2) return null;
-            return (
-              <g style={{ pointerEvents: "none" }}>
-                <line x1={c1.x} y1={c1.y} x2={c2.x} y2={c2.y} stroke="var(--blue-700)" strokeWidth={5} strokeLinecap="round" opacity={0.35} />
-                <circle cx={hoverSplice.x} cy={hoverSplice.y} r={7} fill="var(--blue-700)" stroke="#fff" strokeWidth={1.5} />
-              </g>
-            );
-          })()}
+          {hoverSplice &&
+            (() => {
+              const edge = edges.find((x) => x.id === hoverSplice.edgeId);
+              if (!edge) return null;
+              const fEnd = resolveEndpoint(edge.from),
+                tEnd = resolveEndpoint(edge.to);
+              if (!fEnd || !tEnd) return null;
+              const chain = [
+                fEnd.screen,
+                ...edge.points.map((v) => toScreen(view, v.x, v.y)),
+                tEnd.screen,
+              ];
+              const c1 = chain[hoverSplice.segIndex],
+                c2 = chain[hoverSplice.segIndex + 1];
+              if (!c1 || !c2) return null;
+              return (
+                <g style={{ pointerEvents: "none" }}>
+                  <line
+                    x1={c1.x}
+                    y1={c1.y}
+                    x2={c2.x}
+                    y2={c2.y}
+                    stroke="var(--blue-700)"
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    opacity={0.35}
+                  />
+                  <circle
+                    cx={hoverSplice.x}
+                    cy={hoverSplice.y}
+                    r={7}
+                    fill="var(--blue-700)"
+                    stroke="#fff"
+                    strokeWidth={1.5}
+                  />
+                </g>
+              );
+            })()}
           {wire && (
             <line
               x1={wire.x1}
@@ -1858,24 +2286,38 @@ export default function GisCanvas({
             straight line across them. */}
         {(flowLinesOn || flowLabelsOn) && (
           <>
-            <style>{
-              "@keyframes fm-flow-dash-fwd { to { stroke-dashoffset: -20; } }" +
-              "@keyframes fm-flow-dash-rev { to { stroke-dashoffset: 20; } }" +
-              "@keyframes fm-wet-dash { to { stroke-dashoffset: -30; } }"
-            }</style>
-            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            <style>
+              {"@keyframes fm-flow-dash-fwd { to { stroke-dashoffset: -20; } }" +
+                "@keyframes fm-flow-dash-rev { to { stroke-dashoffset: 20; } }" +
+                "@keyframes fm-wet-dash { to { stroke-dashoffset: -30; } }"}
+            </style>
+            <svg
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+              }}
+            >
               {edges.map((e) => {
-                const fEnd = resolveEndpoint(e.from), tEnd = resolveEndpoint(e.to);
+                const fEnd = resolveEndpoint(e.from),
+                  tEnd = resolveEndpoint(e.to);
                 if (!fEnd || !tEnd) return null;
                 if (fEnd.groupId && fEnd.groupId === tEnd.groupId) return null;
                 const chain = [
                   { id: e.from, screen: fEnd.screen },
-                  ...e.points.map((v) => ({ id: v.id, screen: toScreen(view, v.x, v.y) })),
+                  ...e.points.map((v) => ({
+                    id: v.id,
+                    screen: toScreen(view, v.x, v.y),
+                  })),
                   { id: e.to, screen: tEnd.screen },
                 ];
                 const flow = flowByEdge?.[e.id];
                 if (!flow) return null;
-                const inRange = flow.velocity >= velocityRange.min && flow.velocity <= velocityRange.max;
+                const inRange =
+                  flow.velocity >= velocityRange.min &&
+                  flow.velocity <= velocityRange.max;
                 const showPulse = flowLinesOn && (!clipOutOfRange || inRange);
                 const traced = flowTracerOn && tracedEdgeIds?.has(e.id);
                 const duration = Math.max(0.35, 1.8 - flow.velocity * 1.5);
@@ -1887,7 +2329,8 @@ export default function GisCanvas({
                 let d = `M ${chain[0].screen.x} ${chain[0].screen.y}`;
                 const midpoints = [];
                 for (let i = 0; i < chain.length - 1; i++) {
-                  const c1 = chain[i], c2 = chain[i + 1];
+                  const c1 = chain[i],
+                    c2 = chain[i + 1];
                   const key = c1.id + "|" + c2.id;
                   const ctrl = e.curves?.[key];
                   if (ctrl) {
@@ -1896,36 +2339,83 @@ export default function GisCanvas({
                     midpoints.push(cs);
                   } else {
                     d += ` L ${c2.screen.x} ${c2.screen.y}`;
-                    midpoints.push({ x: (c1.screen.x + c2.screen.x) / 2, y: (c1.screen.y + c2.screen.y) / 2 });
+                    midpoints.push({
+                      x: (c1.screen.x + c2.screen.x) / 2,
+                      y: (c1.screen.y + c2.screen.y) / 2,
+                    });
                   }
                 }
 
                 return (
                   <g key={e.id}>
-                    {traced && <path d={d} fill="none" stroke="var(--node-selected-border)" strokeWidth={6} strokeLinecap="round" opacity={0.35} />}
+                    {traced && (
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="var(--node-selected-border)"
+                        strokeWidth={6}
+                        strokeLinecap="round"
+                        opacity={0.35}
+                      />
+                    )}
                     {showPulse && (
                       <>
                         {/* Recessive base line — the "channel" stays visible between wave passes */}
-                        <path d={d} fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2} strokeLinecap="round" opacity={0.22} />
+                        <path
+                          d={d}
+                          fill="none"
+                          stroke="var(--interface-blue-500, #55c7ff)"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          opacity={0.22}
+                        />
                         {/* Several soft-edged dashes travelling together (not blurred — that bled outside the line) */}
                         <path
-                          d={d} fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2.5} strokeLinecap="round"
+                          d={d}
+                          fill="none"
+                          stroke="var(--interface-blue-500, #55c7ff)"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
                           strokeDasharray="4 6"
-                          style={{ animation: `${reversed ? "fm-flow-dash-rev" : "fm-flow-dash-fwd"} ${duration}s linear infinite` }}
+                          style={{
+                            animation: `${reversed ? "fm-flow-dash-rev" : "fm-flow-dash-fwd"} ${duration}s linear infinite`,
+                          }}
                         />
                       </>
                     )}
-                    {flowLabelsOn && (() => {
-                      const metric = FLOW_LABEL_METRICS.find((m) => m.id === flowLabelMetric) || FLOW_LABEL_METRICS[0];
-                      const text = metric.format(flow);
-                      const labelW = Math.max(30, text.length * 6 + 8);
-                      return midpoints.map((mp, i) => (
-                        <g key={"label" + i}>
-                          <rect x={mp.x - labelW / 2} y={mp.y - 9} width={labelW} height={14} rx={2} fill="rgba(255,255,255,0.9)" stroke="var(--border-primary)" strokeWidth={1} />
-                          <text x={mp.x} y={mp.y + 1} textAnchor="middle" fontSize={9} fontWeight={500} fill="var(--text-primary)">{text}</text>
-                        </g>
-                      ));
-                    })()}
+                    {flowLabelsOn &&
+                      (() => {
+                        const metric =
+                          FLOW_LABEL_METRICS.find(
+                            (m) => m.id === flowLabelMetric,
+                          ) || FLOW_LABEL_METRICS[0];
+                        const text = metric.format(flow);
+                        const labelW = Math.max(30, text.length * 6 + 8);
+                        return midpoints.map((mp, i) => (
+                          <g key={"label" + i}>
+                            <rect
+                              x={mp.x - labelW / 2}
+                              y={mp.y - 9}
+                              width={labelW}
+                              height={14}
+                              rx={2}
+                              fill="rgba(255,255,255,0.9)"
+                              stroke="var(--border-primary)"
+                              strokeWidth={1}
+                            />
+                            <text
+                              x={mp.x}
+                              y={mp.y + 1}
+                              textAnchor="middle"
+                              fontSize={9}
+                              fontWeight={500}
+                              fill="var(--text-primary)"
+                            >
+                              {text}
+                            </text>
+                          </g>
+                        ));
+                      })()}
                   </g>
                 );
               })}
@@ -1935,115 +2425,272 @@ export default function GisCanvas({
 
         {/* Group-select marquee + measure/transect overlay — separate layer
             so it doesn't interfere with the reach-editing svg's hit testing. */}
-        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+        <svg
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        >
           {marquee && marquee.shape === "rect" && (
             <rect
-              x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)}
-              width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)}
-              fill={marquee.mode === "subtract" ? "rgba(225,69,91,0.1)" : "rgba(70,138,243,0.1)"}
-              stroke={marquee.mode === "subtract" ? "var(--red-700)" : "var(--blue-700)"}
-              strokeWidth={1} strokeDasharray="4 3"
+              x={Math.min(marquee.x0, marquee.x1)}
+              y={Math.min(marquee.y0, marquee.y1)}
+              width={Math.abs(marquee.x1 - marquee.x0)}
+              height={Math.abs(marquee.y1 - marquee.y0)}
+              fill={
+                marquee.mode === "subtract"
+                  ? "rgba(225,69,91,0.1)"
+                  : "rgba(70,138,243,0.1)"
+              }
+              stroke={
+                marquee.mode === "subtract"
+                  ? "var(--red-700)"
+                  : "var(--blue-700)"
+              }
+              strokeWidth={1}
+              strokeDasharray="4 3"
             />
           )}
           {marquee && marquee.shape === "ellipse" && (
             <ellipse
-              cx={(marquee.x0 + marquee.x1) / 2} cy={(marquee.y0 + marquee.y1) / 2}
-              rx={Math.abs(marquee.x1 - marquee.x0) / 2} ry={Math.abs(marquee.y1 - marquee.y0) / 2}
-              fill={marquee.mode === "subtract" ? "rgba(225,69,91,0.1)" : "rgba(70,138,243,0.1)"}
-              stroke={marquee.mode === "subtract" ? "var(--red-700)" : "var(--blue-700)"}
-              strokeWidth={1} strokeDasharray="4 3"
+              cx={(marquee.x0 + marquee.x1) / 2}
+              cy={(marquee.y0 + marquee.y1) / 2}
+              rx={Math.abs(marquee.x1 - marquee.x0) / 2}
+              ry={Math.abs(marquee.y1 - marquee.y0) / 2}
+              fill={
+                marquee.mode === "subtract"
+                  ? "rgba(225,69,91,0.1)"
+                  : "rgba(70,138,243,0.1)"
+              }
+              stroke={
+                marquee.mode === "subtract"
+                  ? "var(--red-700)"
+                  : "var(--blue-700)"
+              }
+              strokeWidth={1}
+              strokeDasharray="4 3"
             />
           )}
           {marquee && marquee.shape === "freeform" && (
             <polygon
               points={marquee.path.map((p) => `${p.x},${p.y}`).join(" ")}
-              fill={marquee.mode === "subtract" ? "rgba(225,69,91,0.1)" : "rgba(70,138,243,0.1)"}
-              stroke={marquee.mode === "subtract" ? "var(--red-700)" : "var(--blue-700)"}
-              strokeWidth={1} strokeDasharray="4 3"
+              fill={
+                marquee.mode === "subtract"
+                  ? "rgba(225,69,91,0.1)"
+                  : "rgba(70,138,243,0.1)"
+              }
+              stroke={
+                marquee.mode === "subtract"
+                  ? "var(--red-700)"
+                  : "var(--blue-700)"
+              }
+              strokeWidth={1}
+              strokeDasharray="4 3"
             />
           )}
 
           {/* In-progress measure/transect line — each drawn segment gets its
               own distance label, plus a live segment out to the cursor. */}
-          {measure && (() => {
-            const screenPts = measure.points.map((w) => toScreen(view, w.x, w.y));
-            const cursorScreen = toScreen(view, measure.cursor.x, measure.cursor.y);
-            const { segs, total } = measureDistances([...measure.points, measure.cursor]);
-            const color = measure.mode === "transect" ? "var(--node-selected-border)" : "var(--blue-700)";
-            return (
-              <g>
-                {screenPts.slice(0, -1).map((p1, i) => {
-                  const p2 = screenPts[i + 1];
-                  return <line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={color} strokeWidth={2} />;
-                })}
-                <line x1={screenPts[screenPts.length - 1].x} y1={screenPts[screenPts.length - 1].y} x2={cursorScreen.x} y2={cursorScreen.y} stroke={color} strokeWidth={2} strokeDasharray="4 3" />
-                {screenPts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={color} />)}
-                {segs.slice(0, -1).map((m, i) => {
-                  const p1 = screenPts[i], p2 = screenPts[i + 1];
-                  return (
-                    <text key={i} x={(p1.x + p2.x) / 2} y={(p1.y + p2.y) / 2 - 6} textAnchor="middle" fontSize={10} fill="var(--text-primary)" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
-                      {m.toFixed(1)}m
-                    </text>
-                  );
-                })}
-                <text x={cursorScreen.x} y={cursorScreen.y - 12} textAnchor="middle" fontSize={11} fontWeight={600} fill={color} style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
-                  {segs[segs.length - 1].toFixed(1)}m · total {total.toFixed(1)}m
-                </text>
-              </g>
-            );
-          })()}
+          {measure &&
+            (() => {
+              const screenPts = measure.points.map((w) =>
+                toScreen(view, w.x, w.y),
+              );
+              const cursorScreen = toScreen(
+                view,
+                measure.cursor.x,
+                measure.cursor.y,
+              );
+              const { segs, total } = measureDistances([
+                ...measure.points,
+                measure.cursor,
+              ]);
+              const color =
+                measure.mode === "transect"
+                  ? "var(--node-selected-border)"
+                  : "var(--blue-700)";
+              return (
+                <g>
+                  {screenPts.slice(0, -1).map((p1, i) => {
+                    const p2 = screenPts[i + 1];
+                    return (
+                      <line
+                        key={i}
+                        x1={p1.x}
+                        y1={p1.y}
+                        x2={p2.x}
+                        y2={p2.y}
+                        stroke={color}
+                        strokeWidth={2}
+                      />
+                    );
+                  })}
+                  <line
+                    x1={screenPts[screenPts.length - 1].x}
+                    y1={screenPts[screenPts.length - 1].y}
+                    x2={cursorScreen.x}
+                    y2={cursorScreen.y}
+                    stroke={color}
+                    strokeWidth={2}
+                    strokeDasharray="4 3"
+                  />
+                  {screenPts.map((p, i) => (
+                    <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={color} />
+                  ))}
+                  {segs.slice(0, -1).map((m, i) => {
+                    const p1 = screenPts[i],
+                      p2 = screenPts[i + 1];
+                    return (
+                      <text
+                        key={i}
+                        x={(p1.x + p2.x) / 2}
+                        y={(p1.y + p2.y) / 2 - 6}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fill="var(--text-primary)"
+                        style={{
+                          paintOrder: "stroke",
+                          stroke: "#fff",
+                          strokeWidth: 3,
+                        }}
+                      >
+                        {m.toFixed(1)}m
+                      </text>
+                    );
+                  })}
+                  <text
+                    x={cursorScreen.x}
+                    y={cursorScreen.y - 12}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight={600}
+                    fill={color}
+                    style={{
+                      paintOrder: "stroke",
+                      stroke: "#fff",
+                      strokeWidth: 3,
+                    }}
+                  >
+                    {segs[segs.length - 1].toFixed(1)}m · total{" "}
+                    {total.toFixed(1)}m
+                  </text>
+                </g>
+              );
+            })()}
 
           {/* Finished measure line stays drawn (with its labels) until a new
               one starts or the tool changes. */}
-          {finishedMeasure && (() => {
-            const screenPts = finishedMeasure.points.map((w) => toScreen(view, w.x, w.y));
-            const { segs, total } = measureDistances(finishedMeasure.points);
-            return (
-              <g>
-                {screenPts.slice(0, -1).map((p1, i) => {
-                  const p2 = screenPts[i + 1];
-                  return <line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="var(--blue-700)" strokeWidth={2} />;
-                })}
-                {screenPts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3.5} fill="var(--blue-700)" />)}
-                {segs.map((m, i) => {
-                  const p1 = screenPts[i], p2 = screenPts[i + 1];
-                  return (
-                    <text key={i} x={(p1.x + p2.x) / 2} y={(p1.y + p2.y) / 2 - 6} textAnchor="middle" fontSize={10} fill="var(--text-primary)" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
-                      {m.toFixed(1)}m
-                    </text>
-                  );
-                })}
-                <text x={screenPts[screenPts.length - 1].x} y={screenPts[screenPts.length - 1].y - 12} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--blue-700)" style={{ paintOrder: "stroke", stroke: "#fff", strokeWidth: 3 }}>
-                  total {total.toFixed(1)}m
-                </text>
-              </g>
-            );
-          })()}
+          {finishedMeasure &&
+            (() => {
+              const screenPts = finishedMeasure.points.map((w) =>
+                toScreen(view, w.x, w.y),
+              );
+              const { segs, total } = measureDistances(finishedMeasure.points);
+              return (
+                <g>
+                  {screenPts.slice(0, -1).map((p1, i) => {
+                    const p2 = screenPts[i + 1];
+                    return (
+                      <line
+                        key={i}
+                        x1={p1.x}
+                        y1={p1.y}
+                        x2={p2.x}
+                        y2={p2.y}
+                        stroke="var(--blue-700)"
+                        strokeWidth={2}
+                      />
+                    );
+                  })}
+                  {screenPts.map((p, i) => (
+                    <circle
+                      key={i}
+                      cx={p.x}
+                      cy={p.y}
+                      r={3.5}
+                      fill="var(--blue-700)"
+                    />
+                  ))}
+                  {segs.map((m, i) => {
+                    const p1 = screenPts[i],
+                      p2 = screenPts[i + 1];
+                    return (
+                      <text
+                        key={i}
+                        x={(p1.x + p2.x) / 2}
+                        y={(p1.y + p2.y) / 2 - 6}
+                        textAnchor="middle"
+                        fontSize={10}
+                        fill="var(--text-primary)"
+                        style={{
+                          paintOrder: "stroke",
+                          stroke: "#fff",
+                          strokeWidth: 3,
+                        }}
+                      >
+                        {m.toFixed(1)}m
+                      </text>
+                    );
+                  })}
+                  <text
+                    x={screenPts[screenPts.length - 1].x}
+                    y={screenPts[screenPts.length - 1].y - 12}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontWeight={600}
+                    fill="var(--blue-700)"
+                    style={{
+                      paintOrder: "stroke",
+                      stroke: "#fff",
+                      strokeWidth: 3,
+                    }}
+                  >
+                    total {total.toFixed(1)}m
+                  </text>
+                </g>
+              );
+            })()}
         </svg>
 
         {/* Expanded groups' bounding boxes — sit beneath the node layer so
             member nodes visually read as "inside" the tinted box. */}
-        {groups.filter((g) => !g.collapsed).map((g) => {
-          const members = nodes.filter((n) => g.memberIds.includes(n.id));
-          if (!members.length) return null;
-          const rects = members.map((n) => ({ s: toScreen(view, n.x, n.y), sz: sizeOf(n) }));
-          const left = Math.min(...rects.map((r) => r.s.x)) - GROUP_PAD;
-          const top = Math.min(...rects.map((r) => r.s.y)) - GROUP_PAD;
-          const right = Math.max(...rects.map((r) => r.s.x + r.sz)) + GROUP_PAD;
-          const bottom = Math.max(...rects.map((r) => r.s.y + r.sz)) + GROUP_PAD;
-          return (
-            <div key={g.id}
-              onMouseDown={(e) => groupBoxDown(e, g)}
-              onContextMenu={(e) => onGroupContext(e, g)}
-              style={{
-                position: "absolute",
-                left, top, width: right - left, height: bottom - top,
-                cursor: dragNode?.ids?.includes(g.memberIds[0]) ? "grabbing" : "grab",
-                ...GROUP_BOX_STYLE,
-              }}
-            />
-          );
-        })}
+        {groups
+          .filter((g) => !g.collapsed)
+          .map((g) => {
+            const members = nodes.filter((n) => g.memberIds.includes(n.id));
+            if (!members.length) return null;
+            const rects = members.map((n) => ({
+              s: toScreen(view, n.x, n.y),
+              sz: sizeOf(n),
+            }));
+            const left = Math.min(...rects.map((r) => r.s.x)) - GROUP_PAD;
+            const top = Math.min(...rects.map((r) => r.s.y)) - GROUP_PAD;
+            const right =
+              Math.max(...rects.map((r) => r.s.x + r.sz)) + GROUP_PAD;
+            const bottom =
+              Math.max(...rects.map((r) => r.s.y + r.sz)) + GROUP_PAD;
+            return (
+              <div
+                key={g.id}
+                onMouseDown={(e) => groupBoxDown(e, g)}
+                onContextMenu={(e) => onGroupContext(e, g)}
+                style={{
+                  position: "absolute",
+                  left,
+                  top,
+                  width: right - left,
+                  height: bottom - top,
+                  cursor: dragNode?.ids?.includes(g.memberIds[0])
+                    ? "grabbing"
+                    : "grab",
+                  ...GROUP_BOX_STYLE,
+                }}
+              />
+            );
+          })}
 
         {/* Nodes */}
         {nodes.map((n) => {
@@ -2052,7 +2699,9 @@ export default function GisCanvas({
           const s = toScreen(view, n.x, n.y);
           const sz = sizeOf(n);
           const isHov = hovered === n.id,
-            isSel = selected.includes(n.id) || Boolean(memberGroup && !memberGroup.collapsed),
+            isSel =
+              selected.includes(n.id) ||
+              Boolean(memberGroup && !memberGroup.collapsed),
             isSnap = snapTo === n.id;
           const isConfluence = (degree?.[n.id] || 0) >= 3;
           const showPorts =
@@ -2060,13 +2709,17 @@ export default function GisCanvas({
           // "Wet": this unit sits on at least one reach currently showing a
           // flow pulse — the travelling ring around its icon is the same
           // "water is moving through here" cue as the line pulse itself.
-          const isWet = flowLinesOn && edges.some((ed) => {
-            if (ed.from !== n.id && ed.to !== n.id) return false;
-            const flow = flowByEdge?.[ed.id];
-            if (!flow) return false;
-            const inRange = flow.velocity >= velocityRange.min && flow.velocity <= velocityRange.max;
-            return !clipOutOfRange || inRange;
-          });
+          const isWet =
+            flowLinesOn &&
+            edges.some((ed) => {
+              if (ed.from !== n.id && ed.to !== n.id) return false;
+              const flow = flowByEdge?.[ed.id];
+              if (!flow) return false;
+              const inRange =
+                flow.velocity >= velocityRange.min &&
+                flow.velocity <= velocityRange.max;
+              return !clipOutOfRange || inRange;
+            });
           return (
             <div key={n.id}>
               {(isHov || isSel) && (
@@ -2104,15 +2757,33 @@ export default function GisCanvas({
               {isWet && (
                 <svg
                   title="Wet: flow is currently moving through this unit"
-                  style={{ position: "absolute", left: s.x - 3, top: s.y - 3, width: sz + 6, height: sz + 6, pointerEvents: "none", overflow: "visible" }}
+                  style={{
+                    position: "absolute",
+                    left: s.x - 3,
+                    top: s.y - 3,
+                    width: sz + 6,
+                    height: sz + 6,
+                    pointerEvents: "none",
+                    overflow: "visible",
+                  }}
                 >
                   <rect
-                    x={1} y={1} width={sz + 4} height={sz + 4}
+                    x={1}
+                    y={1}
+                    width={sz + 4}
+                    height={sz + 4}
                     rx={n.shape === "diamond" ? 3 : 6}
-                    fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2}
-                    strokeDasharray="6 9" strokeLinecap="round"
+                    fill="none"
+                    stroke="var(--interface-blue-500, #55c7ff)"
+                    strokeWidth={2}
+                    strokeDasharray="6 9"
+                    strokeLinecap="round"
                     style={{ animation: "fm-wet-dash 1.4s linear infinite" }}
-                    transform={n.shape === "diamond" ? `rotate(45 ${(sz + 6) / 2} ${(sz + 6) / 2})` : undefined}
+                    transform={
+                      n.shape === "diamond"
+                        ? `rotate(45 ${(sz + 6) / 2} ${(sz + 6) / 2})`
+                        : undefined
+                    }
                   />
                 </svg>
               )}
@@ -2173,91 +2844,190 @@ export default function GisCanvas({
             actually reads a reach by: rate, velocity, stage, depth, and
             Froude number (with its sub/super/critical regime), plus a
             live-trace sparkline, matching fm-v8-1d-unit-tooltip. */}
-        {flowLinesOn && hovered && !dragNode && (() => {
-          const n = nodes.find((x) => x.id === hovered);
-          if (!n) return null;
-          const edge = edges.find((e) => e.from === n.id || e.to === n.id);
-          const flow = edge ? flowByEdge?.[edge.id] : null;
-          const s = toScreen(view, n.x, n.y);
-          const sparkPts = "0,8 8,3 16,6 24,1 32,5 40,2 48,7";
-          const regimeColor = flow?.regime === "Subcritical" ? "var(--blue-700)" : flow?.regime === "Supercritical" ? "var(--red-700)" : "var(--text-tertiary)";
-          const row = (label, value) => (
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{label}</span>
-              <span style={{ fontSize: 10, fontWeight: 500, color: "var(--text-primary)" }}>{value}</span>
-            </div>
-          );
-          return (
-            <div style={{
-              position: "absolute", left: s.x + sizeOf(n) + 8, top: s.y - 8, zIndex: 40, pointerEvents: "none",
-              background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
-              boxShadow: "0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.1)",
-              padding: 10, display: "flex", flexDirection: "column", gap: 6, width: 168,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Icon src={A[n.icon]} size={14} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)" }}>{n.unitLabel || n.label}</span>
+        {flowLinesOn &&
+          hovered &&
+          !dragNode &&
+          (() => {
+            const n = nodes.find((x) => x.id === hovered);
+            if (!n) return null;
+            const edge = edges.find((e) => e.from === n.id || e.to === n.id);
+            const flow = edge ? flowByEdge?.[edge.id] : null;
+            const s = toScreen(view, n.x, n.y);
+            const sparkPts = "0,8 8,3 16,6 24,1 32,5 40,2 48,7";
+            const regimeColor =
+              flow?.regime === "Subcritical"
+                ? "var(--blue-700)"
+                : flow?.regime === "Supercritical"
+                  ? "var(--red-700)"
+                  : "var(--text-tertiary)";
+            const row = (label, value) => (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                  {label}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {value}
+                </span>
               </div>
-              {flow ? (
-                <>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                    {row("Flow (Q)", `${flow.rateLps.toFixed(2)} l/s`)}
-                    {row("Velocity", `${flow.velocity.toFixed(2)} m/s`)}
-                    {row("Water level", `${flow.waterLevelM.toFixed(2)} m AOD`)}
-                    {row("Depth", `${flow.depthM.toFixed(2)} m`)}
-                    {row("Direction", flow.direction)}
-                  </div>
-                  <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
-                    paddingTop: 4, borderTop: "1px solid var(--border-primary)",
-                  }}>
-                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Froude {flow.froude.toFixed(2)}</span>
-                    <span style={{
-                      fontSize: 9, fontWeight: 600, color: "#fff", background: regimeColor,
-                      borderRadius: 2, padding: "1px 5px",
-                    }}>{flow.regime}</span>
-                  </div>
-                </>
-              ) : (
-                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>No flow data</span>
-              )}
-              <div style={{ paddingTop: 2, borderTop: "1px solid var(--border-primary)" }}>
-                <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Live trace of WL</span>
-                <svg width="100%" height="12" viewBox="0 0 48 10" preserveAspectRatio="none" style={{ display: "block", marginTop: 2 }}>
-                  <polyline points={sparkPts} fill="none" stroke="var(--blue-700)" strokeWidth="1" />
-                </svg>
+            );
+            return (
+              <div
+                style={{
+                  position: "absolute",
+                  left: s.x + sizeOf(n) + 8,
+                  top: s.y - 8,
+                  zIndex: 40,
+                  pointerEvents: "none",
+                  background: "var(--surface-1)",
+                  border: "1px solid var(--border-primary)",
+                  borderRadius: 4,
+                  boxShadow:
+                    "0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.1)",
+                  padding: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  width: 168,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon src={A[n.icon]} size={14} />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {n.unitLabel || n.label}
+                  </span>
+                </div>
+                {flow ? (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 3,
+                      }}
+                    >
+                      {row("Flow (Q)", `${flow.rateLps.toFixed(2)} l/s`)}
+                      {row("Velocity", `${flow.velocity.toFixed(2)} m/s`)}
+                      {row(
+                        "Water level",
+                        `${flow.waterLevelM.toFixed(2)} m AOD`,
+                      )}
+                      {row("Depth", `${flow.depthM.toFixed(2)} m`)}
+                      {row("Direction", flow.direction)}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 6,
+                        paddingTop: 4,
+                        borderTop: "1px solid var(--border-primary)",
+                      }}
+                    >
+                      <span
+                        style={{ fontSize: 10, color: "var(--text-tertiary)" }}
+                      >
+                        Froude {flow.froude.toFixed(2)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          color: "#fff",
+                          background: regimeColor,
+                          borderRadius: 2,
+                          padding: "1px 5px",
+                        }}
+                      >
+                        {flow.regime}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                    No flow data
+                  </span>
+                )}
+                <div
+                  style={{
+                    paddingTop: 2,
+                    borderTop: "1px solid var(--border-primary)",
+                  }}
+                >
+                  <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>
+                    Live trace of WL
+                  </span>
+                  <svg
+                    width="100%"
+                    height="12"
+                    viewBox="0 0 48 10"
+                    preserveAspectRatio="none"
+                    style={{ display: "block", marginTop: 2 }}
+                  >
+                    <polyline
+                      points={sparkPts}
+                      fill="none"
+                      stroke="var(--blue-700)"
+                      strokeWidth="1"
+                    />
+                  </svg>
+                </div>
               </div>
-            </div>
-          );
-        })()}
+            );
+          })()}
 
         {/* Collapsed groups — a single representative box standing in for
             every hidden member, draggable/selectable as one unit. */}
-        {groups.filter((g) => g.collapsed).map((g) => {
-          const c = groupCentroidWorld(g);
-          const s = toScreen(view, c.x, c.y); // screen-space centre of the group
-          const sz = OUTER;
-          const half = (sz + GROUP_PAD) / 2;
-          const rep = nodes.find((n) => g.memberIds.includes(n.id)) || {};
-          return (
-            <div key={g.id}
-              onMouseDown={(e) => groupBoxDown(e, g)}
-              onContextMenu={(e) => onGroupContext(e, g)}
-              style={{
-                position: "absolute",
-                left: s.x - half,
-                top: s.y - half,
-                width: sz + GROUP_PAD,
-                height: sz + GROUP_PAD,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: dragNode?.ids?.includes(g.memberIds[0]) ? "grabbing" : "grab",
-                ...GROUP_BOX_STYLE,
-              }}
-            >
-              {rep.icon && <Icon src={A[rep.icon]} size={ICONSZ} />}
-            </div>
-          );
-        })}
+        {groups
+          .filter((g) => g.collapsed)
+          .map((g) => {
+            const c = groupCentroidWorld(g);
+            const s = toScreen(view, c.x, c.y); // screen-space centre of the group
+            const sz = OUTER;
+            const half = (sz + GROUP_PAD) / 2;
+            const rep = nodes.find((n) => g.memberIds.includes(n.id)) || {};
+            return (
+              <div
+                key={g.id}
+                onMouseDown={(e) => groupBoxDown(e, g)}
+                onContextMenu={(e) => onGroupContext(e, g)}
+                style={{
+                  position: "absolute",
+                  left: s.x - half,
+                  top: s.y - half,
+                  width: sz + GROUP_PAD,
+                  height: sz + GROUP_PAD,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: dragNode?.ids?.includes(g.memberIds[0])
+                    ? "grabbing"
+                    : "grab",
+                  ...GROUP_BOX_STYLE,
+                }}
+              >
+                {rep.icon && <Icon src={A[rep.icon]} size={ICONSZ} />}
+              </div>
+            );
+          })}
 
         {/* Group expand/collapse counter badges — "−N" collapses an
             expanded group, "+N" expands a collapsed one. */}
@@ -2272,18 +3042,26 @@ export default function GisCanvas({
           } else {
             const members = nodes.filter((n) => g.memberIds.includes(n.id));
             if (!members.length) return null;
-            const rects = members.map((n) => ({ s: toScreen(view, n.x, n.y), sz: sizeOf(n) }));
+            const rects = members.map((n) => ({
+              s: toScreen(view, n.x, n.y),
+              sz: sizeOf(n),
+            }));
             anchorX = Math.max(...rects.map((r) => r.s.x + r.sz)) + GROUP_PAD;
             anchorY = Math.min(...rects.map((r) => r.s.y)) - GROUP_PAD;
           }
           return (
-            <div key={g.id}
+            <div
+              key={g.id}
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => { e.stopPropagation(); toggleGroupCollapsed(g.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGroupCollapsed(g.id);
+              }}
               title={g.collapsed ? "Expand group" : "Collapse group"}
               style={{
                 position: "absolute",
-                left: anchorX, top: anchorY,
+                left: anchorX,
+                top: anchorY,
                 transform: "translate(-50%, -50%)",
                 zIndex: 13,
                 background: "var(--node-selected-border)",
@@ -2308,15 +3086,42 @@ export default function GisCanvas({
             like the measure tool. Marker = opaque ink; Highlighter = wide,
             translucent, multiply-blended so it reads like a real highlighter
             over whatever's underneath; Arrows get a filled arrowhead. */}
-        <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+        <svg
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        >
           <defs>
-            {annotations.filter((a) => a.type === "arrow").map((a) => (
-              <marker key={a.id} id={`arrowhead-${a.id}`} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="userSpaceOnUse">
-                <path d="M0,0 L8,4 L0,8 Z" fill={a.color} />
-              </marker>
-            ))}
+            {annotations
+              .filter((a) => a.type === "arrow")
+              .map((a) => (
+                <marker
+                  key={a.id}
+                  id={`arrowhead-${a.id}`}
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="4"
+                  orient="auto"
+                  markerUnits="userSpaceOnUse"
+                >
+                  <path d="M0,0 L8,4 L0,8 Z" fill={a.color} />
+                </marker>
+              ))}
             {annotateDraft?.type === "arrow" && (
-              <marker id="arrowhead-draft" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+              <marker
+                id="arrowhead-draft"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="4"
+                orient="auto"
+                markerUnits="userSpaceOnUse"
+              >
                 <path d="M0,0 L8,4 L0,8 Z" fill={annotationStyle.arrowColor} />
               </marker>
             )}
@@ -2324,97 +3129,202 @@ export default function GisCanvas({
           {annotations.map((a) => {
             if (a.type === "marker" || a.type === "highlighter") {
               const pts = a.points.map((w) => toScreen(view, w.x, w.y));
-              const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+              const d = pts
+                .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+                .join(" ");
               return (
-                <path key={a.id} d={d} fill="none" stroke={a.color} strokeWidth={a.width}
-                  strokeLinecap="round" strokeLinejoin="round"
+                <path
+                  key={a.id}
+                  d={d}
+                  fill="none"
+                  stroke={a.color}
+                  strokeWidth={a.width}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   opacity={a.type === "highlighter" ? 0.35 : 1}
-                  style={a.type === "highlighter" ? { mixBlendMode: "multiply" } : undefined}
+                  style={
+                    a.type === "highlighter"
+                      ? { mixBlendMode: "multiply" }
+                      : undefined
+                  }
                 />
               );
             }
             if (a.type === "arrow") {
-              const p1 = toScreen(view, a.from.x, a.from.y), p2 = toScreen(view, a.to.x, a.to.y);
+              const p1 = toScreen(view, a.from.x, a.from.y),
+                p2 = toScreen(view, a.to.x, a.to.y);
               return (
-                <line key={a.id} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={a.color} strokeWidth={2.5}
-                  strokeLinecap="round" markerEnd={`url(#arrowhead-${a.id})`} />
+                <line
+                  key={a.id}
+                  x1={p1.x}
+                  y1={p1.y}
+                  x2={p2.x}
+                  y2={p2.y}
+                  stroke={a.color}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  markerEnd={`url(#arrowhead-${a.id})`}
+                />
               );
             }
             return null;
           })}
-          {annotateDraft && annotateDraft.type !== "arrow" && (() => {
-            const pts = annotateDraft.points.map((w) => toScreen(view, w.x, w.y));
-            const d = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-            const color = annotateDraft.type === "marker" ? annotationStyle.markerColor : annotationStyle.highlighterColor;
-            const width = annotateDraft.type === "marker" ? annotationStyle.markerWidth : annotationStyle.highlighterWidth;
-            return (
-              <path d={d} fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round"
-                opacity={annotateDraft.type === "highlighter" ? 0.35 : 1}
-                style={annotateDraft.type === "highlighter" ? { mixBlendMode: "multiply" } : undefined} />
-            );
-          })()}
-          {annotateDraft?.type === "arrow" && (() => {
-            const p1 = toScreen(view, annotateDraft.from.x, annotateDraft.from.y), p2 = toScreen(view, annotateDraft.to.x, annotateDraft.to.y);
-            return <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={annotationStyle.arrowColor} strokeWidth={2.5} strokeLinecap="round" markerEnd="url(#arrowhead-draft)" />;
-          })()}
+          {annotateDraft &&
+            annotateDraft.type !== "arrow" &&
+            (() => {
+              const pts = annotateDraft.points.map((w) =>
+                toScreen(view, w.x, w.y),
+              );
+              const d = pts
+                .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+                .join(" ");
+              const color =
+                annotateDraft.type === "marker"
+                  ? annotationStyle.markerColor
+                  : annotationStyle.highlighterColor;
+              const width =
+                annotateDraft.type === "marker"
+                  ? annotationStyle.markerWidth
+                  : annotationStyle.highlighterWidth;
+              return (
+                <path
+                  d={d}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={width}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity={annotateDraft.type === "highlighter" ? 0.35 : 1}
+                  style={
+                    annotateDraft.type === "highlighter"
+                      ? { mixBlendMode: "multiply" }
+                      : undefined
+                  }
+                />
+              );
+            })()}
+          {annotateDraft?.type === "arrow" &&
+            (() => {
+              const p1 = toScreen(
+                  view,
+                  annotateDraft.from.x,
+                  annotateDraft.from.y,
+                ),
+                p2 = toScreen(view, annotateDraft.to.x, annotateDraft.to.y);
+              return (
+                <line
+                  x1={p1.x}
+                  y1={p1.y}
+                  x2={p2.x}
+                  y2={p2.y}
+                  stroke={annotationStyle.arrowColor}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  markerEnd="url(#arrowhead-draft)"
+                />
+              );
+            })()}
         </svg>
 
         {/* Text box annotations — plain HTML so they're editable in place
             (double-click to re-edit, small × to delete). */}
-        {annotations.filter((a) => a.type === "text").map((a) => {
-          const s = toScreen(view, a.x, a.y);
-          return (
-            <div key={a.id}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setTextEditing({ id: a.id, x: a.x, y: a.y, value: a.value });
-                deleteAnnotation(a.id);
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              title="Double-click to edit"
-              style={{
-                position: "absolute", left: s.x, top: s.y, maxWidth: 220,
-                background: "rgba(255,255,255,0.92)", border: "1.5px solid var(--blue-700)", borderRadius: 3,
-                padding: "4px 6px", fontSize: "var(--fs-xs)", color: "var(--text-primary)",
-                whiteSpace: "pre-wrap", wordBreak: "break-word", cursor: "text", boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-              }}
-            >
-              {a.value}
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteAnnotation(a.id); }}
-                onMouseDown={(e) => e.stopPropagation()}
-                title="Delete"
-                style={{
-                  position: "absolute", top: -8, right: -8, width: 16, height: 16, borderRadius: "50%",
-                  border: "1px solid var(--border-primary)", background: "#fff", color: "var(--text-tertiary)",
-                  fontSize: 10, lineHeight: "14px", cursor: "pointer", padding: 0,
+        {annotations
+          .filter((a) => a.type === "text")
+          .map((a) => {
+            const s = toScreen(view, a.x, a.y);
+            return (
+              <div
+                key={a.id}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setTextEditing({ id: a.id, x: a.x, y: a.y, value: a.value });
+                  deleteAnnotation(a.id);
                 }}
-              >×</button>
-            </div>
-          );
-        })}
+                onMouseDown={(e) => e.stopPropagation()}
+                title="Double-click to edit"
+                style={{
+                  position: "absolute",
+                  left: s.x,
+                  top: s.y,
+                  maxWidth: 220,
+                  background: "rgba(255,255,255,0.92)",
+                  border: "1.5px solid var(--blue-700)",
+                  borderRadius: 3,
+                  padding: "4px 6px",
+                  fontSize: "var(--fs-xs)",
+                  color: "var(--text-primary)",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  cursor: "text",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+                }}
+              >
+                {a.value}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteAnnotation(a.id);
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Delete"
+                  style={{
+                    position: "absolute",
+                    top: -8,
+                    right: -8,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    border: "1px solid var(--border-primary)",
+                    background: "#fff",
+                    color: "var(--text-tertiary)",
+                    fontSize: 10,
+                    lineHeight: "14px",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
 
         {/* In-progress text box being typed — commits (if non-empty) on
             blur or Escape, matching commitTextEditing. */}
-        {textEditing && (() => {
-          const s = toScreen(view, textEditing.x, textEditing.y);
-          return (
-            <textarea
-              autoFocus
-              value={textEditing.value}
-              onChange={(e) => setTextEditing((te) => te && { ...te, value: e.target.value })}
-              onBlur={commitTextEditing}
-              onMouseDown={(e) => e.stopPropagation()}
-              placeholder="Type a note…"
-              style={{
-                position: "absolute", left: s.x, top: s.y, minWidth: 140, maxWidth: 260, minHeight: 28,
-                background: "#fff", border: "1.5px solid var(--blue-700)", borderRadius: 3,
-                padding: "4px 6px", fontSize: "var(--fs-xs)", fontFamily: "inherit", color: "var(--text-primary)",
-                resize: "both", zIndex: 20, boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-              }}
-            />
-          );
-        })()}
+        {textEditing &&
+          (() => {
+            const s = toScreen(view, textEditing.x, textEditing.y);
+            return (
+              <textarea
+                autoFocus
+                value={textEditing.value}
+                onChange={(e) =>
+                  setTextEditing((te) => te && { ...te, value: e.target.value })
+                }
+                onBlur={commitTextEditing}
+                onMouseDown={(e) => e.stopPropagation()}
+                placeholder="Type a note…"
+                style={{
+                  position: "absolute",
+                  left: s.x,
+                  top: s.y,
+                  minWidth: 140,
+                  maxWidth: 260,
+                  minHeight: 28,
+                  background: "#fff",
+                  border: "1.5px solid var(--blue-700)",
+                  borderRadius: 3,
+                  padding: "4px 6px",
+                  fontSize: "var(--fs-xs)",
+                  fontFamily: "inherit",
+                  color: "var(--text-primary)",
+                  resize: "both",
+                  zIndex: 20,
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                }}
+              />
+            );
+          })()}
 
         {/* Right-click menu for the current selection (multi-select → Create
             Group; existing group → Collapse/Expand + Ungroup) */}
@@ -2518,32 +3428,92 @@ export default function GisCanvas({
             jumps to the Flow Lines panel; × dismisses it without turning
             Flow Lines off. */}
         {flowLinesOn && flowWidgetOpen && (
-          <div style={{
-            position: "absolute", right: 12, bottom: 36, zIndex: 13, width: 260,
-            background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
-            padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6,
-          }}>
+          <div
+            style={{
+              position: "absolute",
+              right: 12,
+              bottom: 36,
+              zIndex: 13,
+              width: 260,
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-primary)",
+              borderRadius: 4,
+              padding: "8px 10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span onClick={onOpenFlowLinesPanel} title="Open Flow Lines panel" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", flexShrink: 0, cursor: "pointer" }}>Velocity</span>
               <span
-                onClick={() => setVelocityRange((r) => ({ ...r, min: editValue(r.min) }))}
-                title="Click to edit" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}
-              >{velocityRange.min.toFixed(2)} <Icon src={A.edit} size={12} /></span>
+                onClick={onOpenFlowLinesPanel}
+                title="Open Flow Lines panel"
+                style={{
+                  fontSize: "var(--fs-s)",
+                  color: "var(--text-primary)",
+                  flexShrink: 0,
+                  cursor: "pointer",
+                }}
+              >
+                Velocity
+              </span>
+              <span
+                onClick={() =>
+                  setVelocityRange((r) => ({ ...r, min: editValue(r.min) }))
+                }
+                title="Click to edit"
+                style={{
+                  fontSize: "var(--fs-s)",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                {velocityRange.min.toFixed(2)} <Icon src={A.edit} size={12} />
+              </span>
               <div style={{ flex: "1 0 0" }} />
               <span
-                onClick={() => setVelocityRange((r) => ({ ...r, max: editValue(r.max) }))}
-                title="Click to edit" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}
-              >{velocityRange.max.toFixed(2)} <Icon src={A.edit} size={12} /></span>
+                onClick={() =>
+                  setVelocityRange((r) => ({ ...r, max: editValue(r.max) }))
+                }
+                title="Click to edit"
+                style={{
+                  fontSize: "var(--fs-s)",
+                  color: "var(--text-primary)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                {velocityRange.max.toFixed(2)} <Icon src={A.edit} size={12} />
+              </span>
               <button
                 onClick={() => setFlowWidgetOpen(false)}
                 title="Dismiss"
                 style={{
-                  border: "none", background: "transparent", cursor: "pointer", padding: 0, flexShrink: 0,
-                  fontSize: 16, lineHeight: 1, color: "var(--text-tertiary)", width: 16, height: 16,
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  padding: 0,
+                  flexShrink: 0,
+                  fontSize: 16,
+                  lineHeight: 1,
+                  color: "var(--text-tertiary)",
+                  width: 16,
+                  height: 16,
                 }}
-              >×</button>
+              >
+                ×
+              </button>
             </div>
-            <div onClick={onOpenFlowLinesPanel} title="Open Flow Lines panel" style={{ display: "flex", gap: 16, cursor: "pointer" }}>
+            <div
+              onClick={onOpenFlowLinesPanel}
+              title="Open Flow Lines panel"
+              style={{ display: "flex", gap: 16, cursor: "pointer" }}
+            >
               <PulsePreview />
               <PulsePreview fast />
             </div>
@@ -2552,13 +3522,29 @@ export default function GisCanvas({
 
         {/* Scale bar + coordinate/guide status bar, pinned over the bottom
             of the map rather than reserving its own layout space. */}
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 12 }}>
-          <MapFooter cursorWorld={cursorWorld} scale={view.scale} guideItems={guideItems} showAttribution={showBasemap} />
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 12,
+          }}
+        >
+          <MapFooter
+            cursorWorld={cursorWorld}
+            scale={view.scale}
+            guideItems={guideItems}
+            showAttribution={showBasemap}
+          />
         </div>
       </div>
 
       {transectPopup && (
-        <TransectPopup lengthM={transectPopup.lengthM} onClose={() => setTransectPopup(null)} />
+        <TransectPopup
+          lengthM={transectPopup.lengthM}
+          onClose={() => setTransectPopup(null)}
+        />
       )}
     </div>
   );

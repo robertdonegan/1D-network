@@ -1,0 +1,21 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="16" height="16" fill="#1E1E1E"/>
+<g id="Flood Iconography">
+<g id="Ribbon">
+<path d="M-56 -642C-56 -644.209 -54.2091 -646 -52 -646H580C582.209 -646 584 -644.209 584 -642V1523C584 1525.21 582.209 1527 580 1527H-52C-54.2091 1527 -56 1525.21 -56 1523V-642Z" fill="white"/>
+<g id="Advanced dropdown">
+<g id="jbs/fm1d/advanced/breach" clip-path="url(#clip0_1_136)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 249" d="M0 0H16V7H0V0Z" fill="#D7D7D7"/>
+<path id="Rectangle 248" d="M4.31055 3.25L5.31055 4.25H16.75V14.75H3C0.928932 14.75 -0.75 13.0711 -0.75 11V3.25H4.31055Z" fill="#468AF3" stroke="white" stroke-width="1.5"/>
+<path id="Vector 166" d="M7.75 13.25H12.25V10.8232L14.3291 6.66504L14.5361 6.25H16.75V16.75H-0.75V10.25H1.41504L3.27246 2.81836L3.41406 2.25H5.58594L5.72754 2.81836L7.72754 10.8184L7.75 10.9072V13.25Z" fill="#333333" stroke="white" stroke-width="1.5"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_136">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>

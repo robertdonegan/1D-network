@@ -1,0 +1,22 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="16" height="16" fill="#1E1E1E"/>
+<g id="Flood Iconography">
+<g id="Ribbon">
+<path d="M-152 -583C-152 -585.209 -150.209 -587 -148 -587H484C486.209 -587 488 -585.209 488 -583V1582C488 1584.21 486.209 1586 484 1586H-148C-150.209 1586 -152 1584.21 -152 1582V-583Z" fill="white"/>
+<g id="Connectors dropdown">
+<g id="jbs/fm1d/connectors/gauge" clip-path="url(#clip0_1_136)">
+<rect width="16" height="16" fill="white"/>
+<path id="Rectangle 250" d="M16.5 -0.5V16.5H-0.5V-0.5H16.5Z" fill="white" stroke="white"/>
+<path id="Ellipse 171" d="M8 1.75C11.4518 1.75 14.25 4.54822 14.25 8C14.25 11.4518 11.4518 14.25 8 14.25C4.54822 14.25 1.75 11.4518 1.75 8C1.75 4.54822 4.54822 1.75 8 1.75Z" stroke="#333333" stroke-width="1.5"/>
+<circle id="Ellipse 172" cx="8" cy="8" r="1.25" stroke="#468AF3" stroke-width="1.5"/>
+<path id="Vector 168" d="M7 7L4.5 4.5" stroke="#468AF3" stroke-width="1.5"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_1_136">
+<rect width="16" height="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>
