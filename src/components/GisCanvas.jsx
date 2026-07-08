@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { A, Icon } from "../assets.jsx";
 import NodePicker from "./NodePicker.jsx";
 import ReachPicker from "./ReachPicker.jsx";
@@ -6,6 +6,8 @@ import OsmBasemap, { lonLatToWorld, METERS_PER_WORLD_UNIT } from "./OsmBasemap.j
 import MapFooter from "./MapFooter.jsx";
 import TransectPopup from "./TransectPopup.jsx";
 import ContextMenu from "./ContextMenu.jsx";
+import { PulsePreview, editValue } from "./FlowLinesPanel.jsx";
+import { FLOW_LABEL_METRICS } from "../flowMock.js";
 
 // Grouped-unit visuals (Figma "1D Grouped Units" — Group select box / Grouped
 // state): dashed orange bounding box + translucent orange fill, reused for
@@ -211,6 +213,17 @@ export default function GisCanvas({
   annotations,
   setAnnotations,
   annotationStyle,
+  flowLinesOn,
+  flowByEdge,
+  velocityRange,
+  setVelocityRange,
+  clipOutOfRange,
+  flowLabelsOn,
+  flowLabelMetric,
+  flowTracerOn,
+  flowWidgetOpen,
+  setFlowWidgetOpen,
+  onOpenFlowLinesPanel,
 }) {
   const showBasemap = basemap === "osm";
   const [hovered, setHovered] = useState(null);
@@ -294,6 +307,26 @@ export default function GisCanvas({
   // most one group at a time).
   const groupOfNode = {};
   for (const g of groups) for (const id of g.memberIds) groupOfNode[id] = g;
+
+  // Flow Tracer: walks upstream (against edge direction) from the single
+  // selected node, collecting every edge on the way back to an origin —
+  // demo-only "where did this water come from" trace.
+  const tracedEdgeIds = useMemo(() => {
+    if (!flowTracerOn || selected.length !== 1 || !edges.length) return null;
+    const ids = new Set();
+    const queue = [selected[0]];
+    const seenNodes = new Set(queue);
+    while (queue.length) {
+      const nodeId = queue.shift();
+      edges.forEach((e) => {
+        if (e.to === nodeId && !ids.has(e.id)) {
+          ids.add(e.id);
+          if (!seenNodes.has(e.from)) { seenNodes.add(e.from); queue.push(e.from); }
+        }
+      });
+    }
+    return ids;
+  }, [flowTracerOn, selected, edges]);
 
   const groupCentroidWorld = (g) => {
     const members = nodes.filter((n) => g.memberIds.includes(n.id));
@@ -1816,6 +1849,90 @@ export default function GisCanvas({
           )}
         </svg>
 
+        {/* Flow Lines (View > Flow Lines): a travelling dash "pulse" per
+            reach — speed maps to the edge's demo velocity, direction to
+            flow direction — plus optional rate labels and a Flow Tracer
+            glow along the selected node's upstream path. Built as one path
+            per edge (M/L/Q, mirroring the main reach svg) so the pulse
+            actually follows bezier-curved reaches instead of cutting a
+            straight line across them. */}
+        {(flowLinesOn || flowLabelsOn) && (
+          <>
+            <style>{
+              "@keyframes fm-flow-dash-fwd { to { stroke-dashoffset: -20; } }" +
+              "@keyframes fm-flow-dash-rev { to { stroke-dashoffset: 20; } }" +
+              "@keyframes fm-wet-dash { to { stroke-dashoffset: -30; } }"
+            }</style>
+            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+              {edges.map((e) => {
+                const fEnd = resolveEndpoint(e.from), tEnd = resolveEndpoint(e.to);
+                if (!fEnd || !tEnd) return null;
+                if (fEnd.groupId && fEnd.groupId === tEnd.groupId) return null;
+                const chain = [
+                  { id: e.from, screen: fEnd.screen },
+                  ...e.points.map((v) => ({ id: v.id, screen: toScreen(view, v.x, v.y) })),
+                  { id: e.to, screen: tEnd.screen },
+                ];
+                const flow = flowByEdge?.[e.id];
+                if (!flow) return null;
+                const inRange = flow.velocity >= velocityRange.min && flow.velocity <= velocityRange.max;
+                const showPulse = flowLinesOn && (!clipOutOfRange || inRange);
+                const traced = flowTracerOn && tracedEdgeIds?.has(e.id);
+                const duration = Math.max(0.35, 1.8 - flow.velocity * 1.5);
+                const reversed = flow.direction === "Upstream";
+
+                // One path for the whole edge, following each segment's
+                // bezier control point when it has one (same lookup the
+                // main reach svg uses) instead of straight chords.
+                let d = `M ${chain[0].screen.x} ${chain[0].screen.y}`;
+                const midpoints = [];
+                for (let i = 0; i < chain.length - 1; i++) {
+                  const c1 = chain[i], c2 = chain[i + 1];
+                  const key = c1.id + "|" + c2.id;
+                  const ctrl = e.curves?.[key];
+                  if (ctrl) {
+                    const cs = toScreen(view, ctrl.x, ctrl.y);
+                    d += ` Q ${cs.x} ${cs.y} ${c2.screen.x} ${c2.screen.y}`;
+                    midpoints.push(cs);
+                  } else {
+                    d += ` L ${c2.screen.x} ${c2.screen.y}`;
+                    midpoints.push({ x: (c1.screen.x + c2.screen.x) / 2, y: (c1.screen.y + c2.screen.y) / 2 });
+                  }
+                }
+
+                return (
+                  <g key={e.id}>
+                    {traced && <path d={d} fill="none" stroke="var(--node-selected-border)" strokeWidth={6} strokeLinecap="round" opacity={0.35} />}
+                    {showPulse && (
+                      <>
+                        {/* Recessive base line — the "channel" stays visible between wave passes */}
+                        <path d={d} fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2} strokeLinecap="round" opacity={0.22} />
+                        {/* Several soft-edged dashes travelling together (not blurred — that bled outside the line) */}
+                        <path
+                          d={d} fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2.5} strokeLinecap="round"
+                          strokeDasharray="4 6"
+                          style={{ animation: `${reversed ? "fm-flow-dash-rev" : "fm-flow-dash-fwd"} ${duration}s linear infinite` }}
+                        />
+                      </>
+                    )}
+                    {flowLabelsOn && (() => {
+                      const metric = FLOW_LABEL_METRICS.find((m) => m.id === flowLabelMetric) || FLOW_LABEL_METRICS[0];
+                      const text = metric.format(flow);
+                      const labelW = Math.max(30, text.length * 6 + 8);
+                      return midpoints.map((mp, i) => (
+                        <g key={"label" + i}>
+                          <rect x={mp.x - labelW / 2} y={mp.y - 9} width={labelW} height={14} rx={2} fill="rgba(255,255,255,0.9)" stroke="var(--border-primary)" strokeWidth={1} />
+                          <text x={mp.x} y={mp.y + 1} textAnchor="middle" fontSize={9} fontWeight={500} fill="var(--text-primary)">{text}</text>
+                        </g>
+                      ));
+                    })()}
+                  </g>
+                );
+              })}
+            </svg>
+          </>
+        )}
+
         {/* Group-select marquee + measure/transect overlay — separate layer
             so it doesn't interfere with the reach-editing svg's hit testing. */}
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
@@ -1940,6 +2057,16 @@ export default function GisCanvas({
           const isConfluence = (degree?.[n.id] || 0) >= 3;
           const showPorts =
             isHov && !dragNode && !dragVertex && !dragCurve && !panDrag;
+          // "Wet": this unit sits on at least one reach currently showing a
+          // flow pulse — the travelling ring around its icon is the same
+          // "water is moving through here" cue as the line pulse itself.
+          const isWet = flowLinesOn && edges.some((ed) => {
+            if (ed.from !== n.id && ed.to !== n.id) return false;
+            const flow = flowByEdge?.[ed.id];
+            if (!flow) return false;
+            const inRange = flow.velocity >= velocityRange.min && flow.velocity <= velocityRange.max;
+            return !clipOutOfRange || inRange;
+          });
           return (
             <div key={n.id}>
               {(isHov || isSel) && (
@@ -1973,6 +2100,21 @@ export default function GisCanvas({
                     pointerEvents: "none",
                   }}
                 />
+              )}
+              {isWet && (
+                <svg
+                  title="Wet: flow is currently moving through this unit"
+                  style={{ position: "absolute", left: s.x - 3, top: s.y - 3, width: sz + 6, height: sz + 6, pointerEvents: "none", overflow: "visible" }}
+                >
+                  <rect
+                    x={1} y={1} width={sz + 4} height={sz + 4}
+                    rx={n.shape === "diamond" ? 3 : 6}
+                    fill="none" stroke="var(--interface-blue-500, #55c7ff)" strokeWidth={2}
+                    strokeDasharray="6 9" strokeLinecap="round"
+                    style={{ animation: "fm-wet-dash 1.4s linear infinite" }}
+                    transform={n.shape === "diamond" ? `rotate(45 ${(sz + 6) / 2} ${(sz + 6) / 2})` : undefined}
+                  />
+                </svg>
               )}
               <div
                 onMouseDown={(e) => nodeDown(e, n.id)}
@@ -2026,6 +2168,68 @@ export default function GisCanvas({
             </div>
           );
         })}
+
+        {/* Flow Lines hover tooltip — the hydraulic data points a modeller
+            actually reads a reach by: rate, velocity, stage, depth, and
+            Froude number (with its sub/super/critical regime), plus a
+            live-trace sparkline, matching fm-v8-1d-unit-tooltip. */}
+        {flowLinesOn && hovered && !dragNode && (() => {
+          const n = nodes.find((x) => x.id === hovered);
+          if (!n) return null;
+          const edge = edges.find((e) => e.from === n.id || e.to === n.id);
+          const flow = edge ? flowByEdge?.[edge.id] : null;
+          const s = toScreen(view, n.x, n.y);
+          const sparkPts = "0,8 8,3 16,6 24,1 32,5 40,2 48,7";
+          const regimeColor = flow?.regime === "Subcritical" ? "var(--blue-700)" : flow?.regime === "Supercritical" ? "var(--red-700)" : "var(--text-tertiary)";
+          const row = (label, value) => (
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>{label}</span>
+              <span style={{ fontSize: 10, fontWeight: 500, color: "var(--text-primary)" }}>{value}</span>
+            </div>
+          );
+          return (
+            <div style={{
+              position: "absolute", left: s.x + sizeOf(n) + 8, top: s.y - 8, zIndex: 40, pointerEvents: "none",
+              background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
+              boxShadow: "0 2px 4px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.1)",
+              padding: 10, display: "flex", flexDirection: "column", gap: 6, width: 168,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Icon src={A[n.icon]} size={14} />
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)" }}>{n.unitLabel || n.label}</span>
+              </div>
+              {flow ? (
+                <>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {row("Flow (Q)", `${flow.rateLps.toFixed(2)} l/s`)}
+                    {row("Velocity", `${flow.velocity.toFixed(2)} m/s`)}
+                    {row("Water level", `${flow.waterLevelM.toFixed(2)} m AOD`)}
+                    {row("Depth", `${flow.depthM.toFixed(2)} m`)}
+                    {row("Direction", flow.direction)}
+                  </div>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+                    paddingTop: 4, borderTop: "1px solid var(--border-primary)",
+                  }}>
+                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>Froude {flow.froude.toFixed(2)}</span>
+                    <span style={{
+                      fontSize: 9, fontWeight: 600, color: "#fff", background: regimeColor,
+                      borderRadius: 2, padding: "1px 5px",
+                    }}>{flow.regime}</span>
+                  </div>
+                </>
+              ) : (
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>No flow data</span>
+              )}
+              <div style={{ paddingTop: 2, borderTop: "1px solid var(--border-primary)" }}>
+                <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>Live trace of WL</span>
+                <svg width="100%" height="12" viewBox="0 0 48 10" preserveAspectRatio="none" style={{ display: "block", marginTop: 2 }}>
+                  <polyline points={sparkPts} fill="none" stroke="var(--blue-700)" strokeWidth="1" />
+                </svg>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Collapsed groups — a single representative box standing in for
             every hidden member, draggable/selectable as one unit. */}
@@ -2307,6 +2511,44 @@ export default function GisCanvas({
               </div>
             );
           })()}
+
+        {/* Flow Lines velocity widget — bottom-right, matches
+            fm-v8-flow-path-legend. Min/max are directly editable here (not
+            just from the panel); clicking "Velocity" or the pulse preview
+            jumps to the Flow Lines panel; × dismisses it without turning
+            Flow Lines off. */}
+        {flowLinesOn && flowWidgetOpen && (
+          <div style={{
+            position: "absolute", right: 12, bottom: 36, zIndex: 13, width: 260,
+            background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
+            padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span onClick={onOpenFlowLinesPanel} title="Open Flow Lines panel" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", flexShrink: 0, cursor: "pointer" }}>Velocity</span>
+              <span
+                onClick={() => setVelocityRange((r) => ({ ...r, min: editValue(r.min) }))}
+                title="Click to edit" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}
+              >{velocityRange.min.toFixed(2)} <Icon src={A.edit} size={12} /></span>
+              <div style={{ flex: "1 0 0" }} />
+              <span
+                onClick={() => setVelocityRange((r) => ({ ...r, max: editValue(r.max) }))}
+                title="Click to edit" style={{ fontSize: "var(--fs-s)", color: "var(--text-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}
+              >{velocityRange.max.toFixed(2)} <Icon src={A.edit} size={12} /></span>
+              <button
+                onClick={() => setFlowWidgetOpen(false)}
+                title="Dismiss"
+                style={{
+                  border: "none", background: "transparent", cursor: "pointer", padding: 0, flexShrink: 0,
+                  fontSize: 16, lineHeight: 1, color: "var(--text-tertiary)", width: 16, height: 16,
+                }}
+              >×</button>
+            </div>
+            <div onClick={onOpenFlowLinesPanel} title="Open Flow Lines panel" style={{ display: "flex", gap: 16, cursor: "pointer" }}>
+              <PulsePreview />
+              <PulsePreview fast />
+            </div>
+          </div>
+        )}
 
         {/* Scale bar + coordinate/guide status bar, pinned over the bottom
             of the map rather than reserving its own layout space. */}

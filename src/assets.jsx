@@ -126,6 +126,10 @@ import homeNewProject from "./assets/home-new-project.svg";
 import homeTextBox from "./assets/home-text-box.svg";
 import homeHighlighter from "./assets/home-highlighter.svg";
 import homeArrowTool from "./assets/home-arrow-tool.svg";
+import toggleOffX from "./assets/toggle-off-x.svg";
+import flowLinesIcon from "./assets/flow-lines.svg";
+import globalAnimatorIcon from "./assets/global-animator.svg";
+import toggleOnCheck from "./assets/toggle-on-check.svg";
 
 import mouseLeft from "./assets/mouse-left.svg";
 import mouseScroll from "./assets/mouse-scroll.svg";
@@ -183,6 +187,7 @@ export const A = {
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
   homeTextBox, homeHighlighter, homeArrowTool,
+  toggleOffX, toggleOnCheck, flowLinesIcon, globalAnimatorIcon,
   mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
   ribbonActiveArea, ribbonBoundaryCondition, ribbonDefineTopo, ribbon1dEmbed, ribbon1d2dLink,
   ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,

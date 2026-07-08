@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import OSWindow from "./components/OSWindow.jsx";
 import ModeRibbon, { modes } from "./components/ModeRibbon.jsx";
-import ProjectPanel from "./components/ProjectPanel.jsx";
+import PanelSlot from "./components/PanelSlot.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
-import NetworkPanel from "./components/NetworkPanel.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
+import { mockFlowForEdge } from "./flowMock.js";
 
 // Nodes/edges are owned here (not inside GisCanvas) so the live network list
 // in NetworkPanel can mirror exactly what's on the canvas.
@@ -46,11 +46,88 @@ function ResizeHandle({ onDrag }) {
   );
 }
 
+// Blender-style "drag the gap between panels to reveal a new one". Both
+// grips use the same rule: while the panel starts closed (size 0), a small
+// release just snaps back shut instead of leaving an awkward sliver open —
+// once it's actually open, dragging back down/right to 0 closes it too, no
+// separate snap needed.
+const REVEAL_MAX = 400, REVEAL_OPEN_MIN = 80, REVEAL_CANCEL_BELOW = 40;
+
+// Invisible strip overlaid on the canvas's bottom edge — takes no layout
+// space of its own (position:absolute, not in flow), so the canvas sits
+// flush with the same padding as every other panel until this is actually
+// dragged. Drag up to reveal the bottom-docked panel, down to shrink it.
+function BottomRevealHandle({ height, setHeight }) {
+  const onDown = (e) => {
+    e.preventDefault();
+    const wasOpen = height > 0;
+    let lastY = e.clientY;
+    const onMove = (ev) => {
+      const dy = lastY - ev.clientY; // dragging up = positive
+      lastY = ev.clientY;
+      setHeight((h) => Math.max(0, Math.min(REVEAL_MAX, h + dy)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (!wasOpen) setHeight((h) => (h < REVEAL_CANCEL_BELOW ? 0 : Math.max(REVEAL_OPEN_MIN, h)));
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  return (
+    <div onMouseDown={onDown} title="Drag up to reveal the Global Animator panel" style={{
+      position: "absolute", left: 0, right: 0, bottom: height, height: 6, cursor: "row-resize", zIndex: 15,
+    }} />
+  );
+}
+
+// Invisible hit-zone tucked into the canvas's top-right corner, inside the
+// 12px inset before the North/Zoom/Pan nav buttons start — so it never
+// overlaps or displaces them. No visible icon; drag left to reveal a new
+// vertical panel between the canvas and the right-hand panel, switchable
+// via its own title dropdown like any other panel slot.
+function CornerRevealGrip({ width, setWidth }) {
+  const onDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const wasOpen = width > 0;
+    let lastX = e.clientX;
+    const onMove = (ev) => {
+      const dx = lastX - ev.clientX; // dragging left = positive
+      lastX = ev.clientX;
+      setWidth((w) => Math.max(0, Math.min(REVEAL_MAX + 80, w + dx)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (!wasOpen) setWidth((w) => (w < 60 ? 0 : Math.max(180, w)));
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  return (
+    <div onMouseDown={onDown} title="Drag left to reveal a new panel" style={{
+      position: "absolute", top: 0, right: 0, width: 10, height: 10, cursor: "nwse-resize", zIndex: 20,
+    }} />
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState("FM 1D");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [projectW, setProjectW] = useState(232);
   const [networkW, setNetworkW] = useState(232);
+  // Which view each side panel slot currently shows — see PanelSlot.jsx's
+  // PANEL_VIEWS registry. Defaults match the original fixed layout.
+  const [leftView, setLeftView] = useState("project");
+  const [rightView, setRightView] = useState("network");
+  // Two more slots revealed by dragging the gaps around the canvas
+  // (Blender-style area splitting) — both start closed (size 0).
+  const [bottomPanelH, setBottomPanelH] = useState(0);
+  const [bottomPanelView, setBottomPanelView] = useState("globalanimator");
+  const [midPanelW, setMidPanelW] = useState(0);
+  const [midPanelView, setMidPanelView] = useState("toolbox");
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Shared with NetworkPanel so a row click selects the node on the canvas.
@@ -94,6 +171,27 @@ export default function App() {
     arrowColor: "#e1455b",
   });
   const [showAnnotationSettings, setShowAnnotationSettings] = useState(false);
+
+  // View > Flow Lines: `flowLinesOn` gates the pulse animation + the
+  // bottom-right velocity widget on the canvas. `flowByEdge` is demo-only
+  // per-edge flow data (no real hydraulic model), stable per edge id so it
+  // doesn't jitter on every render. The three sub-toggles + velocity range
+  // are shared between GisCanvas (rendering) and the Flow Lines side panel
+  // (controls) — see PanelSlot.jsx's "flowlines" view.
+  const [flowLinesOn, setFlowLinesOn] = useState(false);
+  const [flowWidgetOpen, setFlowWidgetOpen] = useState(true);
+  const [velocityRange, setVelocityRange] = useState({ min: 0.01, max: 0.99 });
+  const [clipOutOfRange, setClipOutOfRange] = useState(false);
+  const [flowLabelsOn, setFlowLabelsOn] = useState(false);
+  const [flowLabelMetric, setFlowLabelMetric] = useState("rateLps");
+  const [flowTracerOn, setFlowTracerOn] = useState(false);
+  const flowByEdge = useMemo(
+    () => Object.fromEntries(edges.map((e) => [e.id, mockFlowForEdge(e.id)])),
+    [edges],
+  );
+  useEffect(() => {
+    if (flowLinesOn) setFlowWidgetOpen(true);
+  }, [flowLinesOn]);
 
   // Reaches (map view line colour + table grouping) computed once here so
   // GisCanvas and NetworkPanel agree on exactly the same grouping. Users can
@@ -177,30 +275,65 @@ export default function App() {
     };
   }, [dragActive]);
 
+  // Shared with BOTH panel slots (either side can show either view — see
+  // PanelSlot.jsx) so switching a slot's view never leaves a Body without
+  // the props it needs.
+  const panelBodyProps = {
+    nodes, edges, selected, setSelected,
+    edgeColors, reachRegistry: registry, reachKeyOfEdge: resolvedKeyByEdge, onRenameReach: renameReach,
+    flowByEdge, velocityRange, setVelocityRange, clipOutOfRange, setClipOutOfRange,
+    flowLabelsOn, setFlowLabelsOn, flowLabelMetric, setFlowLabelMetric, flowTracerOn, setFlowTracerOn,
+  };
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
-      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation} />
+      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation}
+        flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
         onOpenAnnotationSettings={() => setShowAnnotationSettings(true)} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
-        <ProjectPanel width={projectW} />
+        <PanelSlot width={projectW} viewId={leftView} onChangeView={setLeftView} bodyProps={panelBodyProps} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
-        <GisCanvas
-          nodes={nodes} setNodes={setNodes}
-          edges={edges} setEdges={setEdges}
-          selected={selected} setSelected={setSelected}
-          basemap={basemap}
-          flyTo={flyTo} onConsumeFlyTo={() => setFlyTo(null)}
-          ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
-          edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
-          reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
-          annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
-          annotations={annotations} setAnnotations={setAnnotations} annotationStyle={annotationStyle}
-        />
+
+        {/* Canvas column: map + (optionally) the bottom-docked panel below
+            it. The corner grip lives here so it tracks the canvas's actual
+            top-right corner regardless of how wide the mid panel gets. */}
+        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+          <GisCanvas
+            nodes={nodes} setNodes={setNodes}
+            edges={edges} setEdges={setEdges}
+            selected={selected} setSelected={setSelected}
+            basemap={basemap}
+            flyTo={flyTo} onConsumeFlyTo={() => setFlyTo(null)}
+            ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+            edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
+            reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
+            annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
+            annotations={annotations} setAnnotations={setAnnotations} annotationStyle={annotationStyle}
+            flowLinesOn={flowLinesOn} flowByEdge={flowByEdge} velocityRange={velocityRange} setVelocityRange={setVelocityRange}
+            clipOutOfRange={clipOutOfRange} flowLabelsOn={flowLabelsOn} flowLabelMetric={flowLabelMetric} flowTracerOn={flowTracerOn}
+            flowWidgetOpen={flowWidgetOpen} setFlowWidgetOpen={setFlowWidgetOpen}
+            onOpenFlowLinesPanel={() => setRightView("flowlines")}
+          />
+          <CornerRevealGrip width={midPanelW} setWidth={setMidPanelW} />
+          <BottomRevealHandle height={bottomPanelH} setHeight={setBottomPanelH} />
+          {bottomPanelH > 0 && (
+            <PanelSlot height={bottomPanelH} viewId={bottomPanelView} onChangeView={setBottomPanelView}
+              bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)} />
+          )}
+        </div>
+
+        {midPanelW > 0 && (
+          <>
+            <ResizeHandle onDrag={(dx) => setMidPanelW(w => Math.max(0, Math.min(REVEAL_MAX + 80, w - dx)))} />
+            <PanelSlot width={midPanelW} viewId={midPanelView} onChangeView={setMidPanelView}
+              bodyProps={panelBodyProps} onClose={() => setMidPanelW(0)} />
+          </>
+        )}
+
         <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
-        <NetworkPanel width={networkW} nodes={nodes} edges={edges} selected={selected} setSelected={setSelected}
-          edgeColors={edgeColors} reachRegistry={registry} reachKeyOfEdge={resolvedKeyByEdge} onRenameReach={renameReach} />
+        <PanelSlot width={networkW} viewId={rightView} onChangeView={setRightView} bodyProps={panelBodyProps} />
       </div>
 
       {ribbonDrag && (

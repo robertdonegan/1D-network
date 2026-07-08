@@ -1,27 +1,5 @@
 import { A, Icon } from "../assets.jsx";
 
-function PanelHeader({ icon, title }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8, width: "100%",
-      padding: "4px 8px 4px 4px", flexShrink: 0,
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 2, height: 24,
-        padding: 4, borderRadius: 2, background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-      }}>
-        <Icon src={icon} size={16} />
-        <Icon src={A.keyDown} size={12} />
-      </div>
-      <span style={{ fontSize: "var(--fs-s)", fontWeight: 500 }}>{title}</span>
-      <div style={{ flex: "1 0 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-        <Icon src={A.labelFilter} size={12} />
-        <Icon src={A.layers} size={12} />
-      </div>
-    </div>
-  );
-}
-
 function SearchField({ placeholder }) {
   return (
     <div style={{ padding: "0 8px", width: "100%", flexShrink: 0 }}>
@@ -75,13 +53,12 @@ function Toggle({ on }) {
   );
 }
 
-export default function ProjectPanel({ width = 232 }) {
+// Everything below the panel header — the header itself (icon+dropdown
+// switcher, title, filter/layers icons) is owned by the generic PanelSlot
+// shell so any slot can swap between this and the other panel views.
+export function ProjectPanelBody() {
   return (
-    <div style={{
-      width, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column", gap: 4,
-      background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4, overflow: "hidden",
-    }}>
-      <PanelHeader icon={A.hierarchyLine} title="Project" />
+    <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, overflow: "hidden" }}>
       <SearchField placeholder="Search project" />
       <SectionHeader label="Simulation" />
 

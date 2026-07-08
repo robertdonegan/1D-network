@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto('http://localhost:5173/');
+await page.waitForTimeout(500);
+const bh = page.locator('[title="Drag up to reveal the Global Animator panel"]');
+const bb = await bh.boundingBox();
+await page.mouse.move(bb.x+bb.width/2, bb.y+bb.height/2);
+await page.mouse.down();
+await page.mouse.move(bb.x+bb.width/2, bb.y-200, {steps:8});
+await page.mouse.up();
+await page.waitForTimeout(200);
+await page.screenshot({ path: '/tmp/gap-full.png' });
+await page.screenshot({ path: '/tmp/gap-zoom.png', clip: { x: 250, y: 650, width: 500, height: 250 } });
+await browser.close();

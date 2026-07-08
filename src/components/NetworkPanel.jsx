@@ -24,25 +24,6 @@ function ReachMark({ reaches }) {
   );
 }
 
-function PanelHeader({ icon, title }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "4px 8px 4px 4px", flexShrink: 0 }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center", gap: 2, height: 24,
-        padding: 4, borderRadius: 2, background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-      }}>
-        <Icon src={icon} size={16} />
-        <Icon src={A.keyDown} size={12} />
-      </div>
-      <span style={{ fontSize: "var(--fs-s)", fontWeight: 500 }}>{title}</span>
-      <div style={{ flex: "1 0 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-        <Icon src={A.labelFilter} size={12} />
-        <Icon src={A.layers} size={12} />
-      </div>
-    </div>
-  );
-}
-
 function ColHeader({ cols }) {
   return (
     <div style={{
@@ -126,7 +107,10 @@ function ReachHeader({ reach, count, collapsed, onToggle, onRename }) {
 
 const cellStyle = { fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
-export default function NetworkPanel({ nodes, edges, selected, setSelected, reachRegistry, reachKeyOfEdge, onRenameReach, width = 232 }) {
+// Everything below the panel header — the header itself (icon+dropdown
+// switcher, title, filter/layers icons) is owned by the generic PanelSlot
+// shell so any slot can swap between this and the other panel views.
+export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSelected, reachRegistry = [], reachKeyOfEdge = {}, onRenameReach }) {
   // The divider above "Network initial conditions" drags to resize the
   // top table's viewport height.
   const [topH, setTopH] = useState(320);
@@ -171,12 +155,7 @@ export default function NetworkPanel({ nodes, edges, selected, setSelected, reac
   };
 
   return (
-    <div style={{
-      width, flexShrink: 0, height: "100%", display: "flex", flexDirection: "column",
-      background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4, overflow: "hidden",
-    }}>
-      <PanelHeader icon={A.network} title="1D Network" />
-
+    <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Search + prev/next */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 4, padding: "4px 8px", width: "100%", flexShrink: 0 }}>
         <div style={{

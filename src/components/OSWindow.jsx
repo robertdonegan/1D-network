@@ -5,22 +5,58 @@ import { flattenRibbonItems } from "./ModeRibbon.jsx";
 const menus = ["General", "Project", "Layer", "View", "Window", "Toolbox", "Help"];
 const ALL_ITEMS = flattenRibbonItems();
 
+// View menu (fm-v8.0-menu-view spec) — only "Flow Lines" is wired to real
+// behaviour; the rest are visual-only chrome matching the Figma menu, same
+// convention as the Home ribbon's not-yet-built dropdowns.
+const VIEW_MENU = [
+  { label: "Base map", chevron: true },
+  { label: "Web Map Services...", sep: true },
+  { label: "Map decoration", chevron: true },
+  { label: "Nodes", chevron: true },
+  { label: "Icons", chevron: true },
+  { label: "Links", chevron: true },
+  { label: "Overlaps", chevron: true },
+  { id: "flowlines", label: "Flow Lines" },
+  { id: "groups", label: "Groups", checkbox: true },
+  { label: "Map annotations", chevron: true, sep: true },
+  { label: "Labels settings...", sep: true },
+  { label: "Zoom in", value: "+" },
+  { label: "Zoom out", value: "-" },
+  { label: "Zoom to extent", value: "0", sep: true },
+  { label: "Zoom to selection", value: "Ctrl+↑", disabled: true },
+  { label: "UI theme (system)", chevron: true },
+];
+
 // `onBeginDrag(e, items, index)` — same signature ModeRibbon uses, so a
 // search result can be picked up and dropped onto the GIS canvas exactly
 // like a ribbon leaf item. `onGoToLocation(lat, lon)` — a place result was
 // picked instead, so pan/zoom the canvas there (see App's `goToLocation`).
-export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation }) {
+// `flowLinesOn`/`setFlowLinesOn` — the View menu's "Flow Lines" toggle,
+// owned by App since it also drives GisCanvas's pulse animation and the
+// Flow Lines side panel.
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [places, setPlaces] = useState([]);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const boxRef = useRef(null);
+  const viewRef = useRef(null);
 
   useEffect(() => {
     const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
+
+  useEffect(() => {
+    if (!viewMenuOpen) return;
+    const onDown = (e) => { if (viewRef.current && !viewRef.current.contains(e.target)) setViewMenuOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setViewMenuOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [viewMenuOpen]);
 
   // Real-world place lookup (e.g. "One Glass Wharf, Bristol"), debounced
   // against OpenStreetMap's public Nominatim geocoder — same "real OSM data,
@@ -65,15 +101,72 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation 
           <Icon src={A.logo} size={32} alt="Flood Modeller" />
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
-          {menus.map(m => (
-            <div key={m}
-              onClick={m === "Help" ? onOpenShortcuts : undefined}
-              title={m === "Help" ? "Keyboard Shortcuts (Ctrl+Shift+K)" : undefined}
-              style={{
-                height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "0 8px", fontSize: "var(--fs-xs)", cursor: m === "Help" ? "pointer" : "default", whiteSpace: "nowrap",
-              }}>{m}</div>
-          ))}
+          {menus.map(m => {
+            if (m === "View") {
+              return (
+                <div key={m} ref={viewRef} style={{ position: "relative" }}>
+                  <div
+                    onClick={() => setViewMenuOpen((v) => !v)}
+                    style={{
+                      height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: "0 8px", fontSize: "var(--fs-xs)", cursor: "pointer", whiteSpace: "nowrap",
+                      background: viewMenuOpen ? "rgba(255,255,255,0.15)" : "transparent",
+                    }}
+                  >{m}</div>
+                  {viewMenuOpen && (
+                    <div style={{
+                      position: "absolute", top: "100%", left: 0, marginTop: 2, width: 200, color: "var(--text-primary)",
+                      background: "var(--surface-1)", border: "1px solid var(--border-primary)",
+                      borderRadius: 2, boxShadow: "0px 2px 4px rgba(0,0,0,0.1), 0px 3px 6px rgba(0,0,0,0.1)",
+                      padding: "4px 0", zIndex: 90,
+                    }}>
+                      {VIEW_MENU.map((it, i) => {
+                        const isFlowLines = it.id === "flowlines";
+                        const checked = isFlowLines ? flowLinesOn : it.id === "groups" ? false : undefined;
+                        const clickable = isFlowLines && !it.disabled;
+                        return (
+                          <div key={i}>
+                            <div
+                              onClick={clickable ? () => { setFlowLinesOn((v) => !v); setViewMenuOpen(false); } : undefined}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 4, height: 24, margin: "0 4px", padding: "0 4px",
+                                borderRadius: 2, cursor: it.disabled ? "default" : clickable ? "pointer" : "default",
+                                opacity: it.disabled ? 0.4 : 1,
+                                background: isFlowLines && flowLinesOn ? "var(--surface-3)" : "transparent",
+                                border: isFlowLines && flowLinesOn ? "1px solid var(--surface-brand)" : "1px solid transparent",
+                              }}
+                              onMouseOver={(e) => { if (clickable && !flowLinesOn) e.currentTarget.style.background = "var(--surface-3)"; }}
+                              onMouseOut={(e) => { if (clickable) e.currentTarget.style.background = isFlowLines && flowLinesOn ? "var(--surface-3)" : "transparent"; }}
+                            >
+                              <div style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                {checked !== undefined && checked && <Icon src={A.check} size={16} />}
+                              </div>
+                              <span style={{
+                                flex: "1 0 0", fontSize: "var(--fs-xs)", color: "var(--text-primary)",
+                                fontWeight: isFlowLines ? 500 : 400,
+                              }}>{it.label}</span>
+                              {it.value && <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-tertiary)" }}>{it.value}</span>}
+                              {it.chevron && <Icon src={A.keyDown} size={12} style={{ transform: "rotate(-90deg)", opacity: 0.6 }} />}
+                            </div>
+                            {it.sep && <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 4px" }} />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div key={m}
+                onClick={m === "Help" ? onOpenShortcuts : undefined}
+                title={m === "Help" ? "Keyboard Shortcuts (Ctrl+Shift+K)" : undefined}
+                style={{
+                  height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "0 8px", fontSize: "var(--fs-xs)", cursor: m === "Help" ? "pointer" : "default", whiteSpace: "nowrap",
+                }}>{m}</div>
+            );
+          })}
         </div>
       </div>
 
