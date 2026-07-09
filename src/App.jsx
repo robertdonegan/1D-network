@@ -5,6 +5,7 @@ import PanelSlot from "./components/PanelSlot.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import AnnotationSettings from "./components/AnnotationSettings.jsx";
+import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
 import { mockFlowForEdge } from "./flowMock.js";
@@ -113,6 +114,58 @@ function CornerRevealGrip({ width, setWidth }) {
   );
 }
 
+// Toolbox > "Open Toolbox..." (OS menu) pops this floating, draggable
+// window on top of the UI — same ToolboxPanelBody the docked mid-panel
+// slot uses, so search/expand state just isn't shared between the two
+// (each is its own mount, matching how every other panel view works).
+// The dock icon in its header hands off to the existing corner-panel slot
+// (`midPanelView`/`midPanelW` — see CornerRevealGrip) instead of floating.
+function FloatingToolbox({ pos, setPos, onDock, onClose }) {
+  const onHeaderDown = (e) => {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const origin = pos;
+    const onMove = (ev) => {
+      setPos({ x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+  return (
+    <div style={{
+      position: "fixed", left: pos.x, top: pos.y, width: 300, height: 680, maxHeight: "85vh", zIndex: 200,
+      display: "flex", flexDirection: "column",
+      background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
+      boxShadow: "0 8px 24px rgba(0,0,0,0.2)", overflow: "hidden",
+    }}>
+      <div
+        onMouseDown={onHeaderDown}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 8px", flexShrink: 0,
+          cursor: "grab", borderBottom: "1px solid var(--border-primary)", background: "var(--surface-2)",
+        }}
+      >
+        <Icon src={A.toolboxHeaderIcon} size={16} />
+        <span style={{ fontSize: "var(--fs-s)", fontWeight: 500, flex: "1 0 0" }}>Toolbox</span>
+        <button onClick={onDock} title="Dock into layout" style={{
+          border: "none", background: "transparent", cursor: "pointer", padding: 4,
+          display: "flex", alignItems: "center", color: "var(--text-tertiary)",
+        }}>
+          <Icon src={A.dock} size={12} style={{ filter: "invert(1)" }} />
+        </button>
+        <button onClick={onClose} title="Close" style={{
+          border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1, color: "var(--text-tertiary)",
+        }}>×</button>
+      </div>
+      <ToolboxPanelBody />
+    </div>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState("FM 1D");
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -128,6 +181,11 @@ export default function App() {
   const [bottomPanelView, setBottomPanelView] = useState("globalanimator");
   const [midPanelW, setMidPanelW] = useState(0);
   const [midPanelView, setMidPanelView] = useState("toolbox");
+  // Toolbox > "Open Toolbox..." (OS menu) — floating/undocked window; see
+  // FloatingToolbox above. Docking it hands off to the existing mid-panel
+  // corner slot instead (`midPanelW`/`midPanelView`).
+  const [toolboxFloat, setToolboxFloat] = useState(false);
+  const [toolboxPos, setToolboxPos] = useState({ x: 420, y: 90 });
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Shared with NetworkPanel so a row click selects the node on the canvas.
@@ -288,12 +346,14 @@ export default function App() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation}
-        flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} />
+        flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} onOpenToolbox={() => setToolboxFloat(true)}
+        basemap={basemap} setBasemap={setBasemap} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
         onOpenAnnotationSettings={() => setShowAnnotationSettings(true)} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
-        <PanelSlot width={projectW} viewId={leftView} onChangeView={setLeftView} bodyProps={panelBodyProps} />
+        <PanelSlot width={projectW} viewId={leftView} onChangeView={setLeftView} bodyProps={panelBodyProps}
+          onUndockToolbox={() => { setToolboxFloat(true); setLeftView("project"); }} />
         <ResizeHandle onDrag={(dx) => setProjectW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w + dx)))} />
 
         {/* Canvas column: map + (optionally) the bottom-docked panel below
@@ -320,7 +380,8 @@ export default function App() {
           <BottomRevealHandle height={bottomPanelH} setHeight={setBottomPanelH} />
           {bottomPanelH > 0 && (
             <PanelSlot height={bottomPanelH} viewId={bottomPanelView} onChangeView={setBottomPanelView}
-              bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)} />
+              bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)}
+              onUndockToolbox={() => { setToolboxFloat(true); setBottomPanelH(0); }} />
           )}
         </div>
 
@@ -328,12 +389,14 @@ export default function App() {
           <>
             <ResizeHandle onDrag={(dx) => setMidPanelW(w => Math.max(0, Math.min(REVEAL_MAX + 80, w - dx)))} />
             <PanelSlot width={midPanelW} viewId={midPanelView} onChangeView={setMidPanelView}
-              bodyProps={panelBodyProps} onClose={() => setMidPanelW(0)} />
+              bodyProps={panelBodyProps} onClose={() => setMidPanelW(0)}
+              onUndockToolbox={() => { setToolboxFloat(true); setMidPanelW(0); }} />
           </>
         )}
 
         <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
-        <PanelSlot width={networkW} viewId={rightView} onChangeView={setRightView} bodyProps={panelBodyProps} />
+        <PanelSlot width={networkW} viewId={rightView} onChangeView={setRightView} bodyProps={panelBodyProps}
+          onUndockToolbox={() => { setToolboxFloat(true); setRightView("network"); }} />
       </div>
 
       {ribbonDrag && (
@@ -354,6 +417,13 @@ export default function App() {
       )}
 
       {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+      {toolboxFloat && (
+        <FloatingToolbox
+          pos={toolboxPos} setPos={setToolboxPos}
+          onDock={() => { setMidPanelView("toolbox"); setMidPanelW((w) => (w > 0 ? w : 300)); setToolboxFloat(false); }}
+          onClose={() => setToolboxFloat(false)}
+        />
+      )}
       {showAnnotationSettings && (
         <AnnotationSettings
           style={annotationStyle}

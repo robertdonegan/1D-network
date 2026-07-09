@@ -33,6 +33,12 @@ import muskingumV from "./assets/muskingum-v.svg";
 import muskingumX from "./assets/muskingum-x.svg";
 import refh2 from "./assets/refh2.svg";
 import connectorGaugeV2 from "./assets/connector-gauge-v2.svg";
+import toolboxChevronCollapsed from "./assets/toolbox-chevron-collapsed.svg";
+import toolboxChevronExpanded from "./assets/toolbox-chevron-expanded.svg";
+import toolboxTool from "./assets/toolbox-tool.svg";
+import toolboxToolDisabled from "./assets/toolbox-tool-disabled.svg";
+import toolboxHeaderIcon from "./assets/toolbox-header-icon.svg";
+import toolboxUndock from "./assets/toolbox-undock.svg";
 import loadRiverNetwork from "./assets/load-1d-network.svg";
 import newRiverNetwork from "./assets/new-1d-network.svg";
 import saveRiverNetwork from "./assets/save-1d-network.svg";
@@ -186,6 +192,7 @@ export const A = {
   floodplain, onlinePond, reservoir, usbprBridge, archBridge, pierLossBridge, breach, pump, generalLoss,
   loadRiverNetwork, newRiverNetwork, saveRiverNetwork, saveAsRiverNetwork,
   cesSection, muskingum, muskingumR, muskingumV, muskingumX, refh2, connectorGaugeV2,
+  toolboxChevronCollapsed, toolboxChevronExpanded, toolboxTool, toolboxToolDisabled, toolboxHeaderIcon, toolboxUndock,
   labelsColor, rulesColor, settingsColor,
   conduitFullArch, conduitSprungArch, conduitRectangular, conduitSymmetrical, conduitAsymmetrical,
   orifice, invertedSyphon, outfall, floodReliefArch,

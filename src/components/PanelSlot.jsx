@@ -4,6 +4,7 @@ import { ProjectPanelBody } from "./ProjectPanel.jsx";
 import { NetworkPanelBody } from "./NetworkPanel.jsx";
 import { FlowLinesPanelBody } from "./FlowLinesPanel.jsx";
 import { GlobalAnimatorBody } from "./GlobalAnimatorPanel.jsx";
+import { ToolboxPanelBody } from "./ToolboxPanel.jsx";
 
 // Every view a left/right panel slot can be switched to. Project, 1D
 // Network, and Flow Lines have real content — the rest render a blank "not
@@ -19,7 +20,7 @@ export const PANEL_VIEWS = {
   timesteps: { icon: "placeholder", title: "Timesteps" },
   texteditor: { icon: "placeholder", title: "Text editor" },
   diagnostics1d: { icon: "placeholder", title: "1D Diagnostics" },
-  toolbox: { icon: "placeholder", title: "Toolbox" },
+  toolbox: { icon: "edit", title: "Toolbox", Body: ToolboxPanelBody },
   flowlines: { icon: "flowLinesIcon", title: "1D Flow Lines", Body: FlowLinesPanelBody },
 };
 const VIEW_ORDER = [
@@ -91,14 +92,21 @@ function PanelSwitcher({ viewId, onChangeView }) {
   );
 }
 
-function PanelHeader({ viewId, onChangeView, onClose }) {
+function PanelHeader({ viewId, onChangeView, onClose, onUndockToolbox }) {
+  const isToolbox = viewId === "toolbox";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "4px 8px 4px 4px", flexShrink: 0 }}>
       <PanelSwitcher viewId={viewId} onChangeView={onChangeView} />
       <span style={{ fontSize: "var(--fs-s)", fontWeight: 500 }}>{PANEL_VIEWS[viewId].title}</span>
       <div style={{ flex: "1 0 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
         <Icon src={A.labelFilter} size={12} />
-        <Icon src={A.layers} size={12} />
+        {isToolbox && onUndockToolbox ? (
+          <button onClick={onUndockToolbox} title="Undock into a floating window" style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}>
+            <Icon src={A.toolboxUndock} size={12} />
+          </button>
+        ) : (
+          <Icon src={A.layers} size={12} />
+        )}
         {onClose && (
           <button onClick={onClose} title="Close panel" style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1, color: "var(--text-tertiary)" }}>×</button>
         )}
@@ -122,7 +130,7 @@ function BlankBody({ title }) {
 // `width` for a vertical sidebar slot (left/right/mid), `height` for a
 // horizontal slot docked along the bottom (Global Animator) — whichever
 // isn't given defaults to 100% so the slot fills its flex container.
-export default function PanelSlot({ width, height, viewId, onChangeView, bodyProps, onClose }) {
+export default function PanelSlot({ width, height, viewId, onChangeView, bodyProps, onClose, onUndockToolbox }) {
   const view = PANEL_VIEWS[viewId];
   const Body = view.Body;
   return (
@@ -131,7 +139,7 @@ export default function PanelSlot({ width, height, viewId, onChangeView, bodyPro
       display: "flex", flexDirection: "column",
       background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4, overflow: "hidden",
     }}>
-      <PanelHeader viewId={viewId} onChangeView={onChangeView} onClose={onClose} />
+      <PanelHeader viewId={viewId} onChangeView={onChangeView} onClose={onClose} onUndockToolbox={onUndockToolbox} />
       {Body ? <Body {...bodyProps} /> : <BlankBody title={view.title} />}
     </div>
   );

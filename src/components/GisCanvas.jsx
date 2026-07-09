@@ -1561,35 +1561,32 @@ export default function GisCanvas({
   // (Select/Zoom/Options) when nothing below applies.
   const guideItems = (() => {
     if (confirmId)
-      return [{ label: "Click Delete to confirm" }, { label: "Esc to cancel" }];
+      return [{ label: "Click Delete: confirm" }, { label: "Esc: cancel" }];
     if (textEditing)
-      return [
-        { label: "Type your note" },
-        { label: "Click away or Esc to finish" },
-      ];
+      return [{ label: "Type your note" }, { label: "Click away/Esc: finish" }];
     if (annotateTool === "textbox")
-      return [{ label: "Click to place a text box" }, { label: "Esc to stop" }];
+      return [{ label: "Click: place text box" }, { label: "Esc: stop" }];
     if (annotateTool === "marker" || annotateTool === "highlighter")
-      return [{ label: "Drag to draw" }, { label: "Esc to stop" }];
+      return [{ label: "Drag to draw" }, { label: "Esc: stop" }];
     if (annotateTool === "arrow")
-      return [{ label: "Drag from start to end" }, { label: "Esc to stop" }];
+      return [{ label: "Drag start to end" }, { label: "Esc: stop" }];
     if (picker || reachPicker)
-      return [{ label: "Click an item to choose" }, { label: "Esc to cancel" }];
+      return [{ label: "Click an item to choose" }, { label: "Esc: cancel" }];
     if (ribbonDrag)
       return hoverSplice
         ? [
-            { label: "Tab to cycle the unit type" },
-            { label: "Release to insert into the reach" },
+            { label: "Tab: cycle unit type" },
+            { label: "Release: insert into reach" },
           ]
         : [
-            { label: "Tab to cycle the unit type" },
-            { label: "Drop on the canvas to place, or on a line to insert" },
+            { label: "Tab: cycle unit type" },
+            { label: "Drop on canvas to place, on a line to insert" },
           ];
     if (toolDrag?.tool === "zoom")
       return [
         {
           icon: "mouseLeftDrag",
-          label: "Drag up to zoom in, down to zoom out",
+          label: "Drag up/down: zoom in/out",
         },
         { label: "Alt inverts · Shift slows" },
       ];
@@ -1607,60 +1604,57 @@ export default function GisCanvas({
         {
           label:
             marquee.mode === "subtract"
-              ? "Release to remove from selection"
+              ? "Release: remove from selection"
               : "Release to select",
         },
       ];
     if (measure)
       return [
-        { label: "Click to add a point" },
-        { label: "Enter/double-click to finish" },
+        { label: "Click: add point" },
+        { label: "Enter/dbl-click: finish" },
       ];
     if (wire)
       return [
-        { label: "Drop on a node to connect" },
-        { label: "Release elsewhere to choose a unit" },
+        { label: "Drop on node: connect" },
+        { label: "Release elsewhere: choose unit" },
       ];
     if (dragNode)
       return [{ label: "Drag to reposition" }, { label: "Release to drop" }];
     if (dragVertex)
       return [
-        { label: "Drag to move the point" },
-        { label: "Double-click to convert to a unit" },
+        { label: "Drag: move point" },
+        { label: "Dbl-click: convert to unit" },
       ];
-    if (dragCurve) return [{ label: "Drag to bend the curve" }];
+    if (dragCurve) return [{ label: "Drag: bend curve" }];
     if (zoomMode)
-      return [
-        { label: "Click to zoom in" },
-        { label: "Alt+Click to zoom out" },
-      ];
+      return [{ label: "Click: zoom in" }, { label: "Alt+Click: zoom out" }];
     if (panMode) return [{ label: "Click-drag to pan" }];
     if (selected.length > 1)
       return [
-        { icon: "mouseRight", label: "Right-click to group" },
-        { label: "Shift/Ctrl+Click to add/remove" },
-        { label: "Alt+Click to deselect one" },
+        { icon: "mouseRight", label: "Right-click: group" },
+        { label: "Shift/Ctrl+Click: add/remove" },
+        { label: "Alt+Click: deselect one" },
       ];
     if (selected.length === 1)
       return [
-        { icon: "mouseRight", label: "Right-click for options" },
-        { label: "Shift/Ctrl+Click to add another" },
-        { label: "Alt+Click to deselect · Del to remove" },
+        { icon: "mouseRight", label: "Right-click: options" },
+        { label: "Shift/Ctrl+Click: add" },
+        { label: "Alt+Click: deselect · Del: remove" },
       ];
     if (selectedVertex)
       return [
-        { label: "Double-click to convert to a unit" },
+        { label: "Dbl-click: convert to unit" },
         { label: "Del to remove" },
       ];
     if (hovered)
       return [
         { icon: "mouseLeft", label: "Click to select" },
-        { label: "Shift/Ctrl+Click to multi-select" },
+        { label: "Shift/Ctrl+Click: multi-select" },
       ];
     if (hoverLine)
       return [
-        { label: "Click midpoint to add a point" },
-        { label: "Alt+Click to bend · Click to reassign the reach" },
+        { label: "Click midpoint: add point" },
+        { label: "Alt+Click: bend · Click: reassign reach" },
       ];
     return null;
   })();
@@ -3535,7 +3529,6 @@ export default function GisCanvas({
             cursorWorld={cursorWorld}
             scale={view.scale}
             guideItems={guideItems}
-            showAttribution={showBasemap}
           />
         </div>
       </div>

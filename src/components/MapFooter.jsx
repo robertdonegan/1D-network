@@ -65,7 +65,7 @@ const DEFAULT_GUIDE = [
 // ordered hint (icon optional) reflecting whatever the user is currently
 // doing — hovering/selecting a unit, dragging, an open picker, etc. Falls
 // back to the baseline Select/Zoom/Options guide when nothing is active.
-export default function MapFooter({ cursorWorld, scale, guideItems, showAttribution }) {
+export default function MapFooter({ cursorWorld, scale, guideItems }) {
   const items = guideItems && guideItems.length ? guideItems : DEFAULT_GUIDE;
   const metersPerPx = METERS_PER_WORLD_UNIT / scale;
   const meters = pickScale(metersPerPx);
@@ -81,30 +81,33 @@ export default function MapFooter({ cursorWorld, scale, guideItems, showAttribut
         <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-primary)" }}>{fmt(mi, "mi")}</span>
       </div>
 
-      {/* Status bar */}
+      {/* Status bar — grid, not flex: the outer two tracks are both `1fr`
+          so they're always equal width no matter how much text either one
+          holds, which pins the centre track's midpoint to the bar's true
+          centre. A flex layout here made the hint text visibly shift left/
+          right every time the what3words string changed length. */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 11, height: 24, padding: "4px 8px",
+        display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", columnGap: 11,
+        height: 24, padding: "4px 8px",
         background: "var(--surface-1)", borderTop: "1px solid var(--border-primary)",
         borderRadius: "0 0 4px 4px",
       }}>
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", gap: 11, fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 11, fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span>X:{cursorWorld ? cursorWorld.x.toFixed(2) : "—"}</span>
           <span>Y:{cursorWorld ? cursorWorld.y.toFixed(2) : "—"}</span>
           <span title="Simulated — no what3words API configured" style={{ color: "var(--surface-brand)" }}>
             {cursorWorld ? simulatedW3W(cursorWorld.x, cursorWorld.y) : "///—.—.—"}
           </span>
         </div>
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 11, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 11, overflow: "hidden" }}>
           {items.map((it, i) => (
             <GuideItem key={i} icon={it.icon ? A[it.icon] : undefined} label={it.label} />
           ))}
         </div>
-        <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-          {showAttribution && (
-            <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-              © OpenStreetMap contributors
-            </span>
-          )}
+        <div style={{ minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+          <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+            © OpenStreetMap contributors
+          </span>
         </div>
       </div>
     </div>
