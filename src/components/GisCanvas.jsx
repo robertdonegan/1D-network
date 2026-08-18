@@ -9,6 +9,7 @@ import OsmBasemap, {
 import MapFooter from "./MapFooter.jsx";
 import TransectPopup from "./TransectPopup.jsx";
 import ContextMenu from "./ContextMenu.jsx";
+import EditToolbar from "./EditToolbar.jsx";
 import { PulsePreview, editValue } from "./FlowLinesPanel.jsx";
 import { FLOW_LABEL_METRICS } from "../flowMock.js";
 
@@ -179,7 +180,6 @@ const railTools = [
   { icon: A.rectangleSelect, name: "Group select", hasMenu: true },
   { icon: A.measureTool, name: "Measure", hasMenu: true },
   { icon: A.pointQuery, name: "Point query" },
-  { icon: A.comment, name: "Comment" },
   { icon: A.edit, name: "Edit" },
 ];
 
@@ -262,6 +262,7 @@ export default function GisCanvas({
   const [hoverLine, setHoverLine] = useState(null);
   const [dropHint, setDropHint] = useState(false);
   const [activeTool, setActiveTool] = useState(0);
+  const [liveEdit, setLiveEdit] = useState(false);
   const [navHover, setNavHover] = useState(null);
   const [view, setView] = useState({ scale: 1, tx: 0, ty: 0, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
@@ -1683,7 +1684,9 @@ export default function GisCanvas({
           backgroundColor: "#eef0ec",
           border: dropHint
             ? "1px dashed var(--blue-700)"
-            : "1px solid var(--border-primary)",
+            : liveEdit
+              ? "2px solid var(--red-700)"
+              : "1px solid var(--border-primary)",
           borderRadius: 4,
           cursor: ribbonDrag
             ? "copy"
@@ -1735,8 +1738,8 @@ export default function GisCanvas({
         <div
           style={{
             position: "absolute",
-            top: 12,
-            left: 12,
+            top: 6,
+            left: 6,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
@@ -1752,16 +1755,24 @@ export default function GisCanvas({
             // The group-select rail icon reflects whichever shape (rect/
             // ellipse/freeform) is currently armed via its submenu.
             const icon =
-              i === 1
-                ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape)
-                    .icon
-                : t.icon;
+              i === 4 && liveEdit
+                ? A.editStop
+                : i === 1
+                  ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape)
+                      .icon
+                  : t.icon;
             return (
               <div key={t.name} style={{ position: "relative" }}>
                 <button
-                  title={t.name + (t.hasMenu ? " (click for options)" : "")}
+                  title={i === 4 && liveEdit ? "Stop editing" : t.name + (t.hasMenu ? " (click for options)" : "")}
                   onClick={() => {
-                    setActiveTool(i);
+                    if (i === 5) {
+                      setLiveEdit((v) => !v);
+                      setActiveTool(i);
+                    } else {
+                      setLiveEdit(false);
+                      setActiveTool(i);
+                    }
                     if (i === 1) setGroupSelectMenuOpen((v) => !v);
                     if (i === 2) setMeasureMenuOpen((v) => !v);
                   }}
@@ -1775,7 +1786,11 @@ export default function GisCanvas({
                     borderRadius: 2,
                     cursor: "pointer",
                     background:
-                      activeTool === i ? "var(--surface-brand)" : "transparent",
+                      activeTool === i
+                        ? liveEdit
+                          ? "var(--red-700)"
+                          : "var(--surface-brand)"
+                        : "transparent",
                   }}
                   onMouseOver={(e) => {
                     if (activeTool !== i)
@@ -1953,8 +1968,8 @@ export default function GisCanvas({
         <div
           style={{
             position: "absolute",
-            top: 12,
-            right: 12,
+            top: 6,
+            right: 6,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
@@ -3512,6 +3527,11 @@ export default function GisCanvas({
               <PulsePreview fast />
             </div>
           </div>
+        )}
+
+        {/* Edit Toolbar - shown when liveEdit is active */}
+        {liveEdit && (
+          <EditToolbar liveEdit={liveEdit} setLiveEdit={setLiveEdit} />
         )}
 
         {/* Scale bar + coordinate/guide status bar, pinned over the bottom

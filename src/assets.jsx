@@ -134,6 +134,7 @@ import pointQuery from "./assets/point-query.svg";
 import pan from "./assets/pan.svg";
 import zoomTool from "./assets/zoom-tool.svg";
 import edit from "./assets/edit.svg";
+import editStop from "./assets/edit-stop.svg";
 import northStar from "./assets/north-star.svg";
 import comment from "./assets/comment.svg";
 import placeholder from "./assets/placeholder.svg";
@@ -212,7 +213,7 @@ export const A = {
   sim1dRiver, sim1dSwmm, simTuflow, simEstry,
   resultEmbeddedStructures,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
-  rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, northStar, comment,
+  rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, editStop, northStar, comment,
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
