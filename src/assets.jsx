@@ -14,6 +14,19 @@ import userProfile from "./assets/user-profile.svg";
 import hierarchyLine from "./assets/hierarchy-line.svg";
 import network from "./assets/network.svg";
 import labelFilter from "./assets/label-filter.svg";
+import filesFolder from "./assets/files-folder.svg";
+import arrowLeft from "./assets/arrow-left.svg";
+import arrowRight from "./assets/arrow-right.svg";
+import panelGlossary from "./assets/panel-glossary.svg";
+import panelTimesteps from "./assets/panel-timesteps.svg";
+import panelSwmmNetwork from "./assets/panel-swmm-network.svg";
+import panel2dResults from "./assets/panel-2d-results.svg";
+import panelTextEditor from "./assets/panel-text-editor.svg";
+import panelDiagnostics from "./assets/panel-diagnostics.svg";
+import tuflowEstry1d from "./assets/tuflow-estry-1d.svg";
+import hydroCalcPoints from "./assets/hydro-calc-points.svg";
+import swmmNetworkIcon from "./assets/swmm-network.svg";
+import simLoad from "./assets/sim-load.svg";
 
 import load1d from "./assets/load-1d-nwrk.svg";
 import crossSection from "./assets/cross-section-node.svg";
@@ -119,6 +132,26 @@ import sim1dSwmm from "./assets/sim-1d-swmm.svg";
 import simTuflow from "./assets/sim-tuflow.svg";
 import simEstry from "./assets/sim-estry.svg";
 import resultEmbeddedStructures from "./assets/result-embedded-structures.svg";
+import hydroLoadHplus from "./assets/hydro-load-hplus.svg";
+import hydroRefh from "./assets/hydro-refh.svg";
+import hydroFsuPortal from "./assets/hydro-fsu-portal.svg";
+import hydroRiverStations from "./assets/hydro-river-stations.svg";
+import hydroCatchDesc from "./assets/hydro-catch-desc.svg";
+import simQuality from "./assets/sim-quality.svg";
+import simNew2d from "./assets/sim-new-2d.svg";
+import simBuilder from "./assets/sim-builder.svg";
+import simRun from "./assets/sim-run.svg";
+import simRunBatch from "./assets/sim-run-batch.svg";
+import results1d from "./assets/results-1d.svg";
+import results1dFloodMap from "./assets/results-1d-flood-map.svg";
+import resultsTabularCsv from "./assets/results-tabular-csv.svg";
+import results2d from "./assets/results-2d.svg";
+import results2dFloodMap from "./assets/results-2d-flood-map.svg";
+import resultsDamageCalculator from "./assets/results-damage-calculator.svg";
+import resultsDiagnostics from "./assets/results-diagnostics.svg";
+import resultsComments from "./assets/results-comments.svg";
+import favStar from "./assets/fav-star.svg";
+import chartAnalytics from "./assets/chart-analytics.svg";
 
 import cursorSelect from "./assets/cursor-select.svg";
 import calcPointWeir from "./assets/calc-point-weir.svg";
@@ -135,6 +168,14 @@ import pan from "./assets/pan.svg";
 import zoomTool from "./assets/zoom-tool.svg";
 import edit from "./assets/edit.svg";
 import editStop from "./assets/edit-stop.svg";
+import editPenTool from "./assets/edit-pen-tool.svg";
+import editAddVertex from "./assets/edit-add-vertex.svg";
+import editMovePolygon from "./assets/edit-move-polygon.svg";
+import editSnapPoint from "./assets/edit-snap-point.svg";
+import editLayers from "./assets/edit-layers.svg";
+import editViewAttribute from "./assets/edit-view-attribute.svg";
+import editSave from "./assets/edit-save.svg";
+import editUndo from "./assets/edit-undo.svg";
 import northStar from "./assets/north-star.svg";
 import comment from "./assets/comment.svg";
 import placeholder from "./assets/placeholder.svg";
@@ -188,6 +229,9 @@ import ribbonSwmmNode from "./assets/ribbon-swmm-node.svg";
 export const A = {
   logo, search, add, check, minimise, dock, cancel, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
+  filesFolder, arrowLeft, arrowRight,
+  panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,
+  tuflowEstry1d, hydroCalcPoints, swmmNetworkIcon, simLoad,
   load1d, crossSection, interpolate, circularArch, flowTime, normalDepth,
   broadWeir, superBridge, spill, openJunction, blockage,
   floodplain, onlinePond, reservoir, usbprBridge, archBridge, pierLossBridge, breach, pump, generalLoss,
@@ -212,8 +256,13 @@ export const A = {
   mergeUnion, mergeDivide, mergeSubtract,
   sim1dRiver, sim1dSwmm, simTuflow, simEstry,
   resultEmbeddedStructures,
+  hydroLoadHplus, hydroRefh, hydroFsuPortal, hydroRiverStations, hydroCatchDesc,
+  simQuality, simNew2d, simBuilder, simRun, simRunBatch,
+  results1d, results1dFloodMap, resultsTabularCsv, results2d, results2dFloodMap,
+  resultsDamageCalculator, resultsDiagnostics, resultsComments, favStar, chartAnalytics,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
   rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, editStop, northStar, comment,
+  editPenTool, editAddVertex, editMovePolygon, editSnapPoint, editLayers, editViewAttribute, editSave, editUndo,
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,

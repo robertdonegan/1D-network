@@ -37,14 +37,16 @@ const components = [
   { icon: A.lhs3, label: "Supporting data" },
 ];
 
-function Toggle({ on }) {
+function Toggle({ on, onClick }) {
   return (
-    <div style={{
-      width: 16, height: 10, borderRadius: 6, flexShrink: 0,
-      background: on ? "#fff" : "var(--neutral-1000)",
-      border: on ? "none" : "1px solid var(--neutral-900)",
-      position: "relative", cursor: "pointer",
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        width: 16, height: 10, borderRadius: 6, flexShrink: 0,
+        background: on ? "#fff" : "var(--neutral-1000)",
+        border: on ? "none" : "1px solid var(--neutral-900)",
+        position: "relative", cursor: onClick ? "pointer" : "default",
+      }}>
       <div style={{
         position: "absolute", top: 1, width: 8, height: 8, borderRadius: "50%",
         left: on ? 7 : 1, background: on ? "var(--surface-brand)" : "#fff",
@@ -56,7 +58,10 @@ function Toggle({ on }) {
 // Everything below the panel header — the header itself (icon+dropdown
 // switcher, title, filter/layers icons) is owned by the generic PanelSlot
 // shell so any slot can swap between this and the other panel views.
-export function ProjectPanelBody() {
+// `polygons`/`polygonLayerVisible`/`setPolygonLayerVisible` — the Live Edit
+// "Example polygon layer" (see App.jsx/GisCanvas.jsx); real toggle, real
+// live count, not just decorative like the other Components rows.
+export function ProjectPanelBody({ polygons, polygonLayerVisible, setPolygonLayerVisible }) {
   return (
     <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, overflow: "hidden" }}>
       <SearchField placeholder="Search project" />
@@ -114,6 +119,15 @@ export function ProjectPanelBody() {
             </div>
           </div>
         ))}
+        {polygons && (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: 8, borderRadius: 2, background: "var(--neutral-400)" }}>
+            <Icon src={A.editMovePolygon} size={12} />
+            <span style={{ flex: "1 0 0", minWidth: 0, fontSize: "var(--fs-xs)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              Example polygon layer ({polygons.length})
+            </span>
+            <Toggle on={polygonLayerVisible} onClick={() => setPolygonLayerVisible((v) => !v)} />
+          </div>
+        )}
       </div>
 
       {/* Footer tabs */}

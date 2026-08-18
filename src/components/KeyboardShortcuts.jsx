@@ -169,7 +169,7 @@ const SECTIONS = [
   {
     title: "FM 2D",
     rows: [
-      { fn: "Generate iMesh", keys: "Ctrl+M", desc: "Example description" },
+      { fn: "New iMesh", keys: "Ctrl+M", desc: "Example description" },
       { fn: "Modify iMesh", keys: "Ctrl+Shift+M", desc: "Example description" },
     ],
   },

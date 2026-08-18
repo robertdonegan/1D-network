@@ -12,18 +12,33 @@ import { mockFlowForEdge } from "./flowMock.js";
 
 // Nodes/edges are owned here (not inside GisCanvas) so the live network list
 // in NetworkPanel can mirror exactly what's on the canvas.
+// World coords are real-georeferenced (via OsmBasemap's lonLatToWorld),
+// tracing the actual River Severn's course through Upton-upon-Severn
+// north-to-south — Hook Bank down past the town bridge to Ryall — so the
+// demo network lines up believably with the OSM backdrop, not just an
+// arbitrary squiggle. See GisCanvas's default `view` for the matching pan.
 const INIT_NODES = [
-  { id: "n0", icon: "flowTime",     shape: "square",  x: 300, y: 40,  label: "M014",  unitLabel: "Flow-Time" },
-  { id: "n1", icon: "crossSection", shape: "square",  x: 350, y: 108, label: "M015",  unitLabel: "River Section" },
-  { id: "n2", icon: "interpolate",  shape: "diamond", x: 400, y: 176, label: "M0155", unitLabel: "Interpolate" },
-  { id: "n3", icon: "crossSection", shape: "square",  x: 450, y: 244, label: "M016",  unitLabel: "River Section" },
-  { id: "n4", icon: "calcPointWeir",shape: "square",  x: 505, y: 312, label: "M017",  unitLabel: "Calc Point Weir" },
-  { id: "n5", icon: "interpolate",  shape: "diamond", x: 560, y: 380, label: "M0175", unitLabel: "Interpolate" },
-  { id: "n6", icon: "crossSection", shape: "square",  x: 615, y: 448, label: "M018",  unitLabel: "River Section" },
-  { id: "n7", icon: "normalDepth",  shape: "square",  x: 670, y: 516, label: "M026",  unitLabel: "Normal Depth" },
+  { id: "n0", icon: "flowTime",     shape: "square",  x: 5,    y: -379, label: "M014",  unitLabel: "Flow-Time" },
+  { id: "n1", icon: "crossSection", shape: "square",  x: -35,  y: -284, label: "M015",  unitLabel: "River Section" },
+  { id: "n2", icon: "interpolate",  shape: "diamond", x: -82,  y: -190, label: "M0155", unitLabel: "Interpolate" },
+  { id: "n3", icon: "crossSection", shape: "square",  x: -117, y: -95,  label: "M016",  unitLabel: "River Section" },
+  { id: "n4", icon: "calcPointWeir",shape: "square",  x: -140, y: 0,    label: "M017",  unitLabel: "Calc Point Weir" },
+  { id: "n5", icon: "interpolate",  shape: "diamond", x: -168, y: 95,   label: "M0175", unitLabel: "Interpolate" },
+  { id: "n6", icon: "crossSection", shape: "square",  x: -198, y: 190,  label: "M018",  unitLabel: "River Section" },
+  { id: "n7", icon: "normalDepth",  shape: "square",  x: -228, y: 284,  label: "M026",  unitLabel: "Normal Depth" },
 ];
 const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
+
+// Seed content for the "Example polygon layer" (Live Edit phase 3) — a
+// small demo shape near the river so the layer isn't empty on first load,
+// editable/deletable/addable-to like any polygon drawn with the pen tool.
+const INIT_POLYGONS = [
+  { id: "p0", name: "Polygon 1", points: [
+    { id: "pp0", x: -160, y: -30 }, { id: "pp1", x: -100, y: -20 },
+    { id: "pp2", x: -95, y: 30 }, { id: "pp3", x: -155, y: 40 },
+  ] },
+];
 
 const PANEL_MIN = 180, PANEL_MAX = 520;
 
@@ -188,6 +203,12 @@ export default function App() {
   const [toolboxPos, setToolboxPos] = useState({ x: 420, y: 90 });
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
+  // "Example polygon layer" (Live Edit phase 3) — a real vector layer,
+  // editable via the top-centre edit toolbar's Pen/Add vertex/Move polygon
+  // tools while Live Edit is on. Shown + toggleable in the left Project
+  // panel's Components list (see ProjectPanel.jsx).
+  const [polygons, setPolygons] = useState(INIT_POLYGONS);
+  const [polygonLayerVisible, setPolygonLayerVisible] = useState(true);
   // Shared with NetworkPanel so a row click selects the node on the canvas.
   // Array of node ids — supports multi-select (Ctrl+click, box-select).
   const [selected, setSelected] = useState([]);
@@ -341,6 +362,7 @@ export default function App() {
     edgeColors, reachRegistry: registry, reachKeyOfEdge: resolvedKeyByEdge, onRenameReach: renameReach,
     flowByEdge, velocityRange, setVelocityRange, clipOutOfRange, setClipOutOfRange,
     flowLabelsOn, setFlowLabelsOn, flowLabelMetric, setFlowLabelMetric, flowTracerOn, setFlowTracerOn,
+    polygons, polygonLayerVisible, setPolygonLayerVisible,
   };
 
   return (
@@ -375,6 +397,7 @@ export default function App() {
             clipOutOfRange={clipOutOfRange} flowLabelsOn={flowLabelsOn} flowLabelMetric={flowLabelMetric} flowTracerOn={flowTracerOn}
             flowWidgetOpen={flowWidgetOpen} setFlowWidgetOpen={setFlowWidgetOpen}
             onOpenFlowLinesPanel={() => setRightView("flowlines")}
+            polygons={polygons} setPolygons={setPolygons} polygonLayerVisible={polygonLayerVisible}
           />
           <CornerRevealGrip width={midPanelW} setWidth={setMidPanelW} />
           <BottomRevealHandle height={bottomPanelH} setHeight={setBottomPanelH} />

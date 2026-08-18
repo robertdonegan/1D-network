@@ -95,7 +95,7 @@ export default function MapFooter({ cursorWorld, scale, guideItems }) {
         <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 11, fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span>X:{cursorWorld ? cursorWorld.x.toFixed(2) : "—"}</span>
           <span>Y:{cursorWorld ? cursorWorld.y.toFixed(2) : "—"}</span>
-          <span title="Simulated — no what3words API configured" style={{ color: "var(--surface-brand)" }}>
+          <span title="Simulated — no what3words API configured" style={{ color: "var(--text-primary)" }}>
             {cursorWorld ? simulatedW3W(cursorWorld.x, cursorWorld.y) : "///—.—.—"}
           </span>
         </div>

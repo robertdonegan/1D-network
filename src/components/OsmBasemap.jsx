@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 
 // Demo-only backdrop: real OpenStreetMap raster tiles positioned under the
-// network using the same pan/zoom transform as everything else, so it
-// visually tracks the canvas. Not a real georeference — the network's world
-// coordinates aren't tied to actual lat/lon, this just anchors world (0,0)
-// near Upton-upon-Severn (the sample project's namesake) so the backdrop
-// looks plausible while demoing.
+// network using the same pan/zoom/rotate transform as everything else, so
+// it visually tracks the canvas. World (0,0) is anchored near
+// Upton-upon-Severn (the sample project's namesake), and the demo network's
+// seed coordinates (App.jsx's INIT_NODES) are real lon/lat converted via
+// `lonLatToWorld` — so unlike a typical placeholder backdrop, this one
+// actually stays georeferenced under the network as the view rotates.
 const TILE_SIZE = 256;
 const BASE_ZOOM = 15;
 const ANCHOR_LON = -2.2, ANCHOR_LAT = 52.058;
@@ -33,12 +34,21 @@ export function lonLatToWorld(lon, lat) {
 }
 
 export default function OsmBasemap({ view, width, height }) {
+  const rotation = view.rotation || 0;
   const tiles = useMemo(() => {
     const w = width || 800, h = height || 600;
-    // Visible world-space corners (rotation ignored for the backdrop — it's
-    // a decorative layer, not a georeferenced one).
-    const wx0 = -view.tx / view.scale, wy0 = -view.ty / view.scale;
-    const wx1 = (w - view.tx) / view.scale, wy1 = (h - view.ty) / view.scale;
+    // Visible world-space corners — inverse-transform all four screen
+    // corners (not just two) so the needed-tile bounding box is correct
+    // even when the view is rotated, not just panned/zoomed.
+    const rad = (-rotation * Math.PI) / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const toWorld = (sx, sy) => {
+      const ux = (sx - view.tx) / view.scale, uy = (sy - view.ty) / view.scale;
+      return { x: ux * cos - uy * sin, y: ux * sin + uy * cos };
+    };
+    const corners = [toWorld(0, 0), toWorld(w, 0), toWorld(0, h), toWorld(w, h)];
+    const wx0 = Math.min(...corners.map((c) => c.x)), wx1 = Math.max(...corners.map((c) => c.x));
+    const wy0 = Math.min(...corners.map((c) => c.y)), wy1 = Math.max(...corners.map((c) => c.y));
     const p0x = anchorPx.x + wx0, p0y = anchorPx.y + wy0;
     const p1x = anchorPx.x + wx1, p1y = anchorPx.y + wy1;
     const minTx = Math.floor(Math.min(p0x, p1x) / TILE_SIZE) - 1;
@@ -54,13 +64,17 @@ export default function OsmBasemap({ view, width, height }) {
       }
     }
     return list;
-  }, [view.tx, view.ty, view.scale, width, height]);
+  }, [view.tx, view.ty, view.scale, rotation, width, height]);
 
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
       <div style={{
         position: "absolute", left: 0, top: 0, transformOrigin: "0 0",
-        transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`,
+        // Same translate/scale/rotate composition as GisCanvas's toScreen
+        // (screen = translate + scale * rotate * world), so the basemap
+        // stays georeferenced under the network as the view rotates instead
+        // of the two visibly swinging out of alignment.
+        transform: `translate(${view.tx}px, ${view.ty}px) scale(${view.scale}) rotate(${rotation}deg)`,
       }}>
         {tiles.map(({ tx, ty, wrappedX }) => (
           <img key={tx + "_" + ty} alt="" width={TILE_SIZE} height={TILE_SIZE} draggable={false}

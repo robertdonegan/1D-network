@@ -10,6 +10,7 @@ import MapFooter from "./MapFooter.jsx";
 import TransectPopup from "./TransectPopup.jsx";
 import ContextMenu from "./ContextMenu.jsx";
 import EditToolbar from "./EditToolbar.jsx";
+import SaveModal from "./SaveModal.jsx";
 import { PulsePreview, editValue } from "./FlowLinesPanel.jsx";
 import { FLOW_LABEL_METRICS } from "../flowMock.js";
 
@@ -182,6 +183,7 @@ const railTools = [
   { icon: A.pointQuery, name: "Point query" },
   { icon: A.edit, name: "Edit" },
 ];
+const EDIT_TOOL_INDEX = railTools.length - 1;
 
 const GROUP_SELECT_SHAPES = [
   { id: "rect", icon: A.rectangleSelect, label: "Rectangle select" },
@@ -248,6 +250,9 @@ export default function GisCanvas({
   flowWidgetOpen,
   setFlowWidgetOpen,
   onOpenFlowLinesPanel,
+  polygons,
+  setPolygons,
+  polygonLayerVisible,
 }) {
   const showBasemap = basemap === "osm";
   const [hovered, setHovered] = useState(null);
@@ -263,8 +268,154 @@ export default function GisCanvas({
   const [dropHint, setDropHint] = useState(false);
   const [activeTool, setActiveTool] = useState(0);
   const [liveEdit, setLiveEdit] = useState(false);
+  // Set true by any Edit-toolbar action once Live Edit is on; gates whether
+  // stopping edit shows the Discard/Cancel/Save dialog or just exits clean.
+  const [editDirty, setEditDirty] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const handleStopEdit = () => {
+    if (editDirty) setSaveModalOpen(true);
+    else { setLiveEdit(false); setActiveTool(0); }
+  };
+  const handleEditSave = () => {
+    setSaveModalOpen(false); setEditDirty(false); setLiveEdit(false); setActiveTool(0);
+    setDrawPoly(null); setPolyDrag(null); setSelectedPolyId(null); setSelectedPolyVertex(null);
+    setPolyPast([]); setPolyFuture([]);
+  };
+  const handleEditDiscard = () => {
+    setSaveModalOpen(false); setEditDirty(false); setLiveEdit(false); setActiveTool(0);
+    setPolygons(polygonsAtEditStart.current ?? polygons);
+    setDrawPoly(null); setPolyDrag(null); setSelectedPolyId(null); setSelectedPolyVertex(null);
+    setPolyPast([]); setPolyFuture([]);
+  };
+  const handleEditCancel = () => setSaveModalOpen(false);
+
+  // --- Polygon editing (Live Edit phase 3) -----------------------------
+  // Real editable vector layer, gated to Live Edit — `polygons`/
+  // `setPolygons` are lifted to App.jsx (shown as "Example polygon layer"
+  // in the left Project panel) so they persist across Live Edit sessions;
+  // `polySubTool`/`snapOn` are controlled here and passed down to
+  // EditToolbar so its buttons reflect real state instead of being
+  // decorative. Undo/redo is a plain snapshot stack — simple and correct
+  // at this data scale (a handful of polygons, not thousands).
+  const [polySubTool, setPolySubTool] = useState(null); // "pen" | "addVertex" | "movePolygon" | "viewAttribute" | null
+  const [snapOn, setSnapOn] = useState(true);
+  const [drawPoly, setDrawPoly] = useState(null); // { points: [{x,y}], cursor } — in-progress new polygon
+  const [polyDrag, setPolyDrag] = useState(null); // { type: "vertex"|"polygon", polyId, vIdx, ox, oy, origPoints }
+  const [selectedPolyId, setSelectedPolyId] = useState(null);
+  const [selectedPolyVertex, setSelectedPolyVertex] = useState(null); // { polyId, vIdx }
+  const [polySnapPoint, setPolySnapPoint] = useState(null); // world {x,y} — visual snap feedback ring
+  const [polyPast, setPolyPast] = useState([]);
+  const [polyFuture, setPolyFuture] = useState([]);
+  const polygonsAtEditStart = useRef(null);
+  // While a Live Edit polygon tool is armed, the 1D network layer must not
+  // intercept pointer events — its nodes/vertices are plain divs and SVG
+  // shapes that paint on top of the polygon layer, so without this they'd
+  // silently swallow clicks/drags meant for polygons underneath (a real bug:
+  // dragging "through" a node used to drag the node instead of the polygon).
+  const networkReadOnly = liveEdit && !!polySubTool;
+
+  const pushPolyHistory = () => { setPolyPast((p) => [...p, polygons]); setPolyFuture([]); };
+  const undoPoly = () => {
+    if (!polyPast.length) return;
+    setPolyFuture((f) => [polygons, ...f]);
+    setPolygons(polyPast[polyPast.length - 1]);
+    setPolyPast((p) => p.slice(0, -1));
+  };
+  const redoPoly = () => {
+    if (!polyFuture.length) return;
+    setPolyPast((p) => [...p, polygons]);
+    setPolygons(polyFuture[0]);
+    setPolyFuture((f) => f.slice(1));
+  };
+  const POLY_SNAP_PX = 10;
+  const findPolySnap = (wx, wy, excludePolyId, excludeVIdx) => {
+    if (!snapOn) return null;
+    const thresh = POLY_SNAP_PX / view.scale;
+    let best = null, bestD = thresh * thresh;
+    polygons.forEach((poly) => {
+      poly.points.forEach((v, i) => {
+        if (poly.id === excludePolyId && i === excludeVIdx) return;
+        const d = (v.x - wx) ** 2 + (v.y - wy) ** 2;
+        if (d < bestD) { bestD = d; best = { x: v.x, y: v.y }; }
+      });
+    });
+    return best;
+  };
+  const finishDrawPoly = () => {
+    if (!drawPoly || drawPoly.points.length < 3) { setDrawPoly(null); return; }
+    pushPolyHistory();
+    const id = genId();
+    setPolygons((ps) => [...ps, {
+      id, name: "Polygon " + (ps.length + 1),
+      points: drawPoly.points.map((p) => ({ id: genId(), x: p.x, y: p.y })),
+    }]);
+    setDrawPoly(null);
+    setEditDirty(true);
+  };
+  const polyVertexDown = (e, polyId, vIdx) => {
+    e.stopPropagation();
+    if (polySubTool === "movePolygon") return;
+    const poly = polygons.find((pg) => pg.id === polyId);
+    const v = poly.points[vIdx];
+    const p = pt(e);
+    const s = toScreen(view, v.x, v.y);
+    pushPolyHistory();
+    setSelectedPolyId(polyId);
+    setSelectedPolyVertex({ polyId, vIdx });
+    setPolyDrag({ type: "vertex", polyId, vIdx, ox: p.x - s.x, oy: p.y - s.y });
+    setEditDirty(true);
+  };
+  const polyBodyDown = (e, polyId) => {
+    if (polySubTool === "movePolygon") {
+      e.stopPropagation();
+      const poly = polygons.find((pg) => pg.id === polyId);
+      pushPolyHistory();
+      setSelectedPolyId(polyId);
+      setSelectedPolyVertex(null);
+      setPolyDrag({ type: "polygon", polyId, sx: e.clientX, sy: e.clientY, origPoints: poly.points });
+      setEditDirty(true);
+      return;
+    }
+    if (polySubTool === "viewAttribute") {
+      e.stopPropagation();
+      setSelectedPolyId(polyId);
+      setSelectedPolyVertex(null);
+      return;
+    }
+    // pen/addVertex: don't stopPropagation — let clicks pass through to the
+    // canvas so drawing/inserting still works even over an existing shape.
+  };
+  const deletePolyVertex = (polyId, vIdx) => {
+    pushPolyHistory();
+    setPolygons((ps) => ps.map((pg) => {
+      if (pg.id !== polyId) return pg;
+      if (pg.points.length <= 3) return pg;
+      return { ...pg, points: pg.points.filter((_, i) => i !== vIdx) };
+    }));
+    setSelectedPolyVertex(null);
+    setEditDirty(true);
+  };
+  const deletePolygon = (polyId) => {
+    pushPolyHistory();
+    setPolygons((ps) => ps.filter((pg) => pg.id !== polyId));
+    setSelectedPolyId(null);
+    setSelectedPolyVertex(null);
+    setEditDirty(true);
+  };
+  // Switching away from the pen tool (or leaving Live Edit) abandons any
+  // in-progress polygon draw rather than leaving it orphaned mid-shape.
+  useEffect(() => {
+    if (polySubTool !== "pen") setDrawPoly(null);
+  }, [polySubTool]);
+  useEffect(() => {
+    if (!liveEdit) { setDrawPoly(null); setPolySubTool(null); setSelectedPolyId(null); setSelectedPolyVertex(null); }
+  }, [liveEdit]);
   const [navHover, setNavHover] = useState(null);
-  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0, rotation: 0 });
+  // tx/ty centre the default view on the demo network's real-georeferenced
+  // Upton-upon-Severn coordinates (see App.jsx's INIT_NODES) — those world
+  // coords are negative/near-origin (anchored at Upton itself), so a plain
+  // (0,0) pan would leave the network scrolled off-screen on load.
+  const [view, setView] = useState({ scale: 1, tx: 660, ty: 430, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
   const [zoomMode, setZoomMode] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -527,7 +678,7 @@ export default function GisCanvas({
 
   // Reset view helpers, pivoting around the current viewport centre so the
   // content you're looking at doesn't jump.
-  const resetView = () => setView({ scale: 1, tx: 0, ty: 0, rotation: 0 });
+  const resetView = () => setView({ scale: 1, tx: 660, ty: 430, rotation: 0 });
   // Pan and Zoom are mutually exclusive persistent tools — turning one on
   // turns the other off, like a normal tool selector.
   const togglePanMode = () =>
@@ -643,7 +794,9 @@ export default function GisCanvas({
     };
     const onUp = () => {
       if (!toolDrag.moved) {
-        if (toolDrag.tool === "zoom") toggleZoomMode();
+        if (toolDrag.tool === "zoom" && toolDrag.viaCanvas) {
+          zoomBy(toolDrag.altKey ? 1 / KEY_ZOOM_FACTOR : KEY_ZOOM_FACTOR, pt({ clientX: toolDrag.sx, clientY: toolDrag.sy }));
+        } else if (toolDrag.tool === "zoom") toggleZoomMode();
         else if (toolDrag.tool === "pan") togglePanMode();
         else if (toolDrag.tool === "rotate") resetView();
       }
@@ -655,7 +808,7 @@ export default function GisCanvas({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [toolDrag, zoomBy, resetView, togglePanMode, toggleZoomMode]);
+  }, [toolDrag, zoomBy, resetView, togglePanMode, toggleZoomMode, pt]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => {
@@ -670,6 +823,34 @@ export default function GisCanvas({
       const p = pt(e);
       setCursorWorld(toWorld(view, p.x, p.y));
       if (ribbonDrag && !dropHint) setDropHint(true);
+      if (polyDrag) {
+        if (polyDrag.type === "vertex") {
+          const w = toWorld(view, p.x - polyDrag.ox, p.y - polyDrag.oy);
+          const snap = findPolySnap(w.x, w.y, polyDrag.polyId, polyDrag.vIdx);
+          const pos = snap || w;
+          setPolySnapPoint(snap);
+          setPolygons((ps) => ps.map((pg) => {
+            if (pg.id !== polyDrag.polyId) return pg;
+            const points = pg.points.map((v, i) => (i === polyDrag.vIdx ? { ...v, x: pos.x, y: pos.y } : v));
+            return { ...pg, points };
+          }));
+        } else if (polyDrag.type === "polygon") {
+          const dx = (e.clientX - polyDrag.sx) / view.scale, dy = (e.clientY - polyDrag.sy) / view.scale;
+          setPolygons((ps) => ps.map((pg) => (
+            pg.id === polyDrag.polyId
+              ? { ...pg, points: polyDrag.origPoints.map((v) => ({ ...v, x: v.x + dx, y: v.y + dy })) }
+              : pg
+          )));
+        }
+        return;
+      }
+      if (drawPoly) {
+        const w = toWorld(view, p.x, p.y);
+        const snap = findPolySnap(w.x, w.y, null, null);
+        setPolySnapPoint(snap);
+        setDrawPoly((d) => d && { ...d, cursor: snap || w });
+        return;
+      }
       if (annotateDraft) {
         const w = toWorld(view, p.x, p.y);
         if (annotateDraft.type === "arrow") {
@@ -809,6 +990,10 @@ export default function GisCanvas({
       edges,
       groups,
       annotateDraft,
+      polyDrag,
+      drawPoly,
+      polygons,
+      snapOn,
     ],
   );
 
@@ -1002,6 +1187,8 @@ export default function GisCanvas({
       setDragCurve(null);
       setWire(null);
       setSnapTo(null);
+      setPolyDrag(null);
+      setPolySnapPoint(null);
     },
     [
       ribbonDrag,
@@ -1060,6 +1247,12 @@ export default function GisCanvas({
   };
 
   const nodeDown = (e, id) => {
+    // While a Live Edit polygon tool is armed, the 1D network layer is
+    // "read-only" so clicks land on the polygon layer underneath instead
+    // (e.g. drawing/moving a polygon that happens to sit under a unit) —
+    // without this, a node's own drag handler wins the click every time,
+    // since it's painted on top of the polygon layer.
+    if (liveEdit && polySubTool) return;
     e.stopPropagation();
     setSelectedVertex(null);
     // Alt+click deselects this specific unit (Keyboard Shortcuts spec —
@@ -1095,6 +1288,7 @@ export default function GisCanvas({
   };
 
   const vertexDown = (e, edgeId, pid) => {
+    if (liveEdit && polySubTool) return;
     e.stopPropagation();
     if (e.altKey) {
       addCurvesAt(pid);
@@ -1303,6 +1497,9 @@ export default function GisCanvas({
           setSnapTo(null);
           return;
         }
+        if (drawPoly) return setDrawPoly(null);
+        if (selectedPolyVertex) return setSelectedPolyVertex(null);
+        if (selectedPolyId) return setSelectedPolyId(null);
         if (selectedVertex) return setSelectedVertex(null);
         if (annotateTool) return setAnnotateTool(null);
         return setSelected([]);
@@ -1314,6 +1511,31 @@ export default function GisCanvas({
       ) {
         e.preventDefault();
         finishMeasure();
+        return;
+      }
+      if (
+        (e.key === "Enter" || e.key === "NumpadEnter") &&
+        drawPoly &&
+        !isTyping(e)
+      ) {
+        e.preventDefault();
+        finishDrawPoly();
+        return;
+      }
+      if (
+        (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey &&
+        liveEdit && !isTyping(e)
+      ) {
+        e.preventDefault();
+        undoPoly();
+        return;
+      }
+      if (
+        (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z" &&
+        liveEdit && !isTyping(e)
+      ) {
+        e.preventDefault();
+        redoPoly();
         return;
       }
       if (
@@ -1335,6 +1557,22 @@ export default function GisCanvas({
       ) {
         e.preventDefault();
         deleteVertex(selectedVertex.edgeId, selectedVertex.pid);
+      }
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedPolyVertex &&
+        !isTyping(e)
+      ) {
+        e.preventDefault();
+        deletePolyVertex(selectedPolyVertex.polyId, selectedPolyVertex.vIdx);
+      }
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedPolyId && !selectedPolyVertex &&
+        !isTyping(e)
+      ) {
+        e.preventDefault();
+        deletePolygon(selectedPolyId);
       }
       if (e.code === "Space" && !spaceHeld && !isTyping(e)) {
         e.preventDefault();
@@ -1445,6 +1683,10 @@ export default function GisCanvas({
     annotateDraft,
     annotateTool,
     setAnnotateTool,
+    drawPoly,
+    selectedPolyId,
+    selectedPolyVertex,
+    liveEdit,
   ]);
 
   // Middle-click, space/Pan-tool held drag always pans. A plain left-click
@@ -1456,6 +1698,54 @@ export default function GisCanvas({
       e.preventDefault();
       setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
       return;
+    }
+    // Polygon editing tools (Live Edit) — only act on clicks that land on
+    // the raw canvas background (e.target===e.currentTarget); clicks on an
+    // existing vertex/polygon body are handled by their own onMouseDown
+    // (polyVertexDown/polyBodyDown), which stopPropagation before this ever
+    // runs.
+    if (liveEdit && polySubTool && e.target === e.currentTarget && e.button === 0) {
+      const p = pt(e);
+      const w = toWorld(view, p.x, p.y);
+      if (polySubTool === "pen") {
+        const snap = findPolySnap(w.x, w.y, null, null);
+        const pos = snap || w;
+        setDrawPoly((d) => d
+          ? { ...d, points: [...d.points, pos] }
+          : { points: [pos] });
+        setEditDirty(true);
+        return;
+      }
+      if (polySubTool === "addVertex") {
+        let best = null, bestDist = 8;
+        polygons.forEach((poly) => {
+          const chain = poly.points.map((v) => toScreen(view, v.x, v.y));
+          for (let i = 0; i < chain.length; i++) {
+            const a = chain[i], b = chain[(i + 1) % chain.length];
+            const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+            if (c.dist < bestDist) { bestDist = c.dist; best = { polyId: poly.id, segIndex: i, world: toWorld(view, c.x, c.y) }; }
+          }
+        });
+        if (best) {
+          pushPolyHistory();
+          setPolygons((ps) => ps.map((pg) => {
+            if (pg.id !== best.polyId) return pg;
+            const points = [...pg.points];
+            points.splice(best.segIndex + 1, 0, { id: genId(), x: best.world.x, y: best.world.y });
+            return { ...pg, points };
+          }));
+          setEditDirty(true);
+        }
+        return;
+      }
+      if (polySubTool === "movePolygon" || polySubTool === "viewAttribute") {
+        // Reaching here means the click landed on empty canvas, not on an
+        // existing polygon (which has its own onMouseDown — polyBodyDown —
+        // that stops propagation before this branch ever runs).
+        setSelectedPolyId(null);
+        setSelectedPolyVertex(null);
+        return;
+      }
     }
     if (annotateTool && e.target === e.currentTarget && e.button === 0) {
       // Prevent the browser's default mousedown behaviour (blurring
@@ -1481,7 +1771,11 @@ export default function GisCanvas({
     }
     if (zoomMode && e.button === 0 && e.target === e.currentTarget) {
       e.preventDefault();
-      zoomBy(e.altKey ? 1 / KEY_ZOOM_FACTOR : KEY_ZOOM_FACTOR, pt(e));
+      // Same click+hold-drag mechanism as holding the nav Zoom button itself
+      // (see the toolDrag effect below) — a plain click still steps zoom by
+      // one increment (onUp's !moved branch), but now dragging up/down while
+      // armed also does a smooth continuous zoom, not just single clicks.
+      setToolDrag({ tool: "zoom", sx: e.clientX, sy: e.clientY, startView: view, moved: false, viaCanvas: true, altKey: e.altKey });
       return;
     }
     if (activeTool === 1 && e.target === e.currentTarget && e.button === 0) {
@@ -1677,15 +1971,22 @@ export default function GisCanvas({
           flex: "1 0 0",
           position: "relative",
           overflow: "hidden",
+          boxSizing: "border-box",
           background:
             "radial-gradient(var(--neutral-700) 1px, transparent 1px)",
           backgroundSize: `${28 * view.scale}px ${28 * view.scale}px`,
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           backgroundColor: "#eef0ec",
+          // Always 1px — border-width itself must never change, since that
+          // shifts the padding edge (the positioning origin every
+          // absolutely-positioned toolbar inside here is anchored to) by a
+          // pixel and makes them visibly jump. The live-edit red ring is an
+          // outline instead: outline is painted outside the box model
+          // entirely, so it adds visual weight without moving anything.
           border: dropHint
             ? "1px dashed var(--blue-700)"
             : liveEdit
-              ? "2px solid var(--red-700)"
+              ? "1px solid var(--red-700)"
               : "1px solid var(--border-primary)",
           borderRadius: 4,
           cursor: ribbonDrag
@@ -1700,14 +2001,16 @@ export default function GisCanvas({
                     ? "text"
                     : annotateTool
                       ? "crosshair"
-                      : dragNode || dragVertex || dragCurve || wire
+                      : liveEdit && (polySubTool === "pen" || polySubTool === "addVertex")
                         ? "crosshair"
-                        : "default",
+                        : dragNode || dragVertex || dragCurve || wire
+                          ? "crosshair"
+                          : "default",
         }}
         onMouseMove={onMove}
         onMouseUp={onUp}
         onMouseDown={onWrapDown}
-        onDoubleClick={() => measure && finishMeasure()}
+        onDoubleClick={() => { if (measure) finishMeasure(); else if (drawPoly) finishDrawPoly(); }}
         onContextMenu={(e) => {
           if (e.target === e.currentTarget) {
             e.preventDefault();
@@ -1753,24 +2056,27 @@ export default function GisCanvas({
         >
           {railTools.map((t, i) => {
             // The group-select rail icon reflects whichever shape (rect/
-            // ellipse/freeform) is currently armed via its submenu.
-            const icon =
-              i === 4 && liveEdit
-                ? A.editStop
-                : i === 1
-                  ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape)
-                      .icon
-                  : t.icon;
+            // ellipse/freeform) is currently armed via its submenu. The
+            // Edit tool (last rail item) swaps to a red stop-edit pill —
+            // matching the Figma "fm-v8.0-tool" Edit-select state — once
+            // Live Edit is active.
+            const isEditSlot = i === EDIT_TOOL_INDEX;
+            const editActive = isEditSlot && liveEdit;
+            const icon = editActive
+              ? A.editStop
+              : i === 1
+                ? GROUP_SELECT_SHAPES.find((s) => s.id === groupSelectShape).icon
+                : t.icon;
             return (
               <div key={t.name} style={{ position: "relative" }}>
                 <button
-                  title={i === 4 && liveEdit ? "Stop editing" : t.name + (t.hasMenu ? " (click for options)" : "")}
+                  title={isEditSlot ? (liveEdit ? "Stop editing" : "Live-edit Pen tool [V]") : t.name + (t.hasMenu ? " (click for options)" : "")}
                   onClick={() => {
-                    if (i === 5) {
-                      setLiveEdit((v) => !v);
-                      setActiveTool(i);
+                    if (isEditSlot) {
+                      if (liveEdit) handleStopEdit();
+                      else { polygonsAtEditStart.current = polygons; setLiveEdit(true); setActiveTool(i); }
                     } else {
-                      setLiveEdit(false);
+                      if (liveEdit) handleStopEdit();
                       setActiveTool(i);
                     }
                     if (i === 1) setGroupSelectMenuOpen((v) => !v);
@@ -1783,21 +2089,20 @@ export default function GisCanvas({
                     alignItems: "center",
                     justifyContent: "center",
                     border: "none",
-                    borderRadius: 2,
+                    borderRadius: editActive ? "50%" : 2,
                     cursor: "pointer",
-                    background:
-                      activeTool === i
-                        ? liveEdit
-                          ? "var(--red-700)"
-                          : "var(--surface-brand)"
+                    background: editActive
+                      ? "var(--red-700)"
+                      : activeTool === i
+                        ? "var(--surface-brand)"
                         : "transparent",
                   }}
                   onMouseOver={(e) => {
-                    if (activeTool !== i)
+                    if (activeTool !== i && !editActive)
                       e.currentTarget.style.background = "var(--surface-3)";
                   }}
                   onMouseOut={(e) => {
-                    if (activeTool !== i)
+                    if (activeTool !== i && !editActive)
                       e.currentTarget.style.background = "transparent";
                   }}
                 >
@@ -1805,7 +2110,7 @@ export default function GisCanvas({
                     src={icon}
                     size={16}
                     style={
-                      activeTool === i
+                      activeTool === i || editActive
                         ? { filter: "brightness(0) invert(1)" }
                         : undefined
                     }
@@ -1987,7 +2292,7 @@ export default function GisCanvas({
             {
               icon: A.zoomTool,
               tool: "zoom",
-              name: "Zoom (drag up/down) · click = toggle Zoom tool (Z) · while active, click canvas to zoom in, Alt+click to zoom out",
+              name: "Zoom (drag up/down) · click = toggle Zoom tool (Z) · while active, click canvas to zoom in (Alt+click to zoom out), or drag up/down on canvas to zoom continuously",
               active: zoomMode,
             },
             {
@@ -2037,6 +2342,80 @@ export default function GisCanvas({
             </div>
           ))}
         </div>
+
+        {/* Example polygon layer (Live Edit phase 3) — real vector shapes,
+            editable while liveEdit is on; drawn under the 1D network so
+            reach lines/units stay legible on top. */}
+        {polygonLayerVisible !== false && (
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            {polygons.map((poly) => {
+              const screenPts = poly.points.map((v) => toScreen(view, v.x, v.y));
+              const d = screenPts.map((s) => `${s.x},${s.y}`).join(" ");
+              const isSel = selectedPolyId === poly.id;
+              const movable = liveEdit && polySubTool === "movePolygon";
+              const inspectable = liveEdit && polySubTool === "viewAttribute";
+              return (
+                <g key={poly.id}>
+                  <polygon
+                    points={d}
+                    fill={isSel ? "rgba(70,138,243,0.25)" : "rgba(70,138,243,0.12)"}
+                    stroke={isSel ? "var(--blue-700)" : "var(--surface-brand)"}
+                    strokeWidth={isSel ? 2.5 : 1.5}
+                    style={{ pointerEvents: movable || inspectable ? "all" : "none", cursor: movable ? (polyDrag?.type === "polygon" ? "grabbing" : "grab") : inspectable ? "pointer" : "default" }}
+                    onMouseDown={(e) => polyBodyDown(e, poly.id)}
+                  />
+                  {liveEdit && (polySubTool === "pen" || polySubTool === "addVertex") &&
+                    poly.points.map((v, i) => {
+                      const s = screenPts[i];
+                      const vSel = selectedPolyVertex?.polyId === poly.id && selectedPolyVertex?.vIdx === i;
+                      return (
+                        <circle
+                          key={v.id}
+                          cx={s.x} cy={s.y} r={5}
+                          fill={vSel ? "var(--node-selected-fill)" : "#fff"}
+                          stroke={vSel ? "var(--node-selected-border)" : "var(--surface-brand)"}
+                          strokeWidth={2}
+                          style={{ pointerEvents: "all", cursor: polyDrag?.vIdx === i ? "grabbing" : "grab" }}
+                          onMouseDown={(e) => polyVertexDown(e, poly.id, i)}
+                        />
+                      );
+                    })}
+                  {inspectable && isSel && (
+                    <g style={{ pointerEvents: "none" }}>
+                      <rect x={screenPts[0].x + 10} y={screenPts[0].y - 34} width={150} height={44} rx={4} fill="var(--surface-1)" stroke="var(--border-primary)" />
+                      <text x={screenPts[0].x + 20} y={screenPts[0].y - 16} fontSize={12} fontWeight={500} fill="var(--text-primary)">{poly.name}</text>
+                      <text x={screenPts[0].x + 20} y={screenPts[0].y - 2} fontSize={10} fill="var(--text-secondary)">{poly.points.length} vertices</text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+            {/* In-progress polygon being drawn with the pen tool */}
+            {drawPoly && (() => {
+              const screenPts = drawPoly.points.map((v) => toScreen(view, v.x, v.y));
+              const cursorScreen = drawPoly.cursor ? toScreen(view, drawPoly.cursor.x, drawPoly.cursor.y) : null;
+              const d = screenPts.map((s) => `${s.x},${s.y}`).join(" ");
+              return (
+                <g style={{ pointerEvents: "none" }}>
+                  {screenPts.length > 1 && <polyline points={d} fill="none" stroke="var(--surface-brand)" strokeWidth={1.5} strokeDasharray="4 3" />}
+                  {cursorScreen && screenPts.length > 0 && (
+                    <line x1={screenPts[screenPts.length - 1].x} y1={screenPts[screenPts.length - 1].y} x2={cursorScreen.x} y2={cursorScreen.y}
+                      stroke="var(--surface-brand)" strokeWidth={1.5} strokeDasharray="4 3" />
+                  )}
+                  {screenPts.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={4} fill="var(--surface-brand)" />)}
+                </g>
+              );
+            })()}
+            {/* Snap feedback — a highlighted ring at whatever vertex the
+                point currently being placed/dragged has snapped to. */}
+            {snapOn && polySnapPoint && (() => {
+              const s = toScreen(view, polySnapPoint.x, polySnapPoint.y);
+              return (
+                <circle cx={s.x} cy={s.y} r={9} fill="none" stroke="var(--red-700)" strokeWidth={2} style={{ pointerEvents: "none" }} />
+              );
+            })()}
+          </svg>
+        )}
 
         {/* Reaches (as editable polylines, optionally curved) + active wire */}
         <svg
@@ -2121,7 +2500,7 @@ export default function GisCanvas({
                           stroke="#fff"
                           strokeWidth={1.5}
                           style={{
-                            pointerEvents: "all",
+                            pointerEvents: networkReadOnly ? "none" : "all",
                             cursor:
                               dragCurve?.key === key ? "grabbing" : "grab",
                           }}
@@ -2144,7 +2523,7 @@ export default function GisCanvas({
                         stroke={reachStroke}
                         strokeWidth={hoverLine === segKey ? 3.5 : 2.5}
                         strokeLinecap="round"
-                        style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                        style={{ pointerEvents: networkReadOnly ? "none" : "stroke", cursor: "pointer" }}
                         onMouseEnter={() => setHoverLine(segKey)}
                         onMouseLeave={() => setHoverLine(null)}
                         onClick={(ev) => {
@@ -2162,7 +2541,7 @@ export default function GisCanvas({
                         cy={my}
                         r={7}
                         fill="transparent"
-                        style={{ pointerEvents: "all", cursor: "copy" }}
+                        style={{ pointerEvents: networkReadOnly ? "none" : "all", cursor: "copy" }}
                         onMouseEnter={() => setHoverSeg(segKey)}
                         onMouseLeave={() => setHoverSeg(null)}
                         onClick={(ev) => {
@@ -2221,7 +2600,7 @@ export default function GisCanvas({
                       }
                       strokeWidth={2}
                       style={{
-                        pointerEvents: "all",
+                        pointerEvents: networkReadOnly ? "none" : "all",
                         cursor: dragVertex?.pid === v.id ? "grabbing" : "grab",
                       }}
                       onMouseDown={(ev) => vertexDown(ev, e.id, v.id)}
@@ -2696,6 +3075,7 @@ export default function GisCanvas({
                     ? "grabbing"
                     : "grab",
                   ...GROUP_BOX_STYLE,
+                  pointerEvents: networkReadOnly ? "none" : "auto",
                 }}
               />
             );
@@ -2805,6 +3185,7 @@ export default function GisCanvas({
                   left: s.x,
                   top: s.y,
                   cursor: dragNode?.ids?.includes(n.id) ? "grabbing" : "grab",
+                  pointerEvents: networkReadOnly ? "none" : "auto",
                 }}
               >
                 <NodeBox
@@ -3529,9 +3910,19 @@ export default function GisCanvas({
           </div>
         )}
 
-        {/* Edit Toolbar - shown when liveEdit is active */}
+        {/* Edit toolbar — top-centre pill, shown only while Live Edit is
+            active (Figma "FM-v8-GIS-toolbar", node 2045:151429). */}
         {liveEdit && (
-          <EditToolbar liveEdit={liveEdit} setLiveEdit={setLiveEdit} />
+          <EditToolbar
+            dirty={editDirty} setDirty={setEditDirty}
+            subTool={polySubTool} setSubTool={setPolySubTool}
+            snapOn={snapOn} setSnapOn={setSnapOn}
+            onUndo={undoPoly} onRedo={redoPoly}
+            canUndo={polyPast.length > 0} canRedo={polyFuture.length > 0}
+          />
+        )}
+        {saveModalOpen && (
+          <SaveModal onSave={handleEditSave} onDiscard={handleEditDiscard} onCancel={handleEditCancel} />
         )}
 
         {/* Scale bar + coordinate/guide status bar, pinned over the bottom
@@ -3551,6 +3942,20 @@ export default function GisCanvas({
             guideItems={guideItems}
           />
         </div>
+
+        {/* Live-edit red ring, painted last so it sits on top of the footer
+            and toolbars instead of being covered by them (they're children
+            of this wrap too, and children always paint over their parent's
+            own outline regardless of DOM order). Zero layout impact: purely
+            an absolutely-positioned overlay, nothing here affects flow. */}
+        {liveEdit && (
+          <div
+            style={{
+              position: "absolute", inset: 3, border: "2px solid var(--red-700)",
+              borderRadius: 4, pointerEvents: "none", zIndex: 13,
+            }}
+          />
+        )}
       </div>
 
       {transectPopup && (

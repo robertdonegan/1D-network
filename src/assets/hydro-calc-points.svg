@@ -1,0 +1,17 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(3,3)">
+<circle cx="5" cy="5" r="5" fill="#A4E5FF"/>
+</g>
+<g transform="translate(0.75,0.75)">
+<path d="M1.75 7.25H3.75M10.75 7.25H12.75M7.25 1.75V3.75M7.25 10.75V12.75M11.75 7.25C11.75 9.73528 9.73528 11.75 7.25 11.75C4.76472 11.75 2.75 9.73528 2.75 7.25C2.75 4.76472 4.76472 2.75 7.25 2.75C9.73528 2.75 11.75 4.76472 11.75 7.25Z" stroke="#E6E6E6" stroke-width="3.5" stroke-linecap="round"/>
+</g>
+<g transform="translate(2.75,2.75)">
+<path d="M5.25 9.75C7.73528 9.75 9.75 7.73528 9.75 5.25C9.75 2.76472 7.73528 0.75 5.25 0.75C2.76472 0.75 0.75 2.76472 0.75 5.25C0.75 7.73528 2.76472 9.75 5.25 9.75Z" stroke="#1F3AB5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(1.75,1.75)">
+<path d="M0.75 6.25H2.75M9.75 6.25H11.75M6.25 0.75V2.75M6.25 9.75V11.75" stroke="#001E55" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<g transform="translate(7,7)">
+<path d="M0 1C0 1.55228 0.447715 2 1 2C1.55228 2 2 1.55228 2 1C2 0.447715 1.55228 0 1 0C0.447715 0 0 0.447715 0 1Z" fill="#1F3AB5"/>
+</g>
+</svg>
