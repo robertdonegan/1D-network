@@ -232,12 +232,16 @@ export const TUFLOW_RIBBON = [
 ];
 
 export const SWMM_RIBBON = [
-  { id: "loadswmm", icon: "swmmNetworkIcon", label: "SWMM Network", chevron: true },
+  { id: "loadswmm", icon: "swmmNetworkIcon", label: "SWMM Network", chevron: true, menu: [
+    { label: "SWMM Network", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  ] },
   { sep: true },
   { id: "swmm1dlink", icon: "ribbonSwmm1dLink", label: "FM 1D-SWMM link", action: "modal" },
   { id: "swmm2dlink", icon: "ribbonSwmm2dLink", label: "SWMM-2D link", action: "modal" },
   { sep: true },
-  { id: "selectionmode", icon: "ribbonSelectionMode", label: "Selection mode", chevron: true },
+  { id: "selectionmode", icon: "ribbonSelectionMode", label: "Selection mode", chevron: true, menu: [
+    { label: "Selection mode", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  ] },
   { sep: true },
   { id: "addlink", icon: "ribbonAddLink", label: "Add link", action: "modal" },
   { id: "swmmnodes", icon: "ribbonSwmmNode", label: "SWMM nodes", chevron: true, menu: [
@@ -254,7 +258,9 @@ export const SWMM_RIBBON = [
     { label: "Multi-edit/view", icon: "placeholder" },
   ] },
   { sep: true },
-  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM Labels", chevron: true },
+  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM Labels", chevron: true, menu: [
+    { label: "View SWMM Labels", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  ] },
 ];
 
 export const HYDROLOGY_RIBBON = [
