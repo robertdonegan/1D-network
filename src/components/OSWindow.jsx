@@ -17,6 +17,24 @@ function ExternalLinkGlyph() {
   );
 }
 
+// Same star outline as the uploaded "fav-star" asset (A.favStar), traced by
+// hand so it can also render *unfilled* (currentColor stroke, no fill) for
+// items that aren't a favourite yet — the asset itself is baked-in filled
+// orange, so it only covers the "already a favourite" state.
+function StarGlyph({ filled }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M7.76921 3.05499C7.85461 2.84967 8.14547 2.84967 8.23087 3.05499L9.52842 6.17468C9.56442 6.26123 9.64582 6.32038 9.73927 6.32787L13.1072 6.59788C13.3289 6.61565 13.4188 6.89227 13.2499 7.03694L10.6839 9.23502C10.6127 9.29601 10.5816 9.3917 10.6033 9.48289L11.3873 12.7694C11.4389 12.9858 11.2036 13.1567 11.0138 13.0408L8.13035 11.2796C8.05035 11.2307 7.94973 11.2307 7.86973 11.2796L4.98628 13.0408C4.79651 13.1567 4.5612 12.9858 4.61279 12.7694L5.39676 9.48289C5.41851 9.3917 5.38742 9.29601 5.31622 9.23502L2.75019 7.03694C2.58131 6.89227 2.67119 6.61565 2.89285 6.59788L6.26081 6.32787C6.35426 6.32038 6.43566 6.26123 6.47166 6.17468L7.76921 3.05499Z"
+        fill={filled ? "#EF9625" : "none"}
+        stroke={filled ? "#C05C27" : "currentColor"}
+        strokeWidth={filled ? 1.5 : 1.3}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // Figma "fm-v8.0-os-menu" spec (nodes 1:24153-1:24158) — General/Project/
 // Layer/Window/Toolbox/Help are visual-only chrome (matching the Home
 // ribbon's not-yet-built dropdowns convention), except "Open Toolbox..."
@@ -50,9 +68,9 @@ const PROJECT_MENU = [
 ];
 
 const LAYER_MENU = [
-  { label: "Add layer...", shortcut: "Ctrl+Shift+L" },
-  { label: "Create layer...", shortcut: "Ctrl+L" },
-  { label: "Add from Data Library...", sep: true },
+  { label: "Add layer...", shortcut: "Ctrl+Shift+L", disabled: true, disabledReason: "Importing external GIS data isn't wired up in this demo" },
+  { label: "Create layer...", shortcut: "Ctrl+L", id: "create-layer" },
+  { label: "Add from Data Library...", sep: true, disabled: true, disabledReason: "Not yet designed in Figma" },
   { label: "Select", chevron: true },
   { label: "Invert selection", disabled: true, sep: true },
   { label: "Toggle edit on/off", shortcut: "Ctrl+E", sep: true },
@@ -289,8 +307,10 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
 // Flow Lines side panel. `onOpenToolbox` — Toolbox > "Open Toolbox..."
 // pops the floating Toolbox window (see App.jsx). `basemap`/`setBasemap` —
 // View > Base map submenu, same state the Home ribbon's Basemap dropdown
-// drives (see ModeRibbon.jsx).
-export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap }) {
+// drives (see ModeRibbon.jsx). `isFavourite(item)`/`onToggleFavourite(item)`
+// — back each result's star button, so a unit can be favourited straight
+// from search without needing to drag it onto the Favourites ribbon.
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, onCreateLayer }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [places, setPlaces] = useState([]);
@@ -349,6 +369,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
     if (it.id === "shortcuts") onOpenShortcuts();
     if (it.id === "open-toolbox") onOpenToolbox();
     if (it.id === "flowlines") setFlowLinesOn((v) => !v);
+    if (it.id === "create-layer") onCreateLayer?.();
     setOpenMenu(null);
   };
 
@@ -416,20 +437,35 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
             borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.16)", padding: 4, zIndex: 80,
             maxHeight: 320, overflowY: "auto",
           }}>
-            {results.map((it) => (
-              <div key={it.group + "/" + it.label}
-                onMouseDown={(e) => { e.preventDefault(); setOpen(false); onBeginDrag(e, [it], 0); }}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: "grab" }}
-                onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-                onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-                title="Drag onto the canvas to place">
-                <Icon src={A[it.icon]} size={16} />
-                <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                  <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
-                  <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>
+            {results.map((it) => {
+              const fav = isFavourite?.(it);
+              return (
+                <div key={it.group + "/" + it.label}
+                  onMouseDown={(e) => { e.preventDefault(); setOpen(false); onBeginDrag(e, [it], 0); }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: "grab" }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                  title="Drag onto the canvas to place">
+                  <Icon src={A[it.icon]} size={16} />
+                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                    <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
+                    <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>
+                  </div>
+                  <button
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onToggleFavourite?.(it); }}
+                    title={fav ? "Remove from Favourites" : "Add to Favourites"}
+                    style={{
+                      marginLeft: "auto", flexShrink: 0, border: "none", background: "transparent",
+                      cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    <StarGlyph filled={fav} />
+                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {results.length > 0 && (places.length > 0 || placesLoading) && (
               <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
             )}

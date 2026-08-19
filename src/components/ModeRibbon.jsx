@@ -25,9 +25,7 @@ export const HOME_RIBBON = [
   { id: "notes",          icon: "homeNote",       label: "Notes (TBC)", chevron: true },
   { id: "addcontent",     icon: "homeMarker",     label: "Add content",    chevron: true },
   { sep: true },
-  { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true, menu: [
-    { label: "Add GIS data", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
-  ] },
+  { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true, action: "addLayer" },
   { id: "basemap",        icon: "homeGoToMap",    label: "Basemap",        chevron: true },
   { id: "onlineservices", icon: "homeMapView",    label: "Online services",chevron: true, menu: [
     { label: "WMS",          icon: "placeholder" },
@@ -368,29 +366,6 @@ export const RESULTS_RIBBON = [
   ] },
 ];
 
-// Two of these link straight back to real FM1D unit types (same
-// icon/shape), so — unlike the rest of this tab — they're genuinely
-// draggable onto the canvas, not just visual chrome.
-export const FAVOURITES_RIBBON = [
-  { id: "1d2dmodelbuild", icon: "favStar", label: "1D/2D Model Build", chevron: true, menu: [
-    { label: "Create new list", icon: "add" },
-    { menuSep: true },
-    { label: "1D/2D Model Build",      checked: true },
-    { label: "Reservoir design",       icon: "placeholder" },
-    { label: "Flood Risk Management",  checked: true },
-  ] },
-  { sep: true },
-  { id: "favriversection", icon: "crossSection", label: "River section", hideChevron: true, menu: [
-    { label: "River Section", icon: "crossSection", shape: "square", drag: true },
-  ] },
-  { id: "favinterpolate", icon: "interpolate", label: "Interpolate", hideChevron: true, menu: [
-    { label: "Interpolate", icon: "interpolate", shape: "diamond", drag: true },
-  ] },
-  { id: "favheadtime", icon: "boundaryHeadtime", label: "Head-time" },
-  { id: "favactivearea", icon: "ribbonActiveArea", label: "Active area" },
-  { id: "fav1d2dlink", icon: "ribbon1d2dLink", label: "1D-2D link" },
-];
-
 const RIBBON_BY_MODE = {
   "Home": HOME_RIBBON,
   "FM 1D": RIBBON,
@@ -401,7 +376,11 @@ const RIBBON_BY_MODE = {
   "GIS": GIS_RIBBON,
   "Simulation": SIMULATION_RIBBON,
   "Results": RESULTS_RIBBON,
-  "Favourites": FAVOURITES_RIBBON,
+  // No entry for "Favourites" — that tab is entirely the user's dynamic
+  // `favourites` list now (see DEFAULT_FAVOURITES below for its seed data),
+  // not a static ribbon group, so every entry in it can be dismissed,
+  // reordered and added to exactly the same way, instead of some being
+  // read-only chrome.
 };
 
 // Flattened list of every draggable leaf unit, annotated with its ribbon
@@ -416,15 +395,30 @@ export function flattenRibbonItems() {
       else if (it.drag) out.push({ icon: it.icon, shape: it.shape || "square", label: it.label, group, top });
     });
   };
-  // FAVOURITES_RIBBON also has a couple of draggable leaves (shortcuts back
-  // to real FM1D unit types), so its groups resolve correctly too.
-  [RIBBON, FAVOURITES_RIBBON].forEach((ribbon) => {
-    ribbon.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
-  });
+  RIBBON.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
   return out;
 }
 
 const ALL_ITEMS = flattenRibbonItems();
+
+// Seed data for the Favourites tab's dynamic list (see App.jsx's
+// `favourites` state) — the demo's starting set, standing in for whatever
+// a real user would have pinned already. Wired to the *real* FM1D unit
+// entries in ALL_ITEMS where one exists (River Section/Interpolate/
+// Head-Time), so those are draggable onto the canvas like any other
+// favourite; "Active area" and "1D-2D link" have no real placeable unit
+// behind them yet (they're just top-level ribbon groups elsewhere), so
+// they're plain reference chips — still draggable/reorderable/removable,
+// just not meaningfully placeable.
+const byLabel = (label) => ALL_ITEMS.find((it) => it.label === label);
+export const DEFAULT_FAVOURITES = [
+  { icon: "favStar", shape: "square", label: "1D/2D Model Build", group: "Favourites", top: "Favourites" },
+  byLabel("River Section"),
+  byLabel("Interpolate"),
+  byLabel("Head-Time"),
+  { icon: "ribbonActiveArea", shape: "square", label: "Active area", group: "Favourites", top: "Favourites" },
+  { icon: "ribbon1d2dLink", shape: "square", label: "1D-2D link", group: "Favourites", top: "Favourites" },
+].filter(Boolean);
 
 // Figma's updated ribbon spec has no visible rule between groups — the
 // Figma's "FP-separator" — a real 1px #E6E6E6 line (var(--border-primary)),
@@ -498,6 +492,46 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
   );
 }
 
+// Every entry in the Favourites tab — the seeded defaults and anything the
+// user has added — is one of these: draggable onto the canvas (same as a
+// search result row), draggable *within the bar* to reorder (drop it on
+// another chip and it's inserted before that one — tracked via
+// `ribbonDrag`/`dragOver` so the same mousedown-driven drag that places a
+// unit on the canvas also handles reordering, rather than a second,
+// separate drag system), and dismissible via the "×" that appears on
+// hover. Nothing here is read-only chrome any more.
+function FavouriteChip({ item, onBeginDrag, onRemove, ribbonDrag, isDragOver, onHoverStart, onHoverEnd }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => { setHover(true); if (ribbonDrag) onHoverStart(); }}
+      onMouseLeave={() => { setHover(false); if (ribbonDrag) onHoverEnd(); }}
+      onMouseDown={(e) => { e.preventDefault(); onBeginDrag(e, [item], 0); }}
+      title="Drag onto the canvas to place, or onto another favourite to reorder"
+      style={{
+        display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 6px 0 8px",
+        borderRadius: 2, cursor: "grab", flexShrink: 0,
+        background: hover ? "var(--neutral-200)" : "transparent",
+        boxShadow: isDragOver ? "inset 2px 0 0 var(--surface-brand)" : "none",
+      }}
+    >
+      <Icon src={A[item.icon]} size={16} />
+      <span style={{ fontSize: "var(--fs-xs)", fontWeight: 500, whiteSpace: "nowrap" }}>{item.label}</span>
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onRemove(item); }}
+        title="Remove from Favourites"
+        style={{
+          width: 16, height: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          border: "none", borderRadius: "50%", cursor: "pointer", padding: 0, fontSize: 12, lineHeight: 1,
+          background: hover ? "var(--neutral-400)" : "transparent",
+          color: hover ? "#fff" : "transparent",
+        }}
+      >×</button>
+    </div>
+  );
+}
+
 function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction }) {
   const ref = useRef(null);
   const hasMenu = !!group.menu;
@@ -563,8 +597,16 @@ const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this d
 // `mode`/`setMode` — the active mode tab, also owned by App since it drives
 // what ProjectPanel/NetworkPanel/GisCanvas show. `basemap`/`setBasemap` —
 // also owned by App (GisCanvas reads it to render the backdrop), driven here
-// by the Home tab's Basemap dropdown.
-export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings }) {
+// by the Home tab's Basemap dropdown. `favourites`/`onDropFavourite`/
+// `onRemoveFavourite` — the user's saved Favourites list (App owns,
+// persists, and does the actual add-or-reorder splice for); every entry —
+// seeded defaults included, see DEFAULT_FAVOURITES — renders identically as
+// a FavouriteChip, so nothing in this tab is read-only chrome.
+// `ribbonDrag`/`onConsumeRibbonDrag` — same in-progress drag state
+// GisCanvas consumes on drop; releasing over this bar while on the
+// Favourites tab adds/reorders the dragged item instead of placing it on
+// the canvas.
+export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, ribbonDrag, onConsumeRibbonDrag, onAddLayer }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
   // Buttons with no dropdown still need to go *somewhere* (matches the
@@ -575,6 +617,7 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
   const onAction = (group) => {
     if (group.action === "file") setFileModal(group);
     else if (group.action === "modal") setPlaceholderModal(group);
+    else if (group.action === "addLayer") onAddLayer?.();
   };
 
   // View labels / Snapping / Comments sort are checkbox lists, not real
@@ -650,6 +693,21 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, []);
 
+  // Favourites tab doubles as a drop target: releasing an in-progress
+  // ribbon/search drag over this bar adds it to Favourites instead of
+  // placing it on the canvas (GisCanvas's own onMouseUp — which fires first
+  // when the drop lands there instead — is what handles the "place on
+  // canvas" case, so the two never both fire for the same drop).
+  const favouriteKey = (it) => `${it.group}/${it.label}`;
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const onBarMouseUp = () => {
+    if (mode === "Favourites" && ribbonDrag) {
+      onDropFavourite(ribbonDrag.items[ribbonDrag.index], dragOverIndex);
+      onConsumeRibbonDrag();
+      setDragOverIndex(null);
+    }
+  };
+
   return (
     <div style={{ flexShrink: 0, padding: "0 8px", background: "var(--surface-1)", position: "relative", zIndex: 30 }}>
       {/* Mode tabs */}
@@ -680,12 +738,30 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
       </div>
 
       {/* Tool ribbon */}
-      <div ref={barRef} style={{
+      <div ref={barRef} onMouseUp={onBarMouseUp} style={{
         display: "flex", alignItems: "center", gap: 8, height: 48, padding: 8,
-        border: "1px solid var(--border-primary)", borderRadius: 4, background: "var(--surface-1)",
+        border: mode === "Favourites" && ribbonDrag ? "1px dashed var(--surface-brand)" : "1px solid var(--border-primary)",
+        borderRadius: 4, background: "var(--surface-1)",
         overflowX: "visible",
       }}>
         {activeRibbon.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} />)}
+        {mode === "Favourites" && favourites?.map((f, i) => (
+          <FavouriteChip
+            key={favouriteKey(f)}
+            item={f}
+            onBeginDrag={onBeginDrag}
+            onRemove={onRemoveFavourite}
+            ribbonDrag={ribbonDrag}
+            isDragOver={dragOverIndex === i}
+            onHoverStart={() => setDragOverIndex(i)}
+            onHoverEnd={() => setDragOverIndex((cur) => (cur === i ? null : cur))}
+          />
+        ))}
+        {mode === "Favourites" && (!favourites || favourites.length === 0) && (
+          <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+            Drag a search result here, or click its ☆, to add a favourite
+          </span>
+        )}
       </div>
 
       {fileModal && (

@@ -252,7 +252,8 @@ export default function GisCanvas({
   onOpenFlowLinesPanel,
   polygons,
   setPolygons,
-  polygonLayerVisible,
+  layers,
+  activeLayerId,
 }) {
   const showBasemap = basemap === "osm";
   const [hovered, setHovered] = useState(null);
@@ -347,6 +348,7 @@ export default function GisCanvas({
     const id = genId();
     setPolygons((ps) => [...ps, {
       id, name: "Polygon " + (ps.length + 1),
+      layerId: activeLayerId || "example",
       points: drawPoly.points.map((p) => ({ id: genId(), x: p.x, y: p.y })),
     }]);
     setDrawPoly(null);
@@ -411,11 +413,12 @@ export default function GisCanvas({
     if (!liveEdit) { setDrawPoly(null); setPolySubTool(null); setSelectedPolyId(null); setSelectedPolyVertex(null); }
   }, [liveEdit]);
   const [navHover, setNavHover] = useState(null);
-  // tx/ty centre the default view on the demo network's real-georeferenced
-  // Upton-upon-Severn coordinates (see App.jsx's INIT_NODES) — those world
-  // coords are negative/near-origin (anchored at Upton itself), so a plain
-  // (0,0) pan would leave the network scrolled off-screen on load.
-  const [view, setView] = useState({ scale: 1, tx: 660, ty: 430, rotation: 0 });
+  // tx/ty/scale centre+fit the default view on the demo network's real-
+  // georeferenced Upton-upon-Severn coordinates (see App.jsx's INIT_NODES —
+  // 8 points traced along the actual River Severn, spanning ~1450 world
+  // units north-south). Scale is dialled back from 1 to keep the whole
+  // reach in view on load instead of only showing a zoomed-in fragment.
+  const [view, setView] = useState({ scale: 0.5, tx: 689, ty: 479, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
   const [zoomMode, setZoomMode] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -1498,6 +1501,11 @@ export default function GisCanvas({
           return;
         }
         if (drawPoly) return setDrawPoly(null);
+        // An armed-but-idle polygon sub-tool (Pen/Add vertex/Move/View
+        // attribute with nothing drawn or picked yet) previously fell all
+        // the way through to the generic "deselect everything" fallback
+        // below, so Escape looked like it did nothing while editing.
+        if (polySubTool) return setPolySubTool(null);
         if (selectedPolyVertex) return setSelectedPolyVertex(null);
         if (selectedPolyId) return setSelectedPolyId(null);
         if (selectedVertex) return setSelectedVertex(null);
@@ -1593,10 +1601,20 @@ export default function GisCanvas({
         resetView();
       }
       if (noMods && !isTyping(e)) {
-        const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
-        if (toolKey !== undefined) {
+        // Live Edit's Pen tool documents "[V]" as its own hotkey (see the
+        // rail button's title), but it was always shadowed by the base
+        // Select-tool shortcut below — "V" never actually armed/disarmed
+        // the pen while editing. Steal it here first, only while liveEdit
+        // is on, so both hotkeys can coexist without colliding.
+        if (liveEdit && e.key.toLowerCase() === "v") {
           e.preventDefault();
-          setActiveTool(toolKey);
+          setPolySubTool((v) => (v === "pen" ? null : "pen"));
+        } else {
+          const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
+          if (toolKey !== undefined) {
+            e.preventDefault();
+            setActiveTool(toolKey);
+          }
         }
         if (e.key.toLowerCase() === "x") {
           e.preventDefault();
@@ -1687,6 +1705,7 @@ export default function GisCanvas({
     selectedPolyId,
     selectedPolyVertex,
     liveEdit,
+    polySubTool,
   ]);
 
   // Middle-click, space/Pan-tool held drag always pans. A plain left-click
@@ -1980,14 +1999,12 @@ export default function GisCanvas({
           // Always 1px — border-width itself must never change, since that
           // shifts the padding edge (the positioning origin every
           // absolutely-positioned toolbar inside here is anchored to) by a
-          // pixel and makes them visibly jump. The live-edit red ring is an
-          // outline instead: outline is painted outside the box model
-          // entirely, so it adds visual weight without moving anything.
+          // pixel and makes them visibly jump. The live-edit ring is drawn
+          // separately as an absolutely-positioned overlay below (not here),
+          // so it doesn't double up with this border.
           border: dropHint
             ? "1px dashed var(--blue-700)"
-            : liveEdit
-              ? "1px solid var(--red-700)"
-              : "1px solid var(--border-primary)",
+            : "1px solid var(--border-primary)",
           borderRadius: 4,
           cursor: ribbonDrag
             ? "copy"
@@ -2091,10 +2108,14 @@ export default function GisCanvas({
                     border: "none",
                     borderRadius: editActive ? "50%" : 2,
                     cursor: "pointer",
+                    // While Live Edit is on, the active tool highlights red
+                    // (not the usual brand blue) so every highlighted icon
+                    // in the rail reads as part of the same "you're
+                    // editing" state as the red border/stop-edit pill.
                     background: editActive
                       ? "var(--red-700)"
                       : activeTool === i
-                        ? "var(--surface-brand)"
+                        ? (liveEdit ? "var(--red-700)" : "var(--surface-brand)")
                         : "transparent",
                   }}
                   onMouseOver={(e) => {
@@ -2343,23 +2364,31 @@ export default function GisCanvas({
           ))}
         </div>
 
-        {/* Example polygon layer (Live Edit phase 3) — real vector shapes,
-            editable while liveEdit is on; drawn under the 1D network so
-            reach lines/units stay legible on top. */}
-        {polygonLayerVisible !== false && (
+        {/* Vector polygon layers (Live Edit phase 3) — real editable
+            shapes, drawn under the 1D network so reach lines/units stay
+            legible on top. Each polygon carries a `layerId` back to the
+            Project panel's Layers tab (see App.jsx); layers hidden there
+            (visible:false) are simply filtered out of both rendering and
+            hit-testing here, and newly-drawn shapes are tagged onto
+            whichever layer is currently active for drawing. */}
+        {(() => {
+          const layerById = (id) => (layers || []).find((l) => l.id === (id || "example"));
+          const visible = polygons.filter((p) => (layerById(p.layerId)?.visible ?? true));
+          return (
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-            {polygons.map((poly) => {
+            {visible.map((poly) => {
               const screenPts = poly.points.map((v) => toScreen(view, v.x, v.y));
               const d = screenPts.map((s) => `${s.x},${s.y}`).join(" ");
               const isSel = selectedPolyId === poly.id;
               const movable = liveEdit && polySubTool === "movePolygon";
               const inspectable = liveEdit && polySubTool === "viewAttribute";
+              const color = layerById(poly.layerId)?.color || "var(--surface-brand)";
               return (
                 <g key={poly.id}>
                   <polygon
                     points={d}
                     fill={isSel ? "rgba(70,138,243,0.25)" : "rgba(70,138,243,0.12)"}
-                    stroke={isSel ? "var(--blue-700)" : "var(--surface-brand)"}
+                    stroke={isSel ? "var(--blue-700)" : color}
                     strokeWidth={isSel ? 2.5 : 1.5}
                     style={{ pointerEvents: movable || inspectable ? "all" : "none", cursor: movable ? (polyDrag?.type === "polygon" ? "grabbing" : "grab") : inspectable ? "pointer" : "default" }}
                     onMouseDown={(e) => polyBodyDown(e, poly.id)}
@@ -2415,7 +2444,8 @@ export default function GisCanvas({
               );
             })()}
           </svg>
-        )}
+          );
+        })()}
 
         {/* Reaches (as editable polylines, optionally curved) + active wire */}
         <svg
@@ -3947,11 +3977,15 @@ export default function GisCanvas({
             and toolbars instead of being covered by them (they're children
             of this wrap too, and children always paint over their parent's
             own outline regardless of DOM order). Zero layout impact: purely
-            an absolutely-positioned overlay, nothing here affects flow. */}
+            an absolutely-positioned overlay, nothing here affects flow.
+            inset: -1px (not 0) because this div's containing block is the
+            wrap's *padding* edge — one border-width inside its actual outer
+            edge — so inset: -1px pushes it back out to sit flush with the
+            wrap's own 1px border instead of appearing indented. */}
         {liveEdit && (
           <div
             style={{
-              position: "absolute", inset: 3, border: "2px solid var(--red-700)",
+              position: "absolute", inset: -1, border: "2px solid var(--red-700)",
               borderRadius: 4, pointerEvents: "none", zIndex: 13,
             }}
           />

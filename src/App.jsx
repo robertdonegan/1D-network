@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import OSWindow from "./components/OSWindow.jsx";
-import ModeRibbon, { modes } from "./components/ModeRibbon.jsx";
+import ModeRibbon, { modes, DEFAULT_FAVOURITES } from "./components/ModeRibbon.jsx";
 import PanelSlot from "./components/PanelSlot.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import AnnotationSettings from "./components/AnnotationSettings.jsx";
+import AddLayerModal from "./components/AddLayerModal.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
@@ -12,20 +13,22 @@ import { mockFlowForEdge } from "./flowMock.js";
 
 // Nodes/edges are owned here (not inside GisCanvas) so the live network list
 // in NetworkPanel can mirror exactly what's on the canvas.
-// World coords are real-georeferenced (via OsmBasemap's lonLatToWorld),
-// tracing the actual River Severn's course through Upton-upon-Severn
-// north-to-south — Hook Bank down past the town bridge to Ryall — so the
-// demo network lines up believably with the OSM backdrop, not just an
-// arbitrary squiggle. See GisCanvas's default `view` for the matching pan.
+// World coords are real-georeferenced (via OsmBasemap's lonLatToWorld) —
+// sampled at 8 evenly-spaced points along the actual River Severn's centre-
+// line through Upton-upon-Severn (OpenStreetMap `waterway=river` geometry,
+// north from Hanley Road down past the town and on towards Ryall/Naunton),
+// so the demo network lines up believably with the OSM backdrop and traces
+// a real, recognisable bend instead of an arbitrary straight line. See
+// GisCanvas's default `view` for the matching pan/zoom.
 const INIT_NODES = [
-  { id: "n0", icon: "flowTime",     shape: "square",  x: 5,    y: -379, label: "M014",  unitLabel: "Flow-Time" },
-  { id: "n1", icon: "crossSection", shape: "square",  x: -35,  y: -284, label: "M015",  unitLabel: "River Section" },
-  { id: "n2", icon: "interpolate",  shape: "diamond", x: -82,  y: -190, label: "M0155", unitLabel: "Interpolate" },
-  { id: "n3", icon: "crossSection", shape: "square",  x: -117, y: -95,  label: "M016",  unitLabel: "River Section" },
-  { id: "n4", icon: "calcPointWeir",shape: "square",  x: -140, y: 0,    label: "M017",  unitLabel: "Calc Point Weir" },
-  { id: "n5", icon: "interpolate",  shape: "diamond", x: -168, y: 95,   label: "M0175", unitLabel: "Interpolate" },
-  { id: "n6", icon: "crossSection", shape: "square",  x: -198, y: 190,  label: "M018",  unitLabel: "River Section" },
-  { id: "n7", icon: "normalDepth",  shape: "square",  x: -228, y: 284,  label: "M026",  unitLabel: "Normal Depth" },
+  { id: "n0", icon: "flowTime",     shape: "square",  x: -488, y: -915, label: "M014",  unitLabel: "Flow-Time" },
+  { id: "n1", icon: "crossSection", shape: "square",  x: -623, y: -686, label: "M015",  unitLabel: "River Section" },
+  { id: "n2", icon: "interpolate",  shape: "diamond", x: -567, y: -428, label: "M0155", unitLabel: "Interpolate" },
+  { id: "n3", icon: "crossSection", shape: "square",  x: -368, y: -255, label: "M016",  unitLabel: "River Section" },
+  { id: "n4", icon: "calcPointWeir",shape: "square",  x: -111, y: -172, label: "M017",  unitLabel: "Calc Point Weir" },
+  { id: "n5", icon: "interpolate",  shape: "diamond", x: -2,   y: 64,   label: "M0175", unitLabel: "Interpolate" },
+  { id: "n6", icon: "crossSection", shape: "square",  x: -29,  y: 333,  label: "M018",  unitLabel: "River Section" },
+  { id: "n7", icon: "normalDepth",  shape: "square",  x: -193, y: 531,  label: "M026",  unitLabel: "Normal Depth" },
 ];
 const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
@@ -34,11 +37,12 @@ const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],
 // small demo shape near the river so the layer isn't empty on first load,
 // editable/deletable/addable-to like any polygon drawn with the pen tool.
 const INIT_POLYGONS = [
-  { id: "p0", name: "Polygon 1", points: [
-    { id: "pp0", x: -160, y: -30 }, { id: "pp1", x: -100, y: -20 },
-    { id: "pp2", x: -95, y: 30 }, { id: "pp3", x: -155, y: 40 },
+  { id: "p0", name: "Polygon 1", layerId: "example", points: [
+    { id: "pp0", x: -411, y: -190 }, { id: "pp1", x: -351, y: -180 },
+    { id: "pp2", x: -346, y: -130 }, { id: "pp3", x: -406, y: -120 },
   ] },
 ];
+let layerUid = 1;
 
 const PANEL_MIN = 180, PANEL_MAX = 520;
 
@@ -55,7 +59,7 @@ function ResizeHandle({ onDrag }) {
   };
   return (
     <div onMouseDown={onDown} title="Drag to resize" style={{
-      width: 10, flexShrink: 0, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center",
+      width: 8, flexShrink: 0, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center",
     }}>
       <div style={{ width: 2, height: 32, borderRadius: 1, background: "var(--border-secondary)" }} />
     </div>
@@ -203,20 +207,51 @@ export default function App() {
   const [toolboxPos, setToolboxPos] = useState({ x: 420, y: 90 });
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
-  // "Example polygon layer" (Live Edit phase 3) — a real vector layer,
-  // editable via the top-centre edit toolbar's Pen/Add vertex/Move polygon
-  // tools while Live Edit is on. Shown + toggleable in the left Project
-  // panel's Components list (see ProjectPanel.jsx).
+  // Vector polygon layers (Live Edit phase 3) — any number of user-created
+  // layers (see "Add GIS data" in the Home ribbon / AddLayerModal), plus
+  // one seeded "Example polygon layer" for parity with the old single-layer
+  // demo. `polygons` stays one flat array (each entry tagged `layerId`) so
+  // GisCanvas's existing single-array editing/undo machinery didn't need
+  // splitting apart; `layers` is just the per-layer metadata (name, colour,
+  // visibility) shown as real, addable/removable/toggleable rows in the
+  // Project panel's Layers tab (see ProjectPanel.jsx's LayerRow). Whichever
+  // layer is `activeLayerId` is where the Pen tool's next new polygon goes.
   const [polygons, setPolygons] = useState(INIT_POLYGONS);
-  const [polygonLayerVisible, setPolygonLayerVisible] = useState(true);
+  const [layers, setLayers] = useState([
+    { id: "example", name: "Example polygon layer", color: "var(--surface-brand)", visible: true },
+  ]);
+  const [activeLayerId, setActiveLayerId] = useState("example");
+  const [addLayerModalOpen, setAddLayerModalOpen] = useState(false);
+  // Which of the Project panel's own footer tabs is showing — lifted up
+  // here (not left as ProjectPanel-local state) purely so creating a layer
+  // can force it to "layers", since that's the whole point of the "Create
+  // layer..." flow: the new layer should be immediately visible, not left
+  // sitting under whichever tab happened to be open before.
+  const [projectTab, setProjectTab] = useState("components");
+  const addLayer = ({ name, color }) => {
+    const id = "layer" + (layerUid++);
+    setLayers((ls) => [...ls, { id, name, color, visible: true }]);
+    setActiveLayerId(id);
+    setAddLayerModalOpen(false);
+    setLeftView("project");
+    setProjectTab("layers");
+  };
+  const deleteLayer = (id) => {
+    setLayers((ls) => ls.filter((l) => l.id !== id));
+    setPolygons((ps) => ps.filter((p) => (p.layerId || "example") !== id));
+    setActiveLayerId((cur) => (cur === id ? (layers.find((l) => l.id !== id)?.id ?? "example") : cur));
+  };
+  const toggleLayerVisibility = (id) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, visible: l.visible === false } : l)));
   // Shared with NetworkPanel so a row click selects the node on the canvas.
   // Array of node ids — supports multi-select (Ctrl+click, box-select).
   const [selected, setSelected] = useState([]);
   // Basemap selection ("none" | "osm" | ...), driven by the Home tab's
   // Basemap dropdown and read by GisCanvas to render the backdrop. Only
   // "none"/"osm" are real; `lastBasemap` remembers the last non-none pick so
-  // the B shortcut can toggle Grid <-> that basemap.
-  const [basemap, setBasemapRaw] = useState("none");
+  // the B shortcut can toggle Grid <-> that basemap. Defaults to "osm" so
+  // the seed network's real river-traced path is visibly following the
+  // Severn through Upton straight away, not floating over a blank grid.
+  const [basemap, setBasemapRaw] = useState("osm");
   const lastBasemapRef = useRef("osm");
   const setBasemap = (id) => {
     if (id !== "none") lastBasemapRef.current = id;
@@ -236,6 +271,47 @@ export default function App() {
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
+
+  // User-managed Favourites (Favourites tab): every entry — the seeded
+  // defaults (DEFAULT_FAVOURITES) and anything the user has added since —
+  // is treated identically: addable via the star toggle on a global search
+  // result (OSWindow) or by dragging a result onto the bar, removable via
+  // the chip's "×", and reorderable by dragging one chip onto another
+  // (ModeRibbon tracks which chip is hovered mid-drag and reports it back
+  // here as `atIndex`). Same `{icon, shape, label, group, top}` shape
+  // flattenRibbonItems produces, so a favourite is just as draggable onto
+  // the canvas as its original. Persisted to localStorage (after the first
+  // save) so favourites/order survive a reload; keyed by group+label since
+  // that pair is unique across ALL_ITEMS.
+  const [favourites, setFavourites] = useState(() => {
+    try {
+      const saved = localStorage.getItem("fm-favourites");
+      return saved ? JSON.parse(saved) : DEFAULT_FAVOURITES;
+    } catch { return DEFAULT_FAVOURITES; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("fm-favourites", JSON.stringify(favourites)); } catch { /* ignore */ }
+  }, [favourites]);
+  const favouriteKey = (it) => `${it.group}/${it.label}`;
+  const isFavourite = (it) => favourites.some((f) => favouriteKey(f) === favouriteKey(it));
+  const addFavourite = (it) => setFavourites((favs) => (favs.some((f) => favouriteKey(f) === favouriteKey(it)) ? favs : [...favs, it]));
+  const removeFavourite = (it) => setFavourites((favs) => favs.filter((f) => favouriteKey(f) !== favouriteKey(it)));
+  const toggleFavourite = (it) => (isFavourite(it) ? removeFavourite(it) : addFavourite(it));
+  // Unified add-or-reorder drop handler for the Favourites bar: dropping an
+  // *existing* favourite onto another one moves it to that position;
+  // dropping a new item (from search/ribbon) inserts it there (or appends
+  // if dropped on empty space, atIndex == null).
+  const handleFavouriteDrop = (item, atIndex) => {
+    setFavourites((favs) => {
+      const key = favouriteKey(item);
+      const from = favs.findIndex((f) => favouriteKey(f) === key);
+      const next = favs.slice();
+      if (from !== -1) next.splice(from, 1);
+      const insertAt = atIndex == null ? next.length : Math.min(atIndex, next.length);
+      next.splice(insertAt, 0, item);
+      return next;
+    });
+  };
 
   // Home tab's Add Content annotation tools: `annotateTool` is armed from
   // the ribbon and read by GisCanvas, which owns the actual draw/place
@@ -362,17 +438,24 @@ export default function App() {
     edgeColors, reachRegistry: registry, reachKeyOfEdge: resolvedKeyByEdge, onRenameReach: renameReach,
     flowByEdge, velocityRange, setVelocityRange, clipOutOfRange, setClipOutOfRange,
     flowLabelsOn, setFlowLabelsOn, flowLabelMetric, setFlowLabelMetric, flowTracerOn, setFlowTracerOn,
-    polygons, polygonLayerVisible, setPolygonLayerVisible,
+    polygons, layers, activeLayerId, tab: projectTab, setTab: setProjectTab,
+    onSetActiveLayer: setActiveLayerId, onToggleLayerVisibility: toggleLayerVisibility,
+    onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
   };
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
       <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation}
         flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} onOpenToolbox={() => setToolboxFloat(true)}
-        basemap={basemap} setBasemap={setBasemap} />
+        basemap={basemap} setBasemap={setBasemap}
+        isFavourite={isFavourite} onToggleFavourite={toggleFavourite}
+        onCreateLayer={() => setAddLayerModalOpen(true)} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
-        onOpenAnnotationSettings={() => setShowAnnotationSettings(true)} />
+        onOpenAnnotationSettings={() => setShowAnnotationSettings(true)}
+        favourites={favourites} onDropFavourite={handleFavouriteDrop} onRemoveFavourite={removeFavourite}
+        ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+        onAddLayer={() => setAddLayerModalOpen(true)} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
         <PanelSlot width={projectW} viewId={leftView} onChangeView={setLeftView} bodyProps={panelBodyProps}
           onUndockToolbox={() => { setToolboxFloat(true); setLeftView("project"); }} />
@@ -397,7 +480,7 @@ export default function App() {
             clipOutOfRange={clipOutOfRange} flowLabelsOn={flowLabelsOn} flowLabelMetric={flowLabelMetric} flowTracerOn={flowTracerOn}
             flowWidgetOpen={flowWidgetOpen} setFlowWidgetOpen={setFlowWidgetOpen}
             onOpenFlowLinesPanel={() => setRightView("flowlines")}
-            polygons={polygons} setPolygons={setPolygons} polygonLayerVisible={polygonLayerVisible}
+            polygons={polygons} setPolygons={setPolygons} layers={layers} activeLayerId={activeLayerId}
           />
           <CornerRevealGrip width={midPanelW} setWidth={setMidPanelW} />
           <BottomRevealHandle height={bottomPanelH} setHeight={setBottomPanelH} />
@@ -440,6 +523,7 @@ export default function App() {
       )}
 
       {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+      {addLayerModalOpen && <AddLayerModal onCreate={addLayer} onClose={() => setAddLayerModalOpen(false)} />}
       {toolboxFloat && (
         <FloatingToolbox
           pos={toolboxPos} setPos={setToolboxPos}

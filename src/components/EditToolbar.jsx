@@ -18,9 +18,13 @@ function Sep() {
 }
 
 // Reusable small tool button — mirrors the Figma "fm-v8.0-tool" component's
-// default/hover/select states (white / neutral-200 / neutral-400+black),
-// same spec already used for the ribbon buttons and rail tools elsewhere.
-function ToolButton({ icon, title, active, disabled, onClick, badge, iconStyle }) {
+// default/hover/select states. Selected state is red (not the neutral-grey
+// generic ribbon buttons use elsewhere) since every button on this toolbar
+// only exists while Live Edit is active — same red language as the rail's
+// stop-edit pill and the canvas's red border, so an armed tool reads
+// consistently as "you're in edit mode" rather than looking like an
+// ordinary selected ribbon action.
+function ToolButton({ icon, title, active, disabled, onClick, badge, hasMenu, iconStyle }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -34,12 +38,20 @@ function ToolButton({ icon, title, active, disabled, onClick, badge, iconStyle }
         border: "none", borderRadius: 2, padding: 4, flexShrink: 0,
         cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.4 : 1,
-        background: active ? "var(--neutral-400)" : hover && !disabled ? "var(--neutral-200)" : "transparent",
+        background: active ? "var(--red-700)" : hover && !disabled ? "var(--neutral-200)" : "transparent",
       }}
     >
-      <Icon src={icon} size={16} style={iconStyle} />
+      <Icon src={icon} size={16} style={{ ...(active ? { filter: "brightness(0) invert(1)" } : null), ...iconStyle }} />
       {badge && (
         <div style={{ position: "absolute", bottom: 2, right: 2, width: 3, height: 3, borderRadius: "50%", background: "var(--surface-brand)" }} />
+      )}
+      {hasMenu && (
+        <div style={{
+          position: "absolute", right: 1, bottom: 1, width: 0, height: 0,
+          borderLeft: "3.5px solid transparent",
+          borderBottom: `3.5px solid ${active ? "#fff" : "var(--text-tertiary)"}`,
+          pointerEvents: "none",
+        }} />
       )}
     </button>
   );
@@ -60,8 +72,9 @@ function SnapToLayersDropdown() {
         onClick={() => setOpen((v) => !v)}
         title="Snap to layers"
         style={{
-          display: "flex", alignItems: "center", gap: 4, height: 24, width: 176, padding: "0 6px",
-          background: "var(--surface-2)", border: "1px solid var(--border-primary)", borderRadius: 2, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 4, height: 24, width: 148, padding: "0 6px",
+          background: open ? "var(--neutral-200)" : "var(--surface-2)",
+          border: "1px solid var(--border-primary)", borderRadius: 2, cursor: "pointer",
         }}
       >
         <Icon src={A.editLayers} size={14} />
@@ -72,7 +85,7 @@ function SnapToLayersDropdown() {
       </button>
       {open && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, marginTop: 2, width: 176, zIndex: 60,
+          position: "absolute", top: "100%", left: 0, marginTop: 2, width: 148, zIndex: 60,
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 8,
         }}>
@@ -96,7 +109,7 @@ export default function EditToolbar({ dirty, setDirty, subTool, setSubTool, snap
   return (
     <div style={{
       position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", zIndex: 12,
-      display: "flex", alignItems: "center", gap: 8, padding: "4px 8px",
+      display: "flex", alignItems: "center", gap: 6, padding: "4px 8px",
       background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
       boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
     }}>
@@ -104,11 +117,11 @@ export default function EditToolbar({ dirty, setDirty, subTool, setSubTool, snap
       <Sep />
       <ToolButton icon={A.editAddVertex} title="Add vertex — click a polygon edge" active={subTool === "addVertex"} onClick={() => pickTool("addVertex")} />
       <ToolButton icon={A.editMovePolygon} title="Move polygon — drag a shape" active={subTool === "movePolygon"} onClick={() => pickTool("movePolygon")} />
-      <ToolButton icon={A.editSnapPoint} title={snapOn ? "Snapping on" : "Snapping off"} active={snapOn} onClick={() => setSnapOn((v) => !v)} />
+      <ToolButton icon={A.editSnapPoint} title={snapOn ? "Snapping on — click to turn off" : "Snapping off — click to turn on"} active={snapOn} onClick={() => setSnapOn((v) => !v)} />
       <SnapToLayersDropdown />
       <ToolButton icon={A.editViewAttribute} title="View attribute — click a polygon" active={subTool === "viewAttribute"} onClick={() => pickTool("viewAttribute")} />
       <Sep />
-      <ToolButton icon={A.editSave} title="Save" onClick={() => setDirty(false)} />
+      <ToolButton icon={A.editSave} title={dirty ? "Save changes" : "Nothing to save yet"} disabled={!dirty} onClick={() => setDirty(false)} />
       <Sep />
       <ToolButton icon={A.editUndo} title={canUndo ? "Undo [Ctrl+Z]" : "Nothing to undo yet"} disabled={!canUndo} onClick={onUndo} />
       <ToolButton icon={A.editUndo} title={canRedo ? "Redo [Ctrl+Shift+Z]" : "Nothing to redo yet"} disabled={!canRedo} onClick={onRedo}
