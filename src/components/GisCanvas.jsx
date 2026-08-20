@@ -398,6 +398,40 @@ export default function GisCanvas({
     setPolyFuture((f) => f.slice(1));
   };
   const POLY_SNAP_PX = 10;
+  const ADD_VERTEX_PRECISE_PX = 8; // tight — right on a line, any shape
+  const ADD_VERTEX_LOOSE_PX = 40; // generous — anywhere between two of the *active* shape's vertices, not necessarily on the line
+  // Finds where an Add-vertex click/hover at screen point `p` would insert
+  // a point: a precise pass against every polygon's edges (projected onto
+  // the line, tight radius), falling back — once a shape is "active"
+  // (`activeId`) — to a loose pass against just that shape's edges, using
+  // the raw point instead of the projection (standard GIS-tool
+  // "click roughly between two vertices" convenience).
+  const findAddVertexTarget = (p, w, activeId) => {
+    let best = null, bestDist = ADD_VERTEX_PRECISE_PX;
+    polygons.forEach((poly) => {
+      polyAllRings(poly).forEach(([ring, pts]) => {
+        const chain = pts.map((v) => toScreen(view, v.x, v.y));
+        for (let i = 0; i < chain.length; i++) {
+          const a = chain[i], b = chain[(i + 1) % chain.length];
+          const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+          if (c.dist < bestDist) { bestDist = c.dist; best = { polyId: poly.id, ring, segIndex: i, world: toWorld(view, c.x, c.y) }; }
+        }
+      });
+    });
+    if (best || !activeId) return best;
+    const poly = polygons.find((pg) => pg.id === activeId);
+    if (!poly) return null;
+    let loose = null, looseDist = ADD_VERTEX_LOOSE_PX;
+    polyAllRings(poly).forEach(([ring, pts]) => {
+      const chain = pts.map((v) => toScreen(view, v.x, v.y));
+      for (let i = 0; i < chain.length; i++) {
+        const a = chain[i], b = chain[(i + 1) % chain.length];
+        const d = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y).dist;
+        if (d < looseDist) { looseDist = d; loose = { polyId: poly.id, ring, segIndex: i, world: w }; }
+      }
+    });
+    return loose;
+  };
   const findPolySnap = (wx, wy, excludePolyId, excludeRing, excludeVIdx) => {
     if (!snapOn) return null;
     const thresh = POLY_SNAP_PX / view.scale;
@@ -1072,21 +1106,12 @@ export default function GisCanvas({
         return;
       }
       // "Add vertex" tool: ghost-preview the point that would be inserted
-      // if the user clicked right now, so hovering a shape's edge signals
+      // if the user clicked right now, so hovering a shape's edge (or,
+      // once a shape's active, anywhere near two of its vertices) signals
       // "you can add a vertex here" before committing to the click.
       if (liveEdit && polySubTool === "addVertex") {
-        let best = null, bestDist = 8;
-        polygons.forEach((poly) => {
-          polyAllRings(poly).forEach(([, pts]) => {
-            const chain = pts.map((v) => toScreen(view, v.x, v.y));
-            for (let i = 0; i < chain.length; i++) {
-              const a = chain[i], b = chain[(i + 1) % chain.length];
-              const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
-              if (c.dist < bestDist) { bestDist = c.dist; best = toWorld(view, c.x, c.y); }
-            }
-          });
-        });
-        setPolyHoverSeg(best);
+        const target = findAddVertexTarget(p, toWorld(view, p.x, p.y), selectedPolyId);
+        setPolyHoverSeg(target ? target.world : null);
         return;
       }
       if (polyHoverSeg) setPolyHoverSeg(null);
@@ -1236,6 +1261,7 @@ export default function GisCanvas({
       liveEdit,
       polySubTool,
       polyHoverSeg,
+      selectedPolyId,
     ],
   );
 
@@ -2007,27 +2033,25 @@ export default function GisCanvas({
         return;
       }
       if (polySubTool === "addVertex") {
-        let best = null, bestDist = 8;
-        polygons.forEach((poly) => {
-          polyAllRings(poly).forEach(([ring, pts]) => {
-            const chain = pts.map((v) => toScreen(view, v.x, v.y));
-            for (let i = 0; i < chain.length; i++) {
-              const a = chain[i], b = chain[(i + 1) % chain.length];
-              const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
-              if (c.dist < bestDist) { bestDist = c.dist; best = { polyId: poly.id, ring, segIndex: i, world: toWorld(view, c.x, c.y) }; }
-            }
-          });
-        });
+        const best = findAddVertexTarget(p, w, selectedPolyId);
         if (best) {
           pushPolyHistory();
+          const newVIdx = best.segIndex + 1;
+          const newId = genId();
           setPolygons((ps) => ps.map((pg) => {
             if (pg.id !== best.polyId) return pg;
             const pts = [...polyRing(pg, best.ring)];
-            pts.splice(best.segIndex + 1, 0, { id: genId(), x: best.world.x, y: best.world.y });
+            pts.splice(newVIdx, 0, { id: newId, x: best.world.x, y: best.world.y });
             return polyWithRing(pg, best.ring, pts);
           }));
           setEditDirty(true);
           setPolyHoverSeg(null);
+          // Click to add, hold to adjust — arm the same drag Move-vertex
+          // uses on the point just inserted, so it can be dragged into
+          // place in one motion instead of needing a second click.
+          setSelectedPolyId(best.polyId);
+          setSelectedPolyVertex({ polyId: best.polyId, ring: best.ring, vIdx: newVIdx });
+          setPolyDrag({ type: "vertex", polyId: best.polyId, ring: best.ring, vIdx: newVIdx, ox: 0, oy: 0 });
         }
         return;
       }
@@ -2704,9 +2728,10 @@ export default function GisCanvas({
                       const vSel = vertexInteractive && selectedPolyVertex?.polyId === poly.id && selectedPolyVertex?.ring === ring && selectedPolyVertex?.vIdx === i;
                       const isHoverTarget = (polySubTool === "addVertex" || polySubTool === "deleteVertex")
                         && hoveredPolyVertex?.polyId === poly.id && hoveredPolyVertex?.ring === ring && hoveredPolyVertex?.vIdx === i;
-                      const cursor = polySubTool === "moveVertex"
-                        ? (polyDrag?.ring === ring && polyDrag?.vIdx === i ? "grabbing" : "grab")
-                        : polySubTool === "deleteVertex" ? "pointer" : "default";
+                      const cursor = polyDrag?.type === "vertex" && polyDrag?.ring === ring && polyDrag?.vIdx === i
+                        ? "grabbing" // covers both Move-vertex dragging and a just-inserted Add-vertex point being held/adjusted
+                        : polySubTool === "moveVertex" ? "grab"
+                          : polySubTool === "deleteVertex" ? "pointer" : "default";
                       return (
                         <circle
                           key={v.id}
@@ -2749,7 +2774,7 @@ export default function GisCanvas({
             })()}
             {/* "Add vertex" hover ghost — a translucent preview of the
                 vertex that would be inserted if the user clicked now. */}
-            {liveEdit && polySubTool === "addVertex" && polyHoverSeg && (() => {
+            {liveEdit && polySubTool === "addVertex" && !polyDrag && polyHoverSeg && (() => {
               const s = toScreen(view, polyHoverSeg.x, polyHoverSeg.y);
               return (
                 <circle cx={s.x} cy={s.y} r={5} fill="var(--orange-600)" fillOpacity={0.55}

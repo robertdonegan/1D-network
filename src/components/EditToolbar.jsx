@@ -178,7 +178,7 @@ function SnapToLayersDropdown() {
 }
 
 const VERTEX_TOOLS = {
-  addVertex: { icon: "editAddVertex", label: "Add vertex", hint: "Add vertex — click a line to insert one; hover an existing vertex and press Delete/Backspace to remove it" },
+  addVertex: { icon: "editAddVertex", label: "Add vertex", hint: "Add vertex — click a line to insert one (hold and drag to place it precisely); once a shape's active, click roughly between two of its points too. Hover an existing vertex and press Delete/Backspace to remove it" },
   moveVertex: { icon: "editMoveVertex", label: "Move vertex", hint: "Move vertex — drag to reposition (move only, no adding or deleting here)" },
   deleteVertex: { icon: "editDeleteVertex", label: "Delete vertex", hint: "Delete vertex — click one to remove it (delete only, no moving or adding here)" },
 };
