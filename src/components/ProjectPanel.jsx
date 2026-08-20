@@ -56,12 +56,16 @@ function Toggle({ on, onClick }) {
   );
 }
 
-// The one "layer item" component design (Figma node 2528-53806), reused
-// verbatim for both the static Components tree (icon + label + a
-// check-style trailing badge) and the real dynamic Layers list (a colour
-// swatch standing in for the icon, a feature-count sublabel, a visibility
-// Toggle, and a hover-revealed remove "×") — same row shell, same
-// selected/hover treatment, just different trailing content per caller.
+// The one "layer item" component design (Figma node 2528-53806, verified
+// live via the Figma Dev Mode MCP server, and cross-checked against the
+// component's full variant reference sheet), reused verbatim for both the
+// static Components tree (icon + label + a check-style trailing badge) and
+// the real dynamic Layers list (a colour swatch standing in for the icon, a
+// feature-count sublabel, a visibility Toggle, and a hover-revealed remove
+// "×") — same row shell, just different trailing content per caller.
+// Selected/"active" state per the design's Property 1=select variant: a
+// light neutral-500 fill with a 2px solid brand-colour border (NOT a solid
+// brand fill/white text as previously approximated without design access).
 function LayerRow({ icon, color, label, sublabel, active, onClick, trailing }) {
   const [hover, setHover] = useState(false);
   return (
@@ -71,7 +75,8 @@ function LayerRow({ icon, color, label, sublabel, active, onClick, trailing }) {
       onMouseLeave={() => setHover(false)}
       style={{
         display: "flex", alignItems: "center", gap: 4, padding: 8, borderRadius: 2,
-        background: active ? "var(--surface-brand)" : hover && onClick ? "var(--neutral-500)" : "var(--neutral-400)",
+        background: active ? "var(--neutral-500)" : hover && onClick ? "var(--neutral-600)" : "var(--neutral-400)",
+        border: active ? "2px solid var(--surface-brand)" : "2px solid transparent",
         cursor: onClick ? "pointer" : "default",
       }}
     >
@@ -80,11 +85,11 @@ function LayerRow({ icon, color, label, sublabel, active, onClick, trailing }) {
         : <Icon src={icon} size={12} />}
       <div style={{ flex: "1 0 0", minWidth: 0 }}>
         <div style={{
-          fontSize: "var(--fs-xs)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          color: active ? "var(--text-invert)" : "var(--text-primary)",
+          fontSize: "var(--fs-xs)", fontWeight: active ? 600 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          color: active ? "var(--text-primary-selected)" : "var(--text-primary)",
         }}>{label}</div>
         {sublabel && (
-          <div style={{ fontSize: "var(--fs-xxs)", color: active ? "var(--text-invert)" : "var(--text-tertiary)" }}>{sublabel}</div>
+          <div style={{ fontSize: "var(--fs-xxs)", color: active ? "var(--text-primary-selected)" : "var(--text-tertiary)" }}>{sublabel}</div>
         )}
       </div>
       {trailing}
@@ -196,7 +201,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
                     style={{
                       width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center",
                       border: "none", borderRadius: "50%", cursor: "pointer", padding: 0, fontSize: 12, lineHeight: 1,
-                      background: "transparent", color: active ? "var(--text-invert)" : "var(--text-tertiary)",
+                      background: "transparent", color: active ? "var(--text-primary-selected)" : "var(--text-tertiary)",
                     }}
                   >×</button>
                 </div>

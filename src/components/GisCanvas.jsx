@@ -1996,15 +1996,12 @@ export default function GisCanvas({
           backgroundSize: `${28 * view.scale}px ${28 * view.scale}px`,
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           backgroundColor: "#eef0ec",
-          // Always 1px — border-width itself must never change, since that
-          // shifts the padding edge (the positioning origin every
-          // absolutely-positioned toolbar inside here is anchored to) by a
-          // pixel and makes them visibly jump. The live-edit ring is drawn
-          // separately as an absolutely-positioned overlay below (not here),
-          // so it doesn't double up with this border.
+          // Always 2px — the live-edit ring is a sibling in the outer div
+          // (see below), not a child here, so this border-width can change
+          // freely without needing to keep any ring `inset` in sync.
           border: dropHint
-            ? "1px dashed var(--blue-700)"
-            : "1px solid var(--border-primary)",
+            ? "2px dashed var(--blue-700)"
+            : "2px solid var(--border-primary)",
           borderRadius: 4,
           cursor: ribbonDrag
             ? "copy"
@@ -3973,24 +3970,27 @@ export default function GisCanvas({
           />
         </div>
 
-        {/* Live-edit red ring, painted last so it sits on top of the footer
-            and toolbars instead of being covered by them (they're children
-            of this wrap too, and children always paint over their parent's
-            own outline regardless of DOM order). Zero layout impact: purely
-            an absolutely-positioned overlay, nothing here affects flow.
-            inset: -1px (not 0) because this div's containing block is the
-            wrap's *padding* edge — one border-width inside its actual outer
-            edge — so inset: -1px pushes it back out to sit flush with the
-            wrap's own 1px border instead of appearing indented. */}
-        {liveEdit && (
-          <div
-            style={{
-              position: "absolute", inset: -1, border: "2px solid var(--red-700)",
-              borderRadius: 4, pointerEvents: "none", zIndex: 13,
-            }}
-          />
-        )}
       </div>
+
+      {/* Live-edit red ring — deliberately a SIBLING of the wrap above, not
+          a child of it: the wrap has `overflow: hidden` (needed to clip the
+          panned/zoomed map content), so a ring nested inside it would have
+          its outer half clipped away the moment its inset needed to match
+          the wrap's border-width (was invisible entirely at the wrap's
+          current 2px border). Living in this outer div instead — which has
+          no border/padding of its own and no overflow clipping — lets
+          `inset: 0` sit it exactly flush with the wrap's real outer edge,
+          since the wrap is this div's only flex child and fills it
+          completely. Zero layout impact: purely an absolutely-positioned
+          overlay, nothing here affects flow. */}
+      {liveEdit && (
+        <div
+          style={{
+            position: "absolute", inset: 0, border: "2px solid var(--red-700)",
+            borderRadius: 4, pointerEvents: "none", zIndex: 13,
+          }}
+        />
+      )}
 
       {transectPopup && (
         <TransectPopup
