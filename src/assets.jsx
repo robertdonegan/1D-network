@@ -175,7 +175,20 @@ import editSnapPoint from "./assets/edit-snap-point.svg";
 import editLayers from "./assets/edit-layers.svg";
 import editViewAttribute from "./assets/edit-view-attribute.svg";
 import editSave from "./assets/edit-save.svg";
+import editSaveAs from "./assets/edit-save-as.svg";
 import editUndo from "./assets/edit-undo.svg";
+import editRedo from "./assets/edit-redo.svg";
+import editRevert from "./assets/edit-revert.svg";
+import editMoveVertex from "./assets/edit-move-vertex.svg";
+import editDeleteVertex from "./assets/edit-delete-vertex.svg";
+import editRotateShape from "./assets/edit-rotate-shape.svg";
+import editReverseShape from "./assets/edit-reverse-shape.svg";
+import editDeleteShape from "./assets/edit-delete-shape.svg";
+import editSnapLine from "./assets/edit-snap-line.svg";
+import editSnapPointLine from "./assets/edit-snap-point-line.svg";
+import editSnapMapGrid from "./assets/edit-snap-map-grid.svg";
+import editTraceLine from "./assets/edit-trace-line.svg";
+import editSnapSettings from "./assets/edit-snap-settings.svg";
 import northStar from "./assets/north-star.svg";
 import comment from "./assets/comment.svg";
 import placeholder from "./assets/placeholder.svg";
@@ -262,7 +275,9 @@ export const A = {
   resultsDamageCalculator, resultsDiagnostics, resultsComments, favStar, chartAnalytics,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
   rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, editStop, northStar, comment,
-  editPenTool, editAddVertex, editMovePolygon, editSnapPoint, editLayers, editViewAttribute, editSave, editUndo,
+  editPenTool, editAddVertex, editMovePolygon, editSnapPoint, editLayers, editViewAttribute, editSave, editSaveAs,
+  editUndo, editRedo, editRevert, editMoveVertex, editDeleteVertex, editRotateShape, editReverseShape, editDeleteShape,
+  editSnapLine, editSnapPointLine, editSnapMapGrid, editTraceLine, editSnapSettings,
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,

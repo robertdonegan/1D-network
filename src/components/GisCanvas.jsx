@@ -11,8 +11,10 @@ import TransectPopup from "./TransectPopup.jsx";
 import ContextMenu from "./ContextMenu.jsx";
 import EditToolbar from "./EditToolbar.jsx";
 import SaveModal from "./SaveModal.jsx";
+import ConfirmModal from "./ConfirmModal.jsx";
 import { PulsePreview, editValue } from "./FlowLinesPanel.jsx";
 import { FLOW_LABEL_METRICS } from "../flowMock.js";
+import polygonClipping from "polygon-clipping";
 
 // Grouped-unit visuals (Figma "1D Grouped Units" — Group select box / Grouped
 // state): dashed orange bounding box + translucent orange fill, reused for
@@ -118,6 +120,58 @@ const closestOnSegment = (px, py, x1, y1, x2, y2) => {
     cy = y1 + t * dy;
   return { x: cx, y: cy, dist: Math.hypot(px - cx, py - cy) };
 };
+
+// --- Polygon ring helpers (Live Edit boolean combine/punch) --------------
+// A polygon is `{ points, holes }` — `points` is the outer ring, `holes` is
+// an array of inner rings (each an array of {id,x,y}, same shape as
+// `points`). Vertices are addressed everywhere by a `ring` key: the string
+// "outer", or an integer index into `holes`. `polygon-clipping` speaks a
+// different, index-free ring format (arrays of closed [x,y] pairs) so the
+// `ringToXY`/`xyToRing`/`polyToGeom` trio only exists to cross that bridge
+// at the edges (finishDrawPoly) — everywhere else in this file still just
+// reads/writes `{id,x,y}` points.
+const polyRing = (poly, ring) => (ring === "outer" ? poly.points : poly.holes[ring]);
+const polyWithRing = (poly, ring, pts) => (ring === "outer"
+  ? { ...poly, points: pts }
+  : { ...poly, holes: poly.holes.map((h, i) => (i === ring ? pts : h)) });
+const polyAllRings = (poly) => [["outer", poly.points], ...(poly.holes || []).map((h, i) => [i, h])];
+
+// Signed area (shoelace) of a ring of {x,y} points — positive means the
+// ring is wound clockwise in this app's (Y-down) world axes. New-shape
+// combine/punch below keys off this: draw clockwise over something to
+// union with it, anti-clockwise inside something to punch a hole in it.
+const signedArea = (pts) => {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+    a += p1.x * p2.y - p2.x * p1.y;
+  }
+  return a / 2;
+};
+const isClockwise = (pts) => signedArea(pts) > 0;
+
+const ringToXY = (pts) => { const r = pts.map((p) => [p.x, p.y]); r.push(r[0]); return r; };
+const xyToRing = (xy) => {
+  const closed = xy.length > 1 && xy[0][0] === xy[xy.length - 1][0] && xy[0][1] === xy[xy.length - 1][1];
+  return (closed ? xy.slice(0, -1) : xy).map(([x, y]) => ({ id: genId(), x, y }));
+};
+// A polygon-clipping "Polygon" geom: outer ring + hole rings, all closed xy.
+const polyToGeom = (poly) => [ringToXY(poly.points), ...(poly.holes || []).map(ringToXY)];
+const ptsBbox = (pts) => pts.reduce((b, p) => ({
+  minX: Math.min(b.minX, p.x), maxX: Math.max(b.maxX, p.x),
+  minY: Math.min(b.minY, p.y), maxY: Math.max(b.maxY, p.y),
+}), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+const bboxOverlap = (a, b) => a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+// Total area of a polygon-clipping MultiPolygon result (outer rings only —
+// good enough for an "is this a real, area-bearing overlap?" test).
+const geomArea = (multi) => multi.reduce((sum, rings) => sum + Math.abs(signedArea(rings[0].map(([x, y]) => ({ x, y })))), 0);
+// Vertex-average centroid (not a true area centroid, but a fine pivot for
+// rotate/reverse on the kind of shapes this app draws).
+const polyCentroid = (pts) => ({
+  x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+  y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+});
+
 const ports = (n, view) => {
   const s = toScreen(view, n.x, n.y),
     sz = sizeOf(n);
@@ -289,6 +343,13 @@ export default function GisCanvas({
     setPolyPast([]); setPolyFuture([]);
   };
   const handleEditCancel = () => setSaveModalOpen(false);
+  const [revertModalOpen, setRevertModalOpen] = useState(false);
+  const handleRevertConfirm = () => {
+    setRevertModalOpen(false);
+    setPolygons(polygonsAtEditStart.current ?? polygons);
+    setDrawPoly(null); setPolyDrag(null); setSelectedPolyId(null); setSelectedPolyIds([]); setSelectedPolyVertex(null);
+    setPolyPast([]); setPolyFuture([]); setPolySubTool(null);
+  };
 
   // --- Polygon editing (Live Edit phase 3) -----------------------------
   // Real editable vector layer, gated to Live Edit — `polygons`/
@@ -301,10 +362,18 @@ export default function GisCanvas({
   const [polySubTool, setPolySubTool] = useState(null); // "pen" | "addVertex" | "movePolygon" | "viewAttribute" | null
   const [snapOn, setSnapOn] = useState(true);
   const [drawPoly, setDrawPoly] = useState(null); // { points: [{x,y}], cursor } — in-progress new polygon
-  const [polyDrag, setPolyDrag] = useState(null); // { type: "vertex"|"polygon", polyId, vIdx, ox, oy, origPoints }
+  const [polyDrag, setPolyDrag] = useState(null); // { type: "vertex", polyId, ring, vIdx, ox, oy } | { type: "polygon", polyId, sx, sy, origPoints, origHoles } | { type: "polygon-group", polyIds, sx, sy, origById: Map(id -> {points, holes}) }
   const [selectedPolyId, setSelectedPolyId] = useState(null);
-  const [selectedPolyVertex, setSelectedPolyVertex] = useState(null); // { polyId, vIdx }
+  // Multi-select for the rail's Select/Group-select tools (marquee'd or
+  // shift/ctrl-clicked polygons) — separate from `selectedPolyId`, which is
+  // the EditToolbar's own single-shape concept (Move/View attribute). When
+  // exactly one polygon is in `selectedPolyIds` the two stay in sync so the
+  // attribute popup etc. still works no matter which tool selected it.
+  const [selectedPolyIds, setSelectedPolyIds] = useState([]);
+  const [selectedPolyVertex, setSelectedPolyVertex] = useState(null); // { polyId, ring, vIdx } — ring is "outer" or a holes[] index
   const [polySnapPoint, setPolySnapPoint] = useState(null); // world {x,y} — visual snap feedback ring
+  const [polyHoverSeg, setPolyHoverSeg] = useState(null); // { x, y } world — "add vertex here" ghost preview while hovering an edge
+  const [hoveredPolyVertex, setHoveredPolyVertex] = useState(null); // { polyId, ring, vIdx } — hover target for the Delete/Backspace shortcut (Add/Delete-vertex tools)
   const [polyPast, setPolyPast] = useState([]);
   const [polyFuture, setPolyFuture] = useState([]);
   const polygonsAtEditStart = useRef(null);
@@ -329,53 +398,163 @@ export default function GisCanvas({
     setPolyFuture((f) => f.slice(1));
   };
   const POLY_SNAP_PX = 10;
-  const findPolySnap = (wx, wy, excludePolyId, excludeVIdx) => {
+  const findPolySnap = (wx, wy, excludePolyId, excludeRing, excludeVIdx) => {
     if (!snapOn) return null;
     const thresh = POLY_SNAP_PX / view.scale;
     let best = null, bestD = thresh * thresh;
     polygons.forEach((poly) => {
-      poly.points.forEach((v, i) => {
-        if (poly.id === excludePolyId && i === excludeVIdx) return;
-        const d = (v.x - wx) ** 2 + (v.y - wy) ** 2;
-        if (d < bestD) { bestD = d; best = { x: v.x, y: v.y }; }
+      polyAllRings(poly).forEach(([ring, pts]) => {
+        pts.forEach((v, i) => {
+          if (poly.id === excludePolyId && ring === excludeRing && i === excludeVIdx) return;
+          const d = (v.x - wx) ** 2 + (v.y - wy) ** 2;
+          if (d < bestD) { bestD = d; best = { x: v.x, y: v.y }; }
+        });
       });
     });
     return best;
   };
+  // Finishing a new shape doesn't just append it — following standard
+  // GIS-editor convention, a clockwise shape drawn over an existing one on
+  // the same layer unions into it; an anti-clockwise shape drawn inside one
+  // punches a hole out of it. Only a shape that doesn't overlap anything
+  // becomes a new standalone polygon.
   const finishDrawPoly = () => {
     if (!drawPoly || drawPoly.points.length < 3) { setDrawPoly(null); return; }
     pushPolyHistory();
-    const id = genId();
-    setPolygons((ps) => [...ps, {
-      id, name: "Polygon " + (ps.length + 1),
-      layerId: activeLayerId || "example",
-      points: drawPoly.points.map((p) => ({ id: genId(), x: p.x, y: p.y })),
-    }]);
+    const layerId = activeLayerId || "example";
+    const newRing = ringToXY(drawPoly.points);
+    const newBbox = ptsBbox(drawPoly.points);
+    const clockwise = isClockwise(drawPoly.points);
+    setPolygons((ps) => {
+      const candidates = ps.filter((pg) => pg.layerId === layerId
+        && bboxOverlap(newBbox, ptsBbox(pg.points))
+        && geomArea(polygonClipping.intersection(polyToGeom(pg), [newRing])) > 1e-6);
+
+      if (candidates.length === 0) {
+        return [...ps, {
+          id: genId(), name: "Polygon " + (ps.length + 1), layerId,
+          points: drawPoly.points.map((p) => ({ id: genId(), x: p.x, y: p.y })), holes: [],
+        }];
+      }
+
+      const consumedIds = new Set(candidates.map((c) => c.id));
+      const resultGeom = clockwise
+        ? polygonClipping.union([newRing], candidates.map(polyToGeom))
+        : polygonClipping.difference(candidates.map(polyToGeom), [newRing]);
+      const resultPolys = resultGeom.map((rings, i) => {
+        const reused = i === 0 ? candidates[0] : null;
+        return {
+          id: reused?.id || genId(),
+          name: reused?.name || ("Polygon " + (ps.length + 1 + i)),
+          layerId,
+          points: xyToRing(rings[0]),
+          holes: rings.slice(1).map(xyToRing),
+        };
+      });
+      return [...ps.filter((pg) => !consumedIds.has(pg.id)), ...resultPolys];
+    });
     setDrawPoly(null);
     setEditDirty(true);
   };
-  const polyVertexDown = (e, polyId, vIdx) => {
+  // Move/Delete vertex are exclusive — each does only its one job so
+  // precise manipulation doesn't get muddied by the other's affordances:
+  // Move only ever drags, Delete only ever removes on click. Add vertex
+  // (and Pen) don't drag or click-delete a vertex at all — hovering one
+  // there is just a target for the Delete/Backspace shortcut below.
+  const vertexMouseDown = (e, polyId, ring, vIdx) => {
     e.stopPropagation();
-    if (polySubTool === "movePolygon") return;
-    const poly = polygons.find((pg) => pg.id === polyId);
-    const v = poly.points[vIdx];
-    const p = pt(e);
-    const s = toScreen(view, v.x, v.y);
-    pushPolyHistory();
-    setSelectedPolyId(polyId);
-    setSelectedPolyVertex({ polyId, vIdx });
-    setPolyDrag({ type: "vertex", polyId, vIdx, ox: p.x - s.x, oy: p.y - s.y });
-    setEditDirty(true);
+    if (polySubTool === "moveVertex") {
+      const poly = polygons.find((pg) => pg.id === polyId);
+      const v = polyRing(poly, ring)[vIdx];
+      const p = pt(e);
+      const s = toScreen(view, v.x, v.y);
+      pushPolyHistory();
+      setSelectedPolyId(polyId);
+      setSelectedPolyVertex({ polyId, ring, vIdx });
+      setPolyDrag({ type: "vertex", polyId, ring, vIdx, ox: p.x - s.x, oy: p.y - s.y });
+      setEditDirty(true);
+      return;
+    }
+    if (polySubTool === "deleteVertex") {
+      deletePolyVertex(polyId, ring, vIdx);
+      setHoveredPolyVertex(null);
+    }
+    // addVertex/pen: swallow the mousedown so it doesn't also register as
+    // an add-on-the-adjoining-segment hit — deliberately no other effect.
   };
   const polyBodyDown = (e, polyId) => {
+    // No EditToolbar sub-tool armed — the rail's own Select/Group-select
+    // tool owns the click instead, click-drag to move like it would a
+    // network node. Dragging a shape that's already part of a multi-select
+    // (marquee'd via Group select) moves the whole group together instead
+    // of collapsing the selection down to just the one clicked.
+    if (!polySubTool && liveEdit && (activeTool === 0 || activeTool === 1)) {
+      e.stopPropagation();
+      const asGroup = selectedPolyIds.includes(polyId) && selectedPolyIds.length > 1;
+      const dragIds = asGroup ? selectedPolyIds : [polyId];
+      if (!asGroup) { setSelectedPolyIds([polyId]); setSelectedPolyId(polyId); }
+      pushPolyHistory();
+      const origById = new Map(dragIds.map((id) => {
+        const pg = polygons.find((p) => p.id === id);
+        return [id, { points: pg.points, holes: pg.holes || [] }];
+      }));
+      setPolyDrag({ type: "polygon-group", polyIds: dragIds, sx: e.clientX, sy: e.clientY, origById });
+      setEditDirty(true);
+      return;
+    }
     if (polySubTool === "movePolygon") {
       e.stopPropagation();
       const poly = polygons.find((pg) => pg.id === polyId);
       pushPolyHistory();
       setSelectedPolyId(polyId);
       setSelectedPolyVertex(null);
-      setPolyDrag({ type: "polygon", polyId, sx: e.clientX, sy: e.clientY, origPoints: poly.points });
+      setPolyDrag({ type: "polygon", polyId, sx: e.clientX, sy: e.clientY, origPoints: poly.points, origHoles: poly.holes || [] });
       setEditDirty(true);
+      return;
+    }
+    if (polySubTool === "rotateShape") {
+      e.stopPropagation();
+      const poly = polygons.find((pg) => pg.id === polyId);
+      const centroid = polyCentroid(poly.points);
+      const p = pt(e);
+      const w = toWorld(view, p.x, p.y);
+      pushPolyHistory();
+      setSelectedPolyId(polyId);
+      setSelectedPolyVertex(null);
+      setPolyDrag({
+        type: "rotate", polyId, centroid,
+        startAngle: Math.atan2(w.y - centroid.y, w.x - centroid.x),
+        origPoints: poly.points, origHoles: poly.holes || [],
+      });
+      setEditDirty(true);
+      return;
+    }
+    if (polySubTool === "reverseShape") {
+      // Click-to-flip, not a drag — default mirrors left/right, Alt+click
+      // mirrors top/bottom, both around the shape's own centroid.
+      e.stopPropagation();
+      const poly = polygons.find((pg) => pg.id === polyId);
+      const centroid = polyCentroid(poly.points);
+      const flip = e.altKey
+        ? (v) => ({ ...v, y: 2 * centroid.y - v.y })
+        : (v) => ({ ...v, x: 2 * centroid.x - v.x });
+      pushPolyHistory();
+      setPolygons((ps) => ps.map((pg) => (
+        pg.id === polyId ? { ...pg, points: pg.points.map(flip), holes: (pg.holes || []).map((h) => h.map(flip)) } : pg
+      )));
+      setSelectedPolyId(polyId);
+      setSelectedPolyVertex(null);
+      setEditDirty(true);
+      return;
+    }
+    if (polySubTool === "deleteShape") {
+      // Select only — the actual delete is Delete/Backspace (existing
+      // selectedPolyId keyboard handler), a deliberate two-step so a whole
+      // shape can't disappear from a single stray click.
+      e.stopPropagation();
+      setSelectedPolyId(polyId);
+      setSelectedPolyIds([polyId]);
+      setSelectedPolyVertex(null);
       return;
     }
     if (polySubTool === "viewAttribute") {
@@ -387,14 +566,21 @@ export default function GisCanvas({
     // pen/addVertex: don't stopPropagation — let clicks pass through to the
     // canvas so drawing/inserting still works even over an existing shape.
   };
-  const deletePolyVertex = (polyId, vIdx) => {
+  const deletePolyVertex = (polyId, ring, vIdx) => {
     pushPolyHistory();
     setPolygons((ps) => ps.map((pg) => {
       if (pg.id !== polyId) return pg;
-      if (pg.points.length <= 3) return pg;
-      return { ...pg, points: pg.points.filter((_, i) => i !== vIdx) };
+      const pts = polyRing(pg, ring);
+      if (pts.length <= 3) {
+        // A hole ring that's shrunk below a triangle just disappears
+        // instead of leaving a degenerate 1-2 point ring around; the outer
+        // ring can't go below 3 at all (that would delete the shape).
+        return ring === "outer" ? pg : { ...pg, holes: pg.holes.filter((_, i) => i !== ring) };
+      }
+      return polyWithRing(pg, ring, pts.filter((_, i) => i !== vIdx));
     }));
     setSelectedPolyVertex(null);
+    setHoveredPolyVertex(null);
     setEditDirty(true);
   };
   const deletePolygon = (polyId) => {
@@ -408,9 +594,10 @@ export default function GisCanvas({
   // in-progress polygon draw rather than leaving it orphaned mid-shape.
   useEffect(() => {
     if (polySubTool !== "pen") setDrawPoly(null);
+    if (polySubTool !== "addVertex" && polySubTool !== "deleteVertex") setHoveredPolyVertex(null);
   }, [polySubTool]);
   useEffect(() => {
-    if (!liveEdit) { setDrawPoly(null); setPolySubTool(null); setSelectedPolyId(null); setSelectedPolyVertex(null); }
+    if (!liveEdit) { setDrawPoly(null); setPolySubTool(null); setSelectedPolyId(null); setSelectedPolyIds([]); setSelectedPolyVertex(null); setHoveredPolyVertex(null); }
   }, [liveEdit]);
   const [navHover, setNavHover] = useState(null);
   // tx/ty/scale centre+fit the default view on the demo network's real-
@@ -829,19 +1016,49 @@ export default function GisCanvas({
       if (polyDrag) {
         if (polyDrag.type === "vertex") {
           const w = toWorld(view, p.x - polyDrag.ox, p.y - polyDrag.oy);
-          const snap = findPolySnap(w.x, w.y, polyDrag.polyId, polyDrag.vIdx);
+          const snap = findPolySnap(w.x, w.y, polyDrag.polyId, polyDrag.ring, polyDrag.vIdx);
           const pos = snap || w;
           setPolySnapPoint(snap);
           setPolygons((ps) => ps.map((pg) => {
             if (pg.id !== polyDrag.polyId) return pg;
-            const points = pg.points.map((v, i) => (i === polyDrag.vIdx ? { ...v, x: pos.x, y: pos.y } : v));
-            return { ...pg, points };
+            const pts = polyRing(pg, polyDrag.ring).map((v, i) => (i === polyDrag.vIdx ? { ...v, x: pos.x, y: pos.y } : v));
+            return polyWithRing(pg, polyDrag.ring, pts);
           }));
         } else if (polyDrag.type === "polygon") {
           const dx = (e.clientX - polyDrag.sx) / view.scale, dy = (e.clientY - polyDrag.sy) / view.scale;
           setPolygons((ps) => ps.map((pg) => (
             pg.id === polyDrag.polyId
-              ? { ...pg, points: polyDrag.origPoints.map((v) => ({ ...v, x: v.x + dx, y: v.y + dy })) }
+              ? {
+                ...pg,
+                points: polyDrag.origPoints.map((v) => ({ ...v, x: v.x + dx, y: v.y + dy })),
+                holes: polyDrag.origHoles.map((h) => h.map((v) => ({ ...v, x: v.x + dx, y: v.y + dy }))),
+              }
+              : pg
+          )));
+        } else if (polyDrag.type === "polygon-group") {
+          const dx = (e.clientX - polyDrag.sx) / view.scale, dy = (e.clientY - polyDrag.sy) / view.scale;
+          const shift = (v) => ({ ...v, x: v.x + dx, y: v.y + dy });
+          setPolygons((ps) => ps.map((pg) => {
+            const orig = polyDrag.origById.get(pg.id);
+            if (!orig) return pg;
+            return { ...pg, points: orig.points.map(shift), holes: orig.holes.map((h) => h.map(shift)) };
+          }));
+        } else if (polyDrag.type === "rotate") {
+          const w = toWorld(view, p.x, p.y);
+          let angle = Math.atan2(w.y - polyDrag.centroid.y, w.x - polyDrag.centroid.x) - polyDrag.startAngle;
+          if (e.shiftKey) {
+            const step = Math.PI / 12; // 15°
+            angle = Math.round(angle / step) * step;
+          }
+          const cos = Math.cos(angle), sin = Math.sin(angle);
+          const { x: cx, y: cy } = polyDrag.centroid;
+          const rotate = (v) => {
+            const dx = v.x - cx, dy = v.y - cy;
+            return { ...v, x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+          };
+          setPolygons((ps) => ps.map((pg) => (
+            pg.id === polyDrag.polyId
+              ? { ...pg, points: polyDrag.origPoints.map(rotate), holes: polyDrag.origHoles.map((h) => h.map(rotate)) }
               : pg
           )));
         }
@@ -849,11 +1066,30 @@ export default function GisCanvas({
       }
       if (drawPoly) {
         const w = toWorld(view, p.x, p.y);
-        const snap = findPolySnap(w.x, w.y, null, null);
+        const snap = findPolySnap(w.x, w.y, null, null, null);
         setPolySnapPoint(snap);
         setDrawPoly((d) => d && { ...d, cursor: snap || w });
         return;
       }
+      // "Add vertex" tool: ghost-preview the point that would be inserted
+      // if the user clicked right now, so hovering a shape's edge signals
+      // "you can add a vertex here" before committing to the click.
+      if (liveEdit && polySubTool === "addVertex") {
+        let best = null, bestDist = 8;
+        polygons.forEach((poly) => {
+          polyAllRings(poly).forEach(([, pts]) => {
+            const chain = pts.map((v) => toScreen(view, v.x, v.y));
+            for (let i = 0; i < chain.length; i++) {
+              const a = chain[i], b = chain[(i + 1) % chain.length];
+              const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+              if (c.dist < bestDist) { bestDist = c.dist; best = toWorld(view, c.x, c.y); }
+            }
+          });
+        });
+        setPolyHoverSeg(best);
+        return;
+      }
+      if (polyHoverSeg) setPolyHoverSeg(null);
       if (annotateDraft) {
         const w = toWorld(view, p.x, p.y);
         if (annotateDraft.type === "arrow") {
@@ -997,6 +1233,9 @@ export default function GisCanvas({
       drawPoly,
       polygons,
       snapOn,
+      liveEdit,
+      polySubTool,
+      polyHoverSeg,
     ],
   );
 
@@ -1044,22 +1283,20 @@ export default function GisCanvas({
           x1 = Math.max(marquee.x0, marquee.x1);
         const y0 = Math.min(marquee.y0, marquee.y1),
           y1 = Math.max(marquee.y0, marquee.y1);
-        const hitIds = nodes
-          .filter((n) => {
-            const c = centerScreen(n, view);
-            if (marquee.shape === "ellipse") {
-              const rx = (x1 - x0) / 2,
-                ry = (y1 - y0) / 2;
-              if (rx <= 0 || ry <= 0) return false;
-              const cx = x0 + rx,
-                cy = y0 + ry;
-              return ((c.x - cx) / rx) ** 2 + ((c.y - cy) / ry) ** 2 <= 1;
-            }
-            if (marquee.shape === "freeform")
-              return pointInPolygon(c.x, c.y, marquee.path);
-            return c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1;
-          })
-          .map((n) => n.id);
+        const inMarquee = (c) => {
+          if (marquee.shape === "ellipse") {
+            const rx = (x1 - x0) / 2,
+              ry = (y1 - y0) / 2;
+            if (rx <= 0 || ry <= 0) return false;
+            const cx = x0 + rx,
+              cy = y0 + ry;
+            return ((c.x - cx) / rx) ** 2 + ((c.y - cy) / ry) ** 2 <= 1;
+          }
+          if (marquee.shape === "freeform")
+            return pointInPolygon(c.x, c.y, marquee.path);
+          return c.x >= x0 && c.x <= x1 && c.y >= y0 && c.y <= y1;
+        };
+        const hitIds = nodes.filter((n) => inMarquee(centerScreen(n, view))).map((n) => n.id);
         setSelected((sel) => {
           if (marquee.mode === "add")
             return Array.from(new Set([...sel, ...hitIds]));
@@ -1067,6 +1304,20 @@ export default function GisCanvas({
             return sel.filter((id) => !hitIds.includes(id));
           return hitIds;
         });
+        // Group select also rounds up Live Edit shapes — a shape counts as
+        // "in" the marquee if any of its vertices (outer ring or a hole) do.
+        if (liveEdit) {
+          const polyHitIds = polygons
+            .filter((poly) => polyAllRings(poly).some(([, pts]) => pts.some((v) => inMarquee(toScreen(view, v.x, v.y)))))
+            .map((poly) => poly.id);
+          setSelectedPolyIds((sel) => {
+            const next = marquee.mode === "add" ? Array.from(new Set([...sel, ...polyHitIds]))
+              : marquee.mode === "subtract" ? sel.filter((id) => !polyHitIds.includes(id))
+                : polyHitIds;
+            setSelectedPolyId(next.length === 1 ? next[0] : null);
+            return next;
+          });
+        }
         setMarquee(null);
         return;
       }
@@ -1205,6 +1456,8 @@ export default function GisCanvas({
       hoverSplice,
       annotateDraft,
       annotationStyle,
+      liveEdit,
+      polygons,
     ],
   );
 
@@ -1507,6 +1760,7 @@ export default function GisCanvas({
         // below, so Escape looked like it did nothing while editing.
         if (polySubTool) return setPolySubTool(null);
         if (selectedPolyVertex) return setSelectedPolyVertex(null);
+        if (selectedPolyIds.length) { setSelectedPolyIds([]); return setSelectedPolyId(null); }
         if (selectedPolyId) return setSelectedPolyId(null);
         if (selectedVertex) return setSelectedVertex(null);
         if (annotateTool) return setAnnotateTool(null);
@@ -1566,13 +1820,24 @@ export default function GisCanvas({
         e.preventDefault();
         deleteVertex(selectedVertex.edgeId, selectedVertex.pid);
       }
+      // Move vertex is exclusively for dragging — Delete/Backspace is
+      // deliberately a no-op there so a slip mid-nudge can't remove a
+      // point. Add/Delete vertex both support the hover-then-key shortcut.
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
-        selectedPolyVertex &&
+        selectedPolyVertex && polySubTool !== "moveVertex" &&
         !isTyping(e)
       ) {
         e.preventDefault();
-        deletePolyVertex(selectedPolyVertex.polyId, selectedPolyVertex.vIdx);
+        deletePolyVertex(selectedPolyVertex.polyId, selectedPolyVertex.ring, selectedPolyVertex.vIdx);
+      }
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        hoveredPolyVertex && (polySubTool === "addVertex" || polySubTool === "deleteVertex") &&
+        !isTyping(e)
+      ) {
+        e.preventDefault();
+        deletePolyVertex(hoveredPolyVertex.polyId, hoveredPolyVertex.ring, hoveredPolyVertex.vIdx);
       }
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
@@ -1601,12 +1866,12 @@ export default function GisCanvas({
         resetView();
       }
       if (noMods && !isTyping(e)) {
-        // Live Edit's Pen tool documents "[V]" as its own hotkey (see the
-        // rail button's title), but it was always shadowed by the base
-        // Select-tool shortcut below — "V" never actually armed/disarmed
-        // the pen while editing. Steal it here first, only while liveEdit
-        // is on, so both hotkeys can coexist without colliding.
-        if (liveEdit && e.key.toLowerCase() === "v") {
+        // "P" arms/disarms Live Edit's Pen tool — independent of the rail
+        // shortcuts below, since the rail's own Select/Group select/
+        // Measure/Point query tools stay fully usable during Live Edit
+        // (they no longer stop editing — see the rail's onClick) and "V"
+        // should keep meaning Cursor Select even while a shape's mid-draw.
+        if (liveEdit && e.key.toLowerCase() === "p") {
           e.preventDefault();
           setPolySubTool((v) => (v === "pen" ? null : "pen"));
         } else {
@@ -1614,6 +1879,10 @@ export default function GisCanvas({
           if (toolKey !== undefined) {
             e.preventDefault();
             setActiveTool(toolKey);
+            // Picking a rail tool hands the canvas back to it — whatever
+            // Live Edit sub-tool (pen/add vertex/move/etc.) was armed steps
+            // aside rather than fighting it for clicks.
+            if (liveEdit) setPolySubTool(null);
           }
         }
         if (e.key.toLowerCase() === "x") {
@@ -1703,7 +1972,9 @@ export default function GisCanvas({
     setAnnotateTool,
     drawPoly,
     selectedPolyId,
+    selectedPolyIds,
     selectedPolyVertex,
+    hoveredPolyVertex,
     liveEdit,
     polySubTool,
   ]);
@@ -1727,7 +1998,7 @@ export default function GisCanvas({
       const p = pt(e);
       const w = toWorld(view, p.x, p.y);
       if (polySubTool === "pen") {
-        const snap = findPolySnap(w.x, w.y, null, null);
+        const snap = findPolySnap(w.x, w.y, null, null, null);
         const pos = snap || w;
         setDrawPoly((d) => d
           ? { ...d, points: [...d.points, pos] }
@@ -1738,22 +2009,25 @@ export default function GisCanvas({
       if (polySubTool === "addVertex") {
         let best = null, bestDist = 8;
         polygons.forEach((poly) => {
-          const chain = poly.points.map((v) => toScreen(view, v.x, v.y));
-          for (let i = 0; i < chain.length; i++) {
-            const a = chain[i], b = chain[(i + 1) % chain.length];
-            const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
-            if (c.dist < bestDist) { bestDist = c.dist; best = { polyId: poly.id, segIndex: i, world: toWorld(view, c.x, c.y) }; }
-          }
+          polyAllRings(poly).forEach(([ring, pts]) => {
+            const chain = pts.map((v) => toScreen(view, v.x, v.y));
+            for (let i = 0; i < chain.length; i++) {
+              const a = chain[i], b = chain[(i + 1) % chain.length];
+              const c = closestOnSegment(p.x, p.y, a.x, a.y, b.x, b.y);
+              if (c.dist < bestDist) { bestDist = c.dist; best = { polyId: poly.id, ring, segIndex: i, world: toWorld(view, c.x, c.y) }; }
+            }
+          });
         });
         if (best) {
           pushPolyHistory();
           setPolygons((ps) => ps.map((pg) => {
             if (pg.id !== best.polyId) return pg;
-            const points = [...pg.points];
-            points.splice(best.segIndex + 1, 0, { id: genId(), x: best.world.x, y: best.world.y });
-            return { ...pg, points };
+            const pts = [...polyRing(pg, best.ring)];
+            pts.splice(best.segIndex + 1, 0, { id: genId(), x: best.world.x, y: best.world.y });
+            return polyWithRing(pg, best.ring, pts);
           }));
           setEditDirty(true);
+          setPolyHoverSeg(null);
         }
         return;
       }
@@ -1851,7 +2125,7 @@ export default function GisCanvas({
       }
     }
     if (e.target === e.currentTarget) {
-      if (e.button === 0 && !selected.length && !selectedVertex) {
+      if (e.button === 0 && !selected.length && !selectedVertex && !selectedPolyIds.length) {
         setPanDrag({
           sx: e.clientX,
           sy: e.clientY,
@@ -1864,6 +2138,8 @@ export default function GisCanvas({
       setSelectedVertex(null);
       setPicker(null);
       setReachPicker(null);
+      setSelectedPolyIds([]);
+      setSelectedPolyId(null);
     }
   };
 
@@ -2084,13 +2360,18 @@ export default function GisCanvas({
             return (
               <div key={t.name} style={{ position: "relative" }}>
                 <button
-                  title={isEditSlot ? (liveEdit ? "Stop editing" : "Live-edit Pen tool [V]") : t.name + (t.hasMenu ? " (click for options)" : "")}
+                  title={isEditSlot ? (liveEdit ? "Stop editing" : "Live Edit") : t.name + " [" + { 0: "V", 1: "G", 2: "M", 3: "Q" }[i] + "]" + (t.hasMenu ? " (click for options)" : "")}
                   onClick={() => {
                     if (isEditSlot) {
                       if (liveEdit) handleStopEdit();
                       else { polygonsAtEditStart.current = polygons; setLiveEdit(true); setActiveTool(i); }
                     } else {
-                      if (liveEdit) handleStopEdit();
+                      // Switching rail tools no longer exits Live Edit —
+                      // Select/Group select/Measure/Point query are all
+                      // usable mid-edit (they just hand off from whatever
+                      // Live Edit sub-tool was armed, same as the keyboard
+                      // shortcuts above).
+                      if (liveEdit) setPolySubTool(null);
                       setActiveTool(i);
                     }
                     if (i === 1) setGroupSelectMenuOpen((v) => !v);
@@ -2374,38 +2655,72 @@ export default function GisCanvas({
           return (
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
             {visible.map((poly) => {
-              const screenPts = poly.points.map((v) => toScreen(view, v.x, v.y));
-              const d = screenPts.map((s) => `${s.x},${s.y}`).join(" ");
-              const isSel = selectedPolyId === poly.id;
-              const movable = liveEdit && polySubTool === "movePolygon";
+              const ringsData = polyAllRings(poly).map(([ring, pts]) => ({ ring, pts, screen: pts.map((v) => toScreen(view, v.x, v.y)) }));
+              // evenodd so hole rings visually punch through the outer fill
+              // regardless of winding direction — matches how they were
+              // combined (polygon-clipping doesn't guarantee a fixed
+              // winding on its output).
+              const pathD = ringsData.map(({ screen }) => `M${screen.map((pt) => `${pt.x},${pt.y}`).join("L")}Z`).join(" ");
+              const screenPts = ringsData[0].screen;
+              const isSel = selectedPolyId === poly.id || selectedPolyIds.includes(poly.id);
+              // The rail's own Select/Group-select tools can also grab and
+              // drag a shape directly (no EditToolbar sub-tool needed) —
+              // same click-drag-to-move affordance the network layer's
+              // nodes already have.
+              // Move/Rotate drag the shape; Reverse/Delete act on a single
+              // click instead. Either way, the shape's vertices are drawn
+              // as a reference ("this is a real shape, here's its
+              // structure") but only the vertex-editing tools above make
+              // those dots themselves interactive.
+              const dragShape = polySubTool === "movePolygon" || polySubTool === "rotateShape";
+              const clickShape = polySubTool === "reverseShape" || polySubTool === "deleteShape";
+              const shapeToolActive = dragShape || clickShape;
+              const vertexInteractive = polySubTool === "addVertex" || polySubTool === "moveVertex" || polySubTool === "deleteVertex";
+              const railSelectable = liveEdit && !polySubTool && (activeTool === 0 || activeTool === 1);
+              const movable = liveEdit && (dragShape || railSelectable);
               const inspectable = liveEdit && polySubTool === "viewAttribute";
-              const color = layerById(poly.layerId)?.color || "var(--surface-brand)";
+              const color = layerById(poly.layerId)?.color || "var(--orange-900)";
               return (
                 <g key={poly.id}>
-                  <polygon
-                    points={d}
-                    fill={isSel ? "rgba(70,138,243,0.25)" : "rgba(70,138,243,0.12)"}
-                    stroke={isSel ? "var(--blue-700)" : color}
+                  <path
+                    d={pathD}
+                    fillRule="evenodd"
+                    fill="var(--orange-100)"
+                    fillOpacity={isSel ? 0.6 : 0.35}
+                    stroke={isSel ? "var(--orange-900)" : color}
                     strokeWidth={isSel ? 2.5 : 1.5}
-                    style={{ pointerEvents: movable || inspectable ? "all" : "none", cursor: movable ? (polyDrag?.type === "polygon" ? "grabbing" : "grab") : inspectable ? "pointer" : "default" }}
+                    style={{
+                      pointerEvents: liveEdit && (shapeToolActive || railSelectable) || inspectable ? "all" : "none",
+                      cursor: movable
+                        ? (polyDrag?.type === "polygon" || polyDrag?.type === "polygon-group" || polyDrag?.type === "rotate" ? "grabbing" : "grab")
+                        : liveEdit && clickShape ? "pointer"
+                          : inspectable ? "pointer" : "default",
+                    }}
                     onMouseDown={(e) => polyBodyDown(e, poly.id)}
                   />
-                  {liveEdit && (polySubTool === "pen" || polySubTool === "addVertex") &&
-                    poly.points.map((v, i) => {
-                      const s = screenPts[i];
-                      const vSel = selectedPolyVertex?.polyId === poly.id && selectedPolyVertex?.vIdx === i;
+                  {liveEdit && (polySubTool === "pen" || vertexInteractive || shapeToolActive) &&
+                    ringsData.flatMap(({ ring, pts, screen }) => screen.map((sp, i) => {
+                      const v = pts[i];
+                      const vSel = vertexInteractive && selectedPolyVertex?.polyId === poly.id && selectedPolyVertex?.ring === ring && selectedPolyVertex?.vIdx === i;
+                      const isHoverTarget = (polySubTool === "addVertex" || polySubTool === "deleteVertex")
+                        && hoveredPolyVertex?.polyId === poly.id && hoveredPolyVertex?.ring === ring && hoveredPolyVertex?.vIdx === i;
+                      const cursor = polySubTool === "moveVertex"
+                        ? (polyDrag?.ring === ring && polyDrag?.vIdx === i ? "grabbing" : "grab")
+                        : polySubTool === "deleteVertex" ? "pointer" : "default";
                       return (
                         <circle
                           key={v.id}
-                          cx={s.x} cy={s.y} r={5}
-                          fill={vSel ? "var(--node-selected-fill)" : "#fff"}
-                          stroke={vSel ? "var(--node-selected-border)" : "var(--surface-brand)"}
-                          strokeWidth={2}
-                          style={{ pointerEvents: "all", cursor: polyDrag?.vIdx === i ? "grabbing" : "grab" }}
-                          onMouseDown={(e) => polyVertexDown(e, poly.id, i)}
+                          cx={sp.x} cy={sp.y} r={isHoverTarget ? 6 : 5}
+                          fill={vSel ? "var(--node-selected-fill)" : isHoverTarget ? "var(--red-700)" : "var(--orange-600)"}
+                          stroke={vSel ? "var(--node-selected-border)" : isHoverTarget ? "var(--red-700)" : "var(--orange-900)"}
+                          strokeWidth={1.5}
+                          style={{ pointerEvents: vertexInteractive ? "all" : "none", cursor }}
+                          onMouseDown={vertexInteractive ? (e) => vertexMouseDown(e, poly.id, ring, i) : undefined}
+                          onMouseEnter={vertexInteractive ? () => { if (polySubTool === "addVertex" || polySubTool === "deleteVertex") setHoveredPolyVertex({ polyId: poly.id, ring, vIdx: i }); } : undefined}
+                          onMouseLeave={vertexInteractive ? () => setHoveredPolyVertex((h) => (h && h.polyId === poly.id && h.ring === ring && h.vIdx === i ? null : h)) : undefined}
                         />
                       );
-                    })}
+                    }))}
                   {inspectable && isSel && (
                     <g style={{ pointerEvents: "none" }}>
                       <rect x={screenPts[0].x + 10} y={screenPts[0].y - 34} width={150} height={44} rx={4} fill="var(--surface-1)" stroke="var(--border-primary)" />
@@ -2423,13 +2738,23 @@ export default function GisCanvas({
               const d = screenPts.map((s) => `${s.x},${s.y}`).join(" ");
               return (
                 <g style={{ pointerEvents: "none" }}>
-                  {screenPts.length > 1 && <polyline points={d} fill="none" stroke="var(--surface-brand)" strokeWidth={1.5} strokeDasharray="4 3" />}
+                  {screenPts.length > 1 && <polyline points={d} fill="none" stroke="var(--orange-900)" strokeWidth={1.5} strokeDasharray="4 3" />}
                   {cursorScreen && screenPts.length > 0 && (
                     <line x1={screenPts[screenPts.length - 1].x} y1={screenPts[screenPts.length - 1].y} x2={cursorScreen.x} y2={cursorScreen.y}
-                      stroke="var(--surface-brand)" strokeWidth={1.5} strokeDasharray="4 3" />
+                      stroke="var(--orange-900)" strokeWidth={1.5} strokeDasharray="4 3" />
                   )}
-                  {screenPts.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={4} fill="var(--surface-brand)" />)}
+                  {screenPts.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={4} fill="var(--orange-600)" />)}
                 </g>
+              );
+            })()}
+            {/* "Add vertex" hover ghost — a translucent preview of the
+                vertex that would be inserted if the user clicked now. */}
+            {liveEdit && polySubTool === "addVertex" && polyHoverSeg && (() => {
+              const s = toScreen(view, polyHoverSeg.x, polyHoverSeg.y);
+              return (
+                <circle cx={s.x} cy={s.y} r={5} fill="var(--orange-600)" fillOpacity={0.55}
+                  stroke="var(--orange-900)" strokeWidth={1.5} strokeDasharray="1.5 1.5"
+                  style={{ pointerEvents: "none" }} />
               );
             })()}
             {/* Snap feedback — a highlighted ring at whatever vertex the
@@ -3946,10 +4271,20 @@ export default function GisCanvas({
             snapOn={snapOn} setSnapOn={setSnapOn}
             onUndo={undoPoly} onRedo={redoPoly}
             canUndo={polyPast.length > 0} canRedo={polyFuture.length > 0}
+            onRevert={() => setRevertModalOpen(true)}
           />
         )}
         {saveModalOpen && (
           <SaveModal onSave={handleEditSave} onDiscard={handleEditDiscard} onCancel={handleEditCancel} />
+        )}
+        {revertModalOpen && (
+          <ConfirmModal
+            title="Revert to start?"
+            message="This discards every change made since you started editing — added, moved, and deleted shapes alike. This can't be undone."
+            confirmLabel="Revert to start"
+            onConfirm={handleRevertConfirm}
+            onCancel={() => setRevertModalOpen(false)}
+          />
         )}
 
         {/* Scale bar + coordinate/guide status bar, pinned over the bottom

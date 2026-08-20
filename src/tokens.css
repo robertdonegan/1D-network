@@ -34,7 +34,9 @@
   --blue-700: #468af3;
   --green-900: #0a8058;
   --red-700: #e1455b;
+  --orange-100: #ffd9b1;
   --orange-600: #fe7e00;
+  --orange-900: #ce4c00;
 
   /* Calculation Point component states (Flood Component Library) */
   --node-selected-fill: #ffca8f;   /* core/orange/p3-orange */

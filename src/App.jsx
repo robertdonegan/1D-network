@@ -218,7 +218,7 @@ export default function App() {
   // layer is `activeLayerId` is where the Pen tool's next new polygon goes.
   const [polygons, setPolygons] = useState(INIT_POLYGONS);
   const [layers, setLayers] = useState([
-    { id: "example", name: "Example polygon layer", color: "var(--surface-brand)", visible: true },
+    { id: "example", name: "Example polygon layer", color: "var(--orange-900)", visible: true },
   ]);
   const [activeLayerId, setActiveLayerId] = useState("example");
   const [addLayerModalOpen, setAddLayerModalOpen] = useState(false);

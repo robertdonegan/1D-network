@@ -109,6 +109,7 @@ const SECTIONS = [
       { fn: "Measure tool", keys: "M", desc: "Persistently measure between 2 or more points on the Map view", live: true },
       { fn: "Query tool", keys: "Q", desc: "Persistently query underlying data at location selected", live: true },
       { fn: "Live edit", keys: "Ctrl+E", desc: "Activate editing of selected layer, prompt Save dialog window on exit if changes made" },
+      { fn: "Pen tool", keys: "P", desc: "While Live Edit is active, draw a new shape — click to add points, Enter/dbl-click to finish. The rail tools above stay usable without leaving Live Edit.", live: true },
       { fn: "Snapping on/off", keys: "S", desc: "Toggle on/off Snapping" },
       { fn: "Tracing on/off", keys: "T", desc: "Toggle on/off Tracing" },
       { fn: "North star tool", keys: "N", desc: "Persistently rotate view around the north axis" },
