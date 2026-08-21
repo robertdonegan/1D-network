@@ -79,14 +79,31 @@ function MenuSep() {
   return <div style={{ height: 1, margin: "4px 0", background: "var(--border-primary)" }} />;
 }
 
+// Small non-interactive section label — e.g. grouping Pen's Pathfinder
+// (Punch/Union) rows apart from plain Draw.
+function MenuHeader({ label }) {
+  return (
+    <div style={{ padding: "6px 10px 2px", fontSize: "var(--fs-xxs)", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: 0.4 }}>
+      {label}
+    </div>
+  );
+}
+
+const LONG_PRESS_MS = 450;
+
 // A tool button whose main body arms the currently-picked sub-tool (icon
 // reflects that choice) while a small corner chevron opens a dropdown to
 // change which sub-tool that is — matches Figma's "fm-v8.0-tool" + tiny
 // instance-swap corner button pattern used for Vertex/Move/Snap/Save/Undo.
-function SplitTool({ icon, title, active, onClick, menu, menuWidth = 180 }) {
+// `longPress` additionally opens that same dropdown on a press-and-hold of
+// the main body itself, not just the corner chevron — for Vertex/Move/Snap,
+// whose sub-choices are picked often enough to want a shortcut.
+function SplitTool({ icon, title, active, onClick, menu, menuWidth = 180, longPress = false }) {
   const [hover, setHover] = useState(false);
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const pressTimer = useRef(null);
+  const longPressFired = useRef(false);
   useEffect(() => {
     if (!open) return;
     const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -94,13 +111,28 @@ function SplitTool({ icon, title, active, onClick, menu, menuWidth = 180 }) {
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
+  const clearPressTimer = () => {
+    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
+  };
+  const onMainMouseDown = () => {
+    if (!longPress) return;
+    longPressFired.current = false;
+    pressTimer.current = setTimeout(() => { longPressFired.current = true; setOpen(true); }, LONG_PRESS_MS);
+  };
+  const onMainClick = () => {
+    if (longPressFired.current) { longPressFired.current = false; return; } // already opened the menu — don't also arm
+    onClick();
+  };
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
         title={title}
-        onClick={onClick}
+        onClick={onMainClick}
+        onMouseDown={onMainMouseDown}
+        onMouseUp={clearPressTimer}
         onMouseOver={() => setHover(true)}
-        onMouseOut={() => setHover(false)}
+        onMouseOut={() => { setHover(false); clearPressTimer(); }}
         style={{
           position: "relative", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
           border: "none", borderRadius: 2, padding: 4, flexShrink: 0, cursor: "pointer",
@@ -113,13 +145,13 @@ function SplitTool({ icon, title, active, onClick, menu, menuWidth = 180 }) {
           title="More options"
           onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
           style={{
-            position: "absolute", right: -1, bottom: -1, width: 9, height: 9,
+            position: "absolute", right: -1, bottom: -1, width: 10, height: 10,
             display: "flex", alignItems: "flex-end", justifyContent: "flex-end",
           }}
         >
           <div style={{
-            width: 0, height: 0, borderLeft: "3.5px solid transparent",
-            borderBottom: `3.5px solid ${active ? "#fff" : "var(--text-tertiary)"}`,
+            width: 0, height: 0, borderLeft: "4.5px solid transparent",
+            borderBottom: `4.5px solid ${active ? "#fff" : "var(--text-secondary)"}`,
           }} />
         </div>
       </button>
@@ -131,7 +163,9 @@ function SplitTool({ icon, title, active, onClick, menu, menuWidth = 180 }) {
         }}>
           {menu.map((item, i) => item.sep
             ? <MenuSep key={i} />
-            : <MenuRow key={item.label} {...item} onClick={() => { item.onClick(); setOpen(false); }} />)}
+            : item.header
+              ? <MenuHeader key={i} label={item.header} />
+              : <MenuRow key={item.label} {...item} onClick={() => { item.onClick(); setOpen(false); }} />)}
         </div>
       )}
     </div>
@@ -219,13 +253,27 @@ export default function EditToolbar({ dirty, setDirty, subTool, setSubTool, snap
       background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
       boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
     }}>
-      <ToolButton icon={A.editPenTool} title="Draw new polygon — click to add points, Enter/dbl-click to finish [P]" active={subTool === "pen"} onClick={() => pickTool("pen")} />
+      <SplitTool
+        icon={A.editPenTool}
+        title="Draw new polygon — click to add points, Enter/dbl-click to finish [P]. Click near an existing shape's edge instead to add a vertex there (hold to adjust it, Delete/Backspace to remove once selected)."
+        active={subTool === "pen" || subTool === "pathfinderPunch" || subTool === "pathfinderUnion"}
+        onClick={() => pickTool("pen")}
+        longPress
+        menu={[
+          { icon: A.editPenTool, label: "Draw", checked: subTool === "pen", onClick: () => setSubTool("pen") },
+          { sep: true },
+          { header: "Pathfinder" },
+          { icon: A.placeholder, label: "Punch", checked: subTool === "pathfinderPunch", onClick: () => setSubTool("pathfinderPunch") },
+          { icon: A.placeholder, label: "Union", checked: subTool === "pathfinderUnion", onClick: () => setSubTool("pathfinderUnion") },
+        ]}
+      />
 
       <SplitTool
         icon={A[VERTEX_TOOLS[vertexChoice].icon]}
         title={VERTEX_TOOLS[vertexChoice].hint}
         active={subTool === vertexChoice}
         onClick={() => pickTool(vertexChoice)}
+        longPress
         menu={Object.entries(VERTEX_TOOLS).map(([id, t]) => ({
           icon: A[t.icon], label: t.label, checked: vertexChoice === id,
           onClick: () => { setVertexChoice(id); setSubTool(id); },
@@ -236,6 +284,7 @@ export default function EditToolbar({ dirty, setDirty, subTool, setSubTool, snap
         title={SHAPE_TOOLS[shapeChoice].hint}
         active={subTool === shapeChoice}
         onClick={() => pickTool(shapeChoice)}
+        longPress
         menu={Object.entries(SHAPE_TOOLS).map(([id, t]) => ({
           icon: A[t.icon], label: t.label, checked: shapeChoice === id,
           onClick: () => { setShapeChoice(id); setSubTool(id); },
@@ -246,6 +295,7 @@ export default function EditToolbar({ dirty, setDirty, subTool, setSubTool, snap
         title={snapOn ? "Snapping on — click to turn off" : "Snapping off — click to turn on"}
         active={snapOn}
         onClick={() => setSnapOn((v) => !v)}
+        longPress
         menuWidth={200}
         menu={[
           ...Object.entries(SNAP_STYLES).map(([id, s]) => ({
