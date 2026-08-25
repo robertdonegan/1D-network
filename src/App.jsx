@@ -33,15 +33,9 @@ const INIT_NODES = [
 const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
 
-// Seed content for the "Example polygon layer" (Live Edit phase 3) — a
-// small demo shape near the river so the layer isn't empty on first load,
-// editable/deletable/addable-to like any polygon drawn with the pen tool.
-const INIT_POLYGONS = [
-  { id: "p0", name: "Polygon 1", layerId: "example", points: [
-    { id: "pp0", x: -411, y: -190 }, { id: "pp1", x: -351, y: -180 },
-    { id: "pp2", x: -346, y: -130 }, { id: "pp3", x: -406, y: -120 },
-  ] },
-];
+// "Example polygon layer" (Live Edit phase 3) starts empty — users draw
+// their own shapes with the pen tool.
+const INIT_POLYGONS = [];
 let layerUid = 1;
 
 const PANEL_MIN = 180, PANEL_MAX = 520;
