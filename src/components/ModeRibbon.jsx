@@ -383,23 +383,51 @@ const RIBBON_BY_MODE = {
   // read-only chrome.
 };
 
-// Flattened list of every draggable leaf unit, annotated with its ribbon
-// group / sub-group path (`group`, for display) and its top-level group
-// (`top`) — used by the canvas quick-add picker and by the ribbon's
-// press-and-hold-Tab cycle group.
+// Flattened list of every leaf entry across every mode's ribbon — draggable
+// 1D/2D/etc. units (`drag: true`) as well as plain action buttons (new
+// simulation, run sim, project settings, ...) — each annotated with its
+// ribbon group / sub-group path (`group`, for display), its top-level
+// group (`top`, used for ribbon-highlighting and Tab-cycling) and which
+// mode tab it lives under (`mode`). Used by: the canvas quick-add picker
+// and the ribbon's press-and-hold-Tab cycle group (both filter this down
+// to `drag && mode === "FM 1D"` — see NodePicker.jsx / DRAG_ITEMS below),
+// and the global search bar (OSWindow.jsx), which searches everything so
+// e.g. "estry" finds the Simulation tab's "Estry simulation" action.
 export function flattenRibbonItems() {
   const out = [];
-  const walk = (items, group, top) => {
+  const walk = (items, group, top, mode, groupId) => {
     items.forEach((it) => {
-      if (it.sub) walk(it.sub, `${group} / ${it.label}`, top);
-      else if (it.drag) out.push({ icon: it.icon, shape: it.shape || "square", label: it.label, group, top });
+      if (it.menuSep) return;
+      if (it.sub) { walk(it.sub, `${group} / ${it.label}`, top, mode, groupId); return; }
+      // Menu sub-items don't carry their own file/modal action (that's a
+      // ribbon-button-level concept) — but they *do* live inside a
+      // dropdown, so stash the parent group's id as `groupId` so picking
+      // one from global search can at least open that dropdown for the
+      // user, same as clicking the ribbon button would.
+      out.push({ icon: it.icon, shape: it.shape || "square", label: it.label, group, top, mode, drag: !!it.drag, groupId });
     });
   };
-  RIBBON.forEach((g) => { if (g.menu) walk(g.menu, g.label, g.label); });
+  Object.entries(RIBBON_BY_MODE).forEach(([modeName, groups]) => {
+    groups.forEach((g) => {
+      if (g.sep) return;
+      if (g.menu) walk(g.menu, g.label, g.label, modeName, g.id);
+      // Groups with no dropdown menu are themselves a single clickable
+      // action (e.g. Simulation's "Run sim") — searchable as a leaf too.
+      // Mirror RibbonGroup's own click logic (see its onClick below) so
+      // picking this from global search opens the exact same file-explorer
+      // or placeholder-modal dialog a ribbon click would: explicit
+      // `g.action` wins, otherwise a bare chevron (no menu, no action)
+      // still defaults to the placeholder modal.
+      else out.push({ icon: g.icon, shape: "square", label: g.label, group: g.label, top: g.label, mode: modeName, drag: false, action: g.action || (g.chevron ? "modal" : undefined), fileType: g.fileType });
+    });
+  });
   return out;
 }
 
-const ALL_ITEMS = flattenRibbonItems();
+// Draggable FM 1D units only — what the ribbon's own dropdowns and the
+// canvas quick-add picker actually place, as opposed to the fuller
+// cross-mode list global search uses (see flattenRibbonItems above).
+const ALL_ITEMS = flattenRibbonItems().filter((it) => it.drag && it.mode === "FM 1D");
 
 // Seed data for the Favourites tab's dynamic list (see App.jsx's
 // `favourites` state) — the demo's starting set, standing in for whatever
@@ -412,13 +440,25 @@ const ALL_ITEMS = flattenRibbonItems();
 // just not meaningfully placeable.
 const byLabel = (label) => ALL_ITEMS.find((it) => it.label === label);
 export const DEFAULT_FAVOURITES = [
-  { icon: "favStar", shape: "square", label: "1D/2D Model Build", group: "Favourites", top: "Favourites" },
   byLabel("River Section"),
   byLabel("Interpolate"),
   byLabel("Head-Time"),
   { icon: "ribbonActiveArea", shape: "square", label: "Active area", group: "Favourites", top: "Favourites" },
   { icon: "ribbon1d2dLink", shape: "square", label: "1D-2D link", group: "Favourites", top: "Favourites" },
 ].filter(Boolean);
+
+// Seed data for the Favourites tab's list *switcher* (the leading
+// dropdown chip, Figma "FMv8.0 Modes / Ribbons" node 2174-36664) — lets a
+// user keep several named, independent favourite sets (e.g. one per
+// project/workflow) instead of a single flat list. Only "1D/2D Model
+// Build" starts populated (with DEFAULT_FAVOURITES above); the others are
+// empty starter lists, same as a real user creating a new one via
+// "+ Create new list".
+export const DEFAULT_FAVOURITE_LISTS = [
+  { id: "1d2d-model-build", name: "1D/2D Model Build" },
+  { id: "reservoir-design", name: "Reservoir design" },
+  { id: "flood-risk-management", name: "Flood Risk Management" },
+];
 
 // Figma's updated ribbon spec has no visible rule between groups — the
 // Figma's "FP-separator" — a real 1px #E6E6E6 line (var(--border-primary)),
@@ -492,6 +532,97 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
   );
 }
 
+// Leading dropdown chip in the Favourites tab (Figma "FMv8.0 Modes /
+// Ribbons" node 2174-36664) — switches which named favourites list is
+// shown in the rest of the bar, and offers "+ Create new list" to start a
+// new one. Reuses the same `open`/`setOpen` state (and outside-click/
+// Escape close wiring) as every ribbon dropdown, under the sentinel id
+// below, so only one dropdown across the whole bar is ever open at once.
+const FAV_LIST_MENU_ID = "__favouriteLists";
+function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setOpen }) {
+  const isOpen = open === FAV_LIST_MENU_ID;
+  const active = lists.find((l) => l.id === activeId) || lists[0];
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const inputRef = useRef(null);
+  useEffect(() => { if (creating) inputRef.current?.focus(); }, [creating]);
+  useEffect(() => { if (!isOpen) { setCreating(false); setName(""); } }, [isOpen]);
+
+  const submitCreate = () => {
+    if (!name.trim()) return;
+    onCreate(name.trim());
+    setName("");
+    setCreating(false);
+    setOpen(null);
+  };
+
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(isOpen ? null : FAV_LIST_MENU_ID)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 10px",
+          border: "none", borderRadius: 2, cursor: "pointer",
+          background: isOpen ? "var(--neutral-400)" : "transparent",
+        }}
+      >
+        <Icon src={A.favStar} size={16} />
+        <span style={{ fontSize: "var(--fs-xs)", fontWeight: 600, whiteSpace: "nowrap" }}>{active?.name || "Favourites"}</span>
+        <Icon src={A.keyDown} size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} />
+      </button>
+      {isOpen && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, marginTop: 2, width: 220,
+          background: "var(--surface-1)", border: "1px solid var(--border-primary)",
+          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 60,
+        }}>
+          {creating ? (
+            <div style={{ display: "flex", gap: 4, padding: "4px 4px 8px" }}>
+              <input
+                ref={inputRef}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") submitCreate(); if (e.key === "Escape") { setCreating(false); setName(""); } }}
+                placeholder="List name"
+                style={{
+                  flex: "1 0 0", minWidth: 0, border: "1px solid var(--border-primary)", borderRadius: 2,
+                  padding: "4px 6px", fontSize: "var(--fs-xs)", font: "inherit",
+                }}
+              />
+            </div>
+          ) : (
+            <div
+              onClick={() => setCreating(true)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", cursor: "pointer", borderRadius: 2, color: "var(--surface-brand)" }}
+              onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+              onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1, fontWeight: 600 }}>+</span>
+              <span style={{ fontSize: "var(--fs-xs)", fontWeight: 600 }}>Create new list</span>
+            </div>
+          )}
+          <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
+          {lists.map((l) => (
+            <div
+              key={l.id}
+              onClick={() => { onSelect(l.id); setOpen(null); }}
+              style={{
+                padding: "8px 10px", borderRadius: 2, cursor: "pointer", fontSize: "var(--fs-xs)",
+                fontWeight: l.id === activeId ? 600 : 400,
+                background: l.id === activeId ? "var(--neutral-400)" : "transparent",
+              }}
+              onMouseOver={(e) => { if (l.id !== activeId) e.currentTarget.style.background = "var(--surface-3)"; }}
+              onMouseOut={(e) => { if (l.id !== activeId) e.currentTarget.style.background = "transparent"; }}
+            >
+              {l.name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Every entry in the Favourites tab — the seeded defaults and anything the
 // user has added — is one of these: draggable onto the canvas (same as a
 // search result row), draggable *within the bar* to reorder (drop it on
@@ -532,7 +663,7 @@ function FavouriteChip({ item, onBeginDrag, onRemove, ribbonDrag, isDragOver, on
   );
 }
 
-function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction }) {
+function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighted }) {
   const ref = useRef(null);
   const hasMenu = !!group.menu;
   const isOpen = open === group.id;
@@ -542,6 +673,9 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction }) {
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+      {isHighlighted && (
+        <style>{"@keyframes fm-ribbon-highlight-pulse { 0%, 100% { box-shadow: 0 0 0 2px var(--surface-brand); } 50% { box-shadow: 0 0 0 2px var(--surface-brand), 0 0 0 5px rgba(10,125,255,0.25); } }"}</style>
+      )}
       <button
         onClick={() => hasMenu ? setOpen(isOpen ? null : group.id) : group.action ? onAction(group) : group.chevron ? onAction({ ...group, action: "modal" }) : undefined}
         onMouseOver={() => setHover(true)}
@@ -551,6 +685,7 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction }) {
           border: "none", borderRadius: 2, cursor: "pointer",
           background: isSelected ? "var(--neutral-400)" : hover ? "var(--neutral-200)" : "transparent",
           color: group.primary ? "var(--text-primary-selected)" : "var(--text-primary)",
+          ...(isHighlighted ? { animation: "fm-ribbon-highlight-pulse 0.6s ease-in-out 3" } : null),
         }}
       >
         <Icon src={A[group.icon]} size={16} />
@@ -598,15 +733,28 @@ const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this d
 // what ProjectPanel/NetworkPanel/GisCanvas show. `basemap`/`setBasemap` —
 // also owned by App (GisCanvas reads it to render the backdrop), driven here
 // by the Home tab's Basemap dropdown. `favourites`/`onDropFavourite`/
-// `onRemoveFavourite` — the user's saved Favourites list (App owns,
+// `onRemoveFavourite` — the *active* favourites list's items (App owns,
 // persists, and does the actual add-or-reorder splice for); every entry —
 // seeded defaults included, see DEFAULT_FAVOURITES — renders identically as
 // a FavouriteChip, so nothing in this tab is read-only chrome.
+// `favouriteLists`/`activeFavouriteListId`/`onSelectFavouriteList`/
+// `onCreateFavouriteList` — the named-list metadata (see
+// DEFAULT_FAVOURITE_LISTS) backing the tab's leading dropdown chip
+// (FavouriteListDropdown, above), which switches which list's items
+// `favourites` actually is.
 // `ribbonDrag`/`onConsumeRibbonDrag` — same in-progress drag state
 // GisCanvas consumes on drop; releasing over this bar while on the
 // Favourites tab adds/reorders the dragged item instead of placing it on
-// the canvas.
-export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, ribbonDrag, onConsumeRibbonDrag, onAddLayer }) {
+// the canvas. `highlightedGroup` — the top-level group label (if any) to
+// briefly pulse, set by App when a global-search/Recents result is picked
+// (see App.jsx's `highlightRibbonGroup`) so the user can see which ribbon
+// button that result actually lives under. `pendingSearchAction` — the
+// full item just picked from global search/Recents (App.jsx's
+// `handleSelectSearchResult`), so this tab can additionally *do* whatever
+// that ribbon button would (open its file-explorer/placeholder modal, or
+// expand its dropdown menu), not just switch tab + pulse; consumed via
+// `onConsumeSearchAction` so the same item can be re-triggered later.
+export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, favouriteLists, activeFavouriteListId, onSelectFavouriteList, onCreateFavouriteList, ribbonDrag, onConsumeRibbonDrag, onAddLayer, highlightedGroup, pendingSearchAction, onConsumeSearchAction }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
   // Buttons with no dropdown still need to go *somewhere* (matches the
@@ -619,6 +767,21 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     else if (group.action === "modal") setPlaceholderModal(group);
     else if (group.action === "addLayer") onAddLayer?.();
   };
+
+  // Search/Recents picked something that isn't a placeable unit — replay
+  // whatever clicking its actual ribbon button would've done: a real
+  // action (file/modal/addLayer, flattened onto the item itself by
+  // flattenRibbonItems) if it has one, otherwise it must be a menu leaf
+  // (has `groupId`), so just pop that dropdown open instead of leaving the
+  // user to hunt for it themselves.
+  useEffect(() => {
+    if (!pendingSearchAction) return;
+    if (pendingSearchAction.action) onAction(pendingSearchAction);
+    else if (pendingSearchAction.groupId) setOpen(pendingSearchAction.groupId);
+    onConsumeSearchAction?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSearchAction]);
+
 
   // View labels / Snapping / Comments sort are checkbox lists, not real
   // functionality — no canvas behaviour is tied to these yet, they just
@@ -744,7 +907,20 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
         borderRadius: 4, background: "var(--surface-1)",
         overflowX: "visible",
       }}>
-        {activeRibbon.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} />)}
+        {activeRibbon.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />)}
+        {mode === "Favourites" && favouriteLists?.length > 0 && (
+          <>
+            <FavouriteListDropdown
+              lists={favouriteLists}
+              activeId={activeFavouriteListId}
+              onSelect={onSelectFavouriteList}
+              onCreate={onCreateFavouriteList}
+              open={open}
+              setOpen={setOpen}
+            />
+            <Sep />
+          </>
+        )}
         {mode === "Favourites" && favourites?.map((f, i) => (
           <FavouriteChip
             key={favouriteKey(f)}

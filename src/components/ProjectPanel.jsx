@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { A, Icon } from "../assets.jsx";
+import ContextMenu from "./ContextMenu.jsx";
 
 function SearchField({ placeholder }) {
   return (
@@ -66,11 +67,12 @@ function Toggle({ on, onClick }) {
 // Selected/"active" state per the design's Property 1=select variant: a
 // light neutral-500 fill with a 2px solid brand-colour border (NOT a solid
 // brand fill/white text as previously approximated without design access).
-function LayerRow({ icon, color, label, sublabel, active, onClick, trailing }) {
+function LayerRow({ icon, color, label, sublabel, active, onClick, onContextMenu, trailing }) {
   const [hover, setHover] = useState(false);
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
@@ -113,8 +115,61 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
   // works standalone with its own state if no controlling props are given.
   const tab = tabProp ?? tabState;
   const setTab = setTabProp ?? setTabState;
+  const rootRef = useRef(null);
+  const [layerMenu, setLayerMenu] = useState(null); // { x, y, layer }
+
+  const openLayerMenu = (e, layer) => {
+    e.preventDefault();
+    const box = rootRef.current?.getBoundingClientRect();
+    setLayerMenu({ x: e.clientX - (box?.left ?? 0), y: e.clientY - (box?.top ?? 0), layer });
+  };
+
+  // Downloads the layer's features as a GeoJSON FeatureCollection — the one
+  // geodata format the browser can write with zero extra dependencies. True
+  // shapefile (.shp/.shx/.dbf) is a binary multi-file format that would need
+  // a dedicated writer library; GeoJSON is the practical stand-in until/
+  // unless that's added. Any GIS tool (QGIS, ArcGIS, mapshaper.org) can
+  // re-save this straight to .shp if a real shapefile is needed.
+  const exportLayer = (layer) => {
+    const feats = (polygons || []).filter((p) => (p.layerId || "example") === layer.id);
+    const geojson = {
+      type: "FeatureCollection",
+      features: feats.map((p) => ({
+        type: "Feature",
+        properties: { id: p.id, layer: layer.name },
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            p.points.map((pt) => [pt.x, pt.y]),
+            ...(p.holes || []).map((h) => h.map((pt) => [pt.x, pt.y])),
+          ],
+        },
+      })),
+    };
+    const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: "application/geo+json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${layer.name || "layer"}.geojson`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // "Zoom to layer"/"Show attributes"/"Properties" mirror OSWindow's
+  // General/Project/etc. menus — visual-only chrome for now, since acting
+  // on them needs canvas-level state (view pan/zoom, attribute inspector)
+  // that isn't yet wired up from this panel.
+  const layerMenuItems = layerMenu ? [
+    { label: "Start edit", onClick: () => onSetActiveLayer(layerMenu.layer.id) },
+    { label: "Remove layer", onClick: () => onDeleteLayer(layerMenu.layer.id), danger: true },
+    { label: "Zoom to layer", onClick: () => {} },
+    { label: "Export", onClick: () => exportLayer(layerMenu.layer) },
+    { label: "Show attributes", onClick: () => {} },
+    { label: "Properties", onClick: () => {} },
+  ] : [];
+
   return (
-    <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, overflow: "hidden" }}>
+    <div ref={rootRef} style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", gap: 4, overflow: "hidden", position: "relative" }}>
       <SearchField placeholder={tab === "layers" ? "Search layers" : "Search project"} />
 
       {tab === "components" ? (
@@ -179,7 +234,9 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
           data") uses the same LayerRow: click to make it the active
           drawing target (so the Pen tool in Live Edit adds new polygons to
           it), toggle to show/hide its shapes on the canvas, "×" to delete
-          it and its polygons outright. */}
+          it and its polygons outright. Right-click for the Figma
+          "fm-v8.0-row-item" context menu (Start edit/Remove layer/Zoom to
+          layer/Export/Show attributes/Properties) — see `openLayerMenu`. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flex: "1 0 0", overflow: "auto" }}>
         {(layers || []).map((l) => {
           const count = (polygons || []).filter((p) => (p.layerId || "example") === l.id).length;
@@ -192,6 +249,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
               sublabel={`${count} feature${count === 1 ? "" : "s"}${active ? " · active for drawing" : ""}`}
               active={active}
               onClick={() => onSetActiveLayer(l.id)}
+              onContextMenu={(e) => openLayerMenu(e, l)}
               trailing={
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                   <Toggle on={l.visible !== false} onClick={(e) => { e.stopPropagation(); onToggleLayerVisibility(l.id); }} />
@@ -247,6 +305,10 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
           <Icon src={A.settingsColor} size={16} />
         </div>
       </div>
+
+      {layerMenu && (
+        <ContextMenu x={layerMenu.x} y={layerMenu.y} items={layerMenuItems} onClose={() => setLayerMenu(null)} />
+      )}
     </div>
   );
 }

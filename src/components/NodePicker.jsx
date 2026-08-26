@@ -2,7 +2,10 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 import { flattenRibbonItems } from "./ModeRibbon.jsx";
 
-const ITEMS = flattenRibbonItems();
+// Draggable FM 1D units only — same restriction as ModeRibbon's internal
+// ALL_ITEMS (see there), since this picker only ever places 1D network
+// units, never actions from other modes.
+const ITEMS = flattenRibbonItems().filter((it) => it.drag && it.mode === "FM 1D");
 
 // Floating searchable list of every 1D node group / sub-group, used to
 // quickly pick a unit type for a new vertex or a dropped connector.

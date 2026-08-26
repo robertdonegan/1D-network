@@ -35,6 +35,58 @@ function StarGlyph({ filled }) {
   );
 }
 
+function ClockGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M8 4.8V8L10.2 9.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Shared row markup for both the search-results list and the "Recents"
+// section above it. Draggable 1D/2D/etc. units (`it.drag`) are dragged onto
+// the canvas exactly like a ribbon leaf item; anything else (simulation
+// actions, project settings, etc. — see ModeRibbon's flattenRibbonItems) is
+// just clicked, which switches to that item's mode/tab and pulses its
+// ribbon group so the user can find + use it there themselves. `onPick` is
+// the row's onMouseDown (drag-start) or onClick handler, per `it.drag`.
+function ResultRow({ it, isFavourite, onToggleFavourite, onPick }) {
+  const fav = isFavourite?.(it);
+  return (
+    <div
+      onMouseDown={it.drag ? onPick : undefined}
+      onClick={it.drag ? undefined : onPick}
+      style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: it.drag ? "grab" : "pointer" }}
+      onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+      onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+      title={it.drag ? "Drag onto the canvas to place" : "Go to this tool in the ribbon"}>
+      <Icon src={A[it.icon]} size={16} />
+      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
+        <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>
+      </div>
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onToggleFavourite?.(it); }}
+        title={fav ? "Remove from Favourites" : "Add to Favourites"}
+        style={{
+          marginLeft: "auto", flexShrink: 0, border: "none", background: "transparent",
+          cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
+          color: "var(--text-tertiary)",
+          // Favouriting only makes sense for placeable units (Favourites
+          // chips are always dragged onto the canvas) — action items (Run
+          // sim, Project settings, ...) get the "go to it" click behaviour
+          // above instead, with no star.
+          visibility: it.drag ? "visible" : "hidden",
+        }}
+      >
+        <StarGlyph filled={fav} />
+      </button>
+    </div>
+  );
+}
+
 // Figma "fm-v8.0-os-menu" spec (nodes 1:24153-1:24158) — General/Project/
 // Layer/Window/Toolbox/Help are visual-only chrome (matching the Home
 // ribbon's not-yet-built dropdowns convention), except "Open Toolbox..."
@@ -310,7 +362,12 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
 // drives (see ModeRibbon.jsx). `isFavourite(item)`/`onToggleFavourite(item)`
 // — back each result's star button, so a unit can be favourited straight
 // from search without needing to drag it onto the Favourites ribbon.
-export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, onCreateLayer }) {
+// `recentSearches` — MRU list (max 5) of the last distinct results picked,
+// rendered as a "Recents" section when the box is open with an empty query.
+// `onSelectResult(item)` — called whenever a result (or Recents entry) is
+// picked up, so App can record it as a recent and highlight its ribbon
+// group (see App.jsx's `handleSelectSearchResult`).
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, recentSearches, onSelectResult, onCreateLayer }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [places, setPlaces] = useState([]);
@@ -430,42 +487,46 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
             }}
           />
         </div>
-        {open && (results.length > 0 || places.length > 0 || placesLoading) && (
+        {open && (results.length > 0 || places.length > 0 || placesLoading || (!query && recentSearches?.length > 0)) && (
           <div style={{
             position: "absolute", top: "100%", left: 0, marginTop: 2, width: 280, color: "var(--text-primary)",
             background: "var(--surface-1)", border: "1px solid var(--border-primary)",
             borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.16)", padding: 4, zIndex: 80,
             maxHeight: 320, overflowY: "auto",
           }}>
-            {results.map((it) => {
-              const fav = isFavourite?.(it);
-              return (
-                <div key={it.group + "/" + it.label}
-                  onMouseDown={(e) => { e.preventDefault(); setOpen(false); onBeginDrag(e, [it], 0); }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: "grab" }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
-                  title="Drag onto the canvas to place">
-                  <Icon src={A[it.icon]} size={16} />
-                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                    <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
-                    <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>
-                  </div>
-                  <button
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); onToggleFavourite?.(it); }}
-                    title={fav ? "Remove from Favourites" : "Add to Favourites"}
-                    style={{
-                      marginLeft: "auto", flexShrink: 0, border: "none", background: "transparent",
-                      cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    <StarGlyph filled={fav} />
-                  </button>
+            {!query && recentSearches?.length > 0 && (
+              <>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "4px 8px",
+                  fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: 0.4,
+                }}>
+                  <ClockGlyph /> Recents
                 </div>
-              );
-            })}
+                {recentSearches.map((it) => (
+                  <ResultRow key={"recent-" + it.group + "/" + it.label} it={it}
+                    isFavourite={isFavourite} onToggleFavourite={onToggleFavourite}
+                    onPick={(e) => {
+                      if (e.cancelable) e.preventDefault();
+                      setOpen(false);
+                      onSelectResult?.(it);
+                      if (it.drag) onBeginDrag(e, [it], 0);
+                    }} />
+                ))}
+                {(results.length > 0 || places.length > 0 || placesLoading) && (
+                  <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
+                )}
+              </>
+            )}
+            {results.map((it) => (
+              <ResultRow key={it.group + "/" + it.label} it={it}
+                isFavourite={isFavourite} onToggleFavourite={onToggleFavourite}
+                onPick={(e) => {
+                  if (e.cancelable) e.preventDefault();
+                  setOpen(false);
+                  onSelectResult?.(it);
+                  if (it.drag) onBeginDrag(e, [it], 0);
+                }} />
+            ))}
             {results.length > 0 && (places.length > 0 || placesLoading) && (
               <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
             )}

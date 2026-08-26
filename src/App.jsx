@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import OSWindow from "./components/OSWindow.jsx";
-import ModeRibbon, { modes, DEFAULT_FAVOURITES } from "./components/ModeRibbon.jsx";
+import ModeRibbon, { modes, DEFAULT_FAVOURITES, DEFAULT_FAVOURITE_LISTS } from "./components/ModeRibbon.jsx";
 import PanelSlot from "./components/PanelSlot.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
@@ -33,9 +33,80 @@ const INIT_NODES = [
 const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
 
-// "Example polygon layer" (Live Edit phase 3) starts empty — users draw
-// their own shapes with the pen tool.
-const INIT_POLYGONS = [];
+// Two demo shapefiles the user drew in-app with the Pen tool, exported via
+// the Layers tab's right-click "Export" and supplied back to seed every
+// user's default view with a real, accurate shapefile (rather than the
+// blank "Example polygon layer" alone) — same world-space coordinates as
+// INIT_NODES above, so they sit exactly where drawn relative to the demo
+// network and OSM backdrop, roughly bracketing the river's northern
+// (Hanley/Ryall) and southern (Upton/Ryall) floodplain-shaped bends.
+const INIT_POLYGONS = [
+  {
+    id: "dp0", name: "Polygon 1", layerId: "demo-shapefile", holes: [],
+    points: [
+      { id: "dp0v0", x: -546.0, y: -330.5 },
+      { id: "dp0v1", x: -499.3, y: -299.1 },
+      { id: "dp0v2", x: -456.2, y: -270.2 },
+      { id: "dp0v3", x: -375.3, y: -227.7 },
+      { id: "dp0v4", x: -298.6, y: -202.2 },
+      { id: "dp0v5", x: -239.9, y: -184.7 },
+      { id: "dp0v6", x: -165.1, y: -159.9 },
+      { id: "dp0v7", x: -99.3, y: -120.7 },
+      { id: "dp0v8", x: -58.9, y: -52.6 },
+      { id: "dp0v9", x: -31.3, y: 20.7 },
+      { id: "dp0v10", x: -25.4, y: 82.1 },
+      { id: "dp0v11", x: -20.7, y: 147.1 },
+      { id: "dp0v12", x: -36.2, y: 220.9 },
+      { id: "dp0v13", x: -40.1, y: 291.9 },
+      { id: "dp0v14", x: -58.8, y: 362.9 },
+      { id: "dp0v15", x: -84.4, y: 429.9 },
+      { id: "dp0v16", x: -128.9, y: 470.1 },
+      { id: "dp0v17", x: -175.4, y: 494.3 },
+      { id: "dp0v18", x: -241.5, y: 535.2 },
+      { id: "dp0v19", x: -442.9, y: 467.6 },
+      { id: "dp0v20", x: -609.9, y: 244.2 },
+      { id: "dp0v21", x: -646.7, y: -70.2 },
+      { id: "dp0v22", x: -627.0, y: -266.6 },
+    ],
+  },
+  {
+    id: "dp1", name: "Polygon 2", layerId: "demo-shapefile", holes: [],
+    points: [
+      { id: "dp1v0", x: -589.7, y: -698.7 },
+      { id: "dp1v1", x: -597.1, y: -631.2 },
+      { id: "dp1v2", x: -599.6, y: -564.0 },
+      { id: "dp1v3", x: -577.7, y: -498.6 },
+      { id: "dp1v4", x: -553.0, y: -447.2 },
+      { id: "dp1v5", x: -525.9, y: -390.6 },
+      { id: "dp1v6", x: -472.7, y: -335.9 },
+      { id: "dp1v7", x: -401.1, y: -292.3 },
+      { id: "dp1v8", x: -338.1, y: -261.7 },
+      { id: "dp1v9", x: -253.2, y: -236.2 },
+      { id: "dp1v10", x: -185.7, y: -221.9 },
+      { id: "dp1v11", x: -128.0, y: -204.3 },
+      { id: "dp1v12", x: -81.8, y: -178.9 },
+      { id: "dp1v13", x: -36.5, y: -137.0 },
+      { id: "dp1v14", x: -9.0, y: -92.3 },
+      { id: "dp1v15", x: 6.5, y: -43.0 },
+      { id: "dp1v16", x: 13.6, y: -3.8 },
+      { id: "dp1v17", x: 111.7, y: -2.9 },
+      { id: "dp1v18", x: 156.2, y: -81.4 },
+      { id: "dp1v19", x: 207.1, y: -181.1 },
+      { id: "dp1v20", x: 232.6, y: -316.9 },
+      { id: "dp1v21", x: 205.0, y: -459.0 },
+      { id: "dp1v22", x: 135.0, y: -537.5 },
+      { id: "dp1v23", x: 45.9, y: -658.4 },
+      { id: "dp1v24", x: 22.6, y: -753.8 },
+      { id: "dp1v25", x: -130.2, y: -915.1 },
+      { id: "dp1v26", x: -244.7, y: -1014.8 },
+      { id: "dp1v27", x: -350.8, y: -976.6 },
+      { id: "dp1v28", x: -429.3, y: -929.9 },
+      { id: "dp1v29", x: -505.6, y: -858.6 },
+      { id: "dp1v30", x: -551.2, y: -801.7 },
+      { id: "dp1v31", x: -571.4, y: -743.5 },
+    ],
+  },
+];
 let layerUid = 1;
 
 const PANEL_MIN = 180, PANEL_MAX = 520;
@@ -213,6 +284,9 @@ export default function App() {
   const [polygons, setPolygons] = useState(INIT_POLYGONS);
   const [layers, setLayers] = useState([
     { id: "example", name: "Example polygon layer", color: "var(--orange-900)", visible: true },
+    // The two demo shapefiles seeded into INIT_POLYGONS above — blue outline
+    // matches the reference screenshot's supplied shapefile styling.
+    { id: "demo-shapefile", name: "Demo shapefile", color: "var(--blue-700)", visible: true },
   ]);
   const [activeLayerId, setActiveLayerId] = useState("example");
   const [addLayerModalOpen, setAddLayerModalOpen] = useState(false);
@@ -266,31 +340,70 @@ export default function App() {
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
 
-  // User-managed Favourites (Favourites tab): every entry — the seeded
-  // defaults (DEFAULT_FAVOURITES) and anything the user has added since —
-  // is treated identically: addable via the star toggle on a global search
-  // result (OSWindow) or by dragging a result onto the bar, removable via
-  // the chip's "×", and reorderable by dragging one chip onto another
-  // (ModeRibbon tracks which chip is hovered mid-drag and reports it back
-  // here as `atIndex`). Same `{icon, shape, label, group, top}` shape
-  // flattenRibbonItems produces, so a favourite is just as draggable onto
-  // the canvas as its original. Persisted to localStorage (after the first
-  // save) so favourites/order survive a reload; keyed by group+label since
-  // that pair is unique across ALL_ITEMS.
-  const [favourites, setFavourites] = useState(() => {
+  // User-managed Favourites (Favourites tab): the tab now holds several
+  // named, independent lists (Figma "FMv8.0 Modes / Ribbons" node
+  // 2174-36664's leading dropdown chip — "1D/2D Model Build" etc.), not one
+  // flat list — `favouriteLists` is just the {id,name} metadata, switchable
+  // via the ribbon's dropdown; `favouritesByList` holds each list's actual
+  // items keyed by list id. Every item — seeded defaults included, see
+  // DEFAULT_FAVOURITES — is treated identically within its list: addable
+  // via the star toggle on a global search result (OSWindow) or by
+  // dragging a result onto the bar, removable via the chip's "×", and
+  // reorderable by dragging one chip onto another (ModeRibbon tracks which
+  // chip is hovered mid-drag and reports it back here as `atIndex`). Same
+  // `{icon, shape, label, group, top}` shape flattenRibbonItems produces,
+  // so a favourite is just as draggable onto the canvas as its original.
+  // Persisted to localStorage so favourites/order/lists survive a reload;
+  // items are keyed by group+label since that pair is unique across
+  // ALL_ITEMS. A legacy single-list save (from before multi-list support)
+  // is migrated into the first (default) list on load.
+  const [favouriteLists, setFavouriteLists] = useState(() => {
     try {
-      const saved = localStorage.getItem("fm-favourites");
-      return saved ? JSON.parse(saved) : DEFAULT_FAVOURITES;
-    } catch { return DEFAULT_FAVOURITES; }
+      const saved = localStorage.getItem("fm-favourite-lists");
+      return saved ? JSON.parse(saved) : DEFAULT_FAVOURITE_LISTS;
+    } catch { return DEFAULT_FAVOURITE_LISTS; }
   });
   useEffect(() => {
-    try { localStorage.setItem("fm-favourites", JSON.stringify(favourites)); } catch { /* ignore */ }
-  }, [favourites]);
+    try { localStorage.setItem("fm-favourite-lists", JSON.stringify(favouriteLists)); } catch { /* ignore */ }
+  }, [favouriteLists]);
+  const [activeFavouriteListId, setActiveFavouriteListId] = useState(() => {
+    try { return localStorage.getItem("fm-active-favourite-list") || DEFAULT_FAVOURITE_LISTS[0].id; } catch { return DEFAULT_FAVOURITE_LISTS[0].id; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("fm-active-favourite-list", activeFavouriteListId); } catch { /* ignore */ }
+  }, [activeFavouriteListId]);
+  const [favouritesByList, setFavouritesByList] = useState(() => {
+    try {
+      const saved = localStorage.getItem("fm-favourites");
+      const parsed = saved ? JSON.parse(saved) : null;
+      // Legacy shape was a flat array — migrate it onto the default list.
+      if (Array.isArray(parsed)) return { [DEFAULT_FAVOURITE_LISTS[0].id]: parsed };
+      if (parsed && typeof parsed === "object") return parsed;
+      return { [DEFAULT_FAVOURITE_LISTS[0].id]: DEFAULT_FAVOURITES };
+    } catch { return { [DEFAULT_FAVOURITE_LISTS[0].id]: DEFAULT_FAVOURITES }; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("fm-favourites", JSON.stringify(favouritesByList)); } catch { /* ignore */ }
+  }, [favouritesByList]);
+  const favourites = favouritesByList[activeFavouriteListId] || [];
+  const setFavourites = (updater) => setFavouritesByList((byList) => ({
+    ...byList,
+    [activeFavouriteListId]: typeof updater === "function" ? updater(byList[activeFavouriteListId] || []) : updater,
+  }));
   const favouriteKey = (it) => `${it.group}/${it.label}`;
   const isFavourite = (it) => favourites.some((f) => favouriteKey(f) === favouriteKey(it));
   const addFavourite = (it) => setFavourites((favs) => (favs.some((f) => favouriteKey(f) === favouriteKey(it)) ? favs : [...favs, it]));
   const removeFavourite = (it) => setFavourites((favs) => favs.filter((f) => favouriteKey(f) !== favouriteKey(it)));
   const toggleFavourite = (it) => (isFavourite(it) ? removeFavourite(it) : addFavourite(it));
+  const selectFavouriteList = (id) => setActiveFavouriteListId(id);
+  // "+ Create new list" — adds a new, empty named list and switches to it
+  // straight away, same as picking any other list from the dropdown.
+  const createFavouriteList = (name) => {
+    const id = `${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now().toString(36)}`;
+    setFavouriteLists((lists) => [...lists, { id, name: name.trim() }]);
+    setFavouritesByList((byList) => ({ ...byList, [id]: [] }));
+    setActiveFavouriteListId(id);
+  };
   // Unified add-or-reorder drop handler for the Favourites bar: dropping an
   // *existing* favourite onto another one moves it to that position;
   // dropping a new item (from search/ribbon) inserts it there (or appends
@@ -305,6 +418,56 @@ export default function App() {
       next.splice(insertAt, 0, item);
       return next;
     });
+  };
+
+  // Global search's "Recents" section: the last 5 distinct results the user
+  // has actually picked (dragged onto the canvas, or re-picked from Recents
+  // itself), most-recent first — same MRU pattern as a browser's address
+  // bar. Persisted to localStorage like Favourites so it survives a reload.
+  // Picking an item that's already in the list moves it back to the front
+  // rather than duplicating it.
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      const saved = localStorage.getItem("fm-recent-searches");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("fm-recent-searches", JSON.stringify(recentSearches)); } catch { /* ignore */ }
+  }, [recentSearches]);
+  const addRecentSearch = (it) => {
+    setRecentSearches((prev) => [it, ...prev.filter((p) => favouriteKey(p) !== favouriteKey(it))].slice(0, 5));
+  };
+
+  // Highlighting the ribbon toolbar group a just-picked search/Recents item
+  // actually lives in, so users can see where it comes from instead of it
+  // just vanishing into the canvas. Global search now spans every mode's
+  // ribbon (not just FM 1D — see ModeRibbon's flattenRibbonItems), so switch
+  // to whichever mode the picked item actually belongs to (`it.mode`)
+  // before highlighting, otherwise the group wouldn't even be rendered.
+  // The highlight itself is a brief pulse (cleared after 2.5s, see
+  // ModeRibbon's RibbonGroup) rather than a persistent state, so it reads
+  // as "here's where that came from" rather than a lasting selection
+  // indicator.
+  const [highlightedRibbonGroup, setHighlightedRibbonGroup] = useState(null);
+  const highlightTimeoutRef = useRef(null);
+  const highlightRibbonGroup = (it) => {
+    if (!it?.top) return;
+    if (it.mode) setMode(it.mode);
+    setHighlightedRibbonGroup(it.top);
+    clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedRibbonGroup(null), 2500);
+  };
+  // Beyond the pulse above, replay whatever clicking the item's actual
+  // ribbon button would do (open its file-explorer/placeholder modal, or
+  // expand its dropdown menu) — see ModeRibbon's `pendingSearchAction`
+  // handling. Stamped with `_ts` so picking the exact same item twice in a
+  // row still re-fires the effect (object identity alone wouldn't change).
+  const [pendingSearchAction, setPendingSearchAction] = useState(null);
+  const handleSelectSearchResult = (it) => {
+    addRecentSearch(it);
+    highlightRibbonGroup(it);
+    setPendingSearchAction({ ...it, _ts: Date.now() });
   };
 
   // Home tab's Add Content annotation tools: `annotateTool` is armed from
@@ -443,12 +606,17 @@ export default function App() {
         flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} onOpenToolbox={() => setToolboxFloat(true)}
         basemap={basemap} setBasemap={setBasemap}
         isFavourite={isFavourite} onToggleFavourite={toggleFavourite}
+        recentSearches={recentSearches} onSelectResult={handleSelectSearchResult}
         onCreateLayer={() => setAddLayerModalOpen(true)} />
       <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
         onOpenAnnotationSettings={() => setShowAnnotationSettings(true)}
         favourites={favourites} onDropFavourite={handleFavouriteDrop} onRemoveFavourite={removeFavourite}
+        favouriteLists={favouriteLists} activeFavouriteListId={activeFavouriteListId}
+        onSelectFavouriteList={selectFavouriteList} onCreateFavouriteList={createFavouriteList}
         ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+        highlightedGroup={highlightedRibbonGroup}
+        pendingSearchAction={pendingSearchAction} onConsumeSearchAction={() => setPendingSearchAction(null)}
         onAddLayer={() => setAddLayerModalOpen(true)} />
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", padding: 8 }}>
         <PanelSlot width={projectW} viewId={leftView} onChangeView={setLeftView} bodyProps={panelBodyProps}

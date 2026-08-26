@@ -218,6 +218,19 @@ function NodeBox({ iconKey, shape, selected, hovered, snap, size }) {
         alt=""
         draggable={false}
         style={{
+          // Rect icons (Spill) are wider than they are tall (18x14 native
+          // aspect) inside a much-wider-than-that box (32x18) — matching
+          // width's margin convention on the height axis too (RECT_H - 8 =
+          // 10) was tried, but that scales the icon down well below its
+          // native size (it becomes the shrink-bound axis), reading as
+          // "significantly smaller" next to every other unit. Keeping
+          // height at its native-fitting size (RECT_H - 4 = 14, i.e. no
+          // scaling at all) preserves the actual icon size; the resulting
+          // border isn't perfectly even top/bottom vs. left/right, but
+          // that's an inherent trade-off of this icon's own aspect ratio
+          // versus the box's, not a sizing bug — evening it out fully would
+          // require a taller box that no longer reads as flat/wide (the
+          // point of using shape "rect" in the first place).
           width: diamond ? DIAMOND_ICONSZ : rect ? RECT_W - 8 : ICONSZ,
           height: diamond ? DIAMOND_ICONSZ : rect ? RECT_H - 4 : ICONSZ,
           objectFit: "contain",
@@ -1189,7 +1202,11 @@ export default function GisCanvas({
         setPolyVertexMarquee((m) => m && { ...m, x1: p.x, y1: p.y });
         return;
       }
-      if (ribbonDrag && !dropHint) setDropHint(true);
+      // Only show the "you can drop here" hint for items that are actually
+      // placeable (see the ribbonDrag guard in onUp below) — otherwise a
+      // Favourites reference chip like "1D-2D link" would visually invite a
+      // drop it's just going to reject.
+      if (ribbonDrag?.items[ribbonDrag.index]?.drag && !dropHint) setDropHint(true);
       if (polyDrag) {
         if (polyDrag.type === "vertex") {
           // One or more vertices (Shift+click group) move together — the
@@ -1520,6 +1537,20 @@ export default function GisCanvas({
       if (ribbonDrag) {
         const p = pt(e);
         const item = ribbonDrag.items[ribbonDrag.index];
+        // Only genuine placeable 1D units (FM 1D/SWMM 1D/Hydrology+ 1D —
+        // the only entries ever flagged `drag: true`, see ModeRibbon's
+        // RIBBON/SWMM_RIBBON/HYDROLOGY_RIBBON) can actually be dropped as a
+        // node on this 1D network canvas. Everything else that still ends
+        // up in `ribbonDrag` — e.g. a Favourites-tab reference chip like
+        // "Active area" or "1D-2D link", which are 2D-only concepts kept
+        // in Favourites as plain shortcuts, not real 1D units — gets its
+        // drag simply cancelled here instead of creating a fake node.
+        if (!item?.drag) {
+          setDropHint(false);
+          setHoverSplice(null);
+          onConsumeRibbonDrag();
+          return;
+        }
         const sz = sizeOf(item);
         const id = genId();
         const label = "M0" + mCounter++;
@@ -2465,12 +2496,13 @@ export default function GisCanvas({
           backgroundSize: `${28 * view.scale}px ${28 * view.scale}px`,
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           backgroundColor: "#eef0ec",
-          // Always 2px — the live-edit ring is a sibling in the outer div
-          // (see below), not a child here, so this border-width can change
-          // freely without needing to keep any ring `inset` in sync.
+          // Matches every other panel's 1px var(--border-primary) edge (see
+          // ProjectPanel.jsx etc.) — the live-edit ring is a sibling in the
+          // outer div (see below), not a child here, so it stays visually
+          // unaffected by this border's width/color.
           border: dropHint
-            ? "2px dashed var(--blue-700)"
-            : "2px solid var(--border-primary)",
+            ? "1px dashed var(--blue-700)"
+            : "1px solid var(--border-primary)",
           borderRadius: 4,
           cursor: ribbonDrag
             ? "copy"
@@ -2562,7 +2594,11 @@ export default function GisCanvas({
                   onClick={() => {
                     if (isEditSlot) {
                       if (liveEdit) handleStopEdit();
-                      else { polygonsAtEditStart.current = polygons; setLiveEdit(true); setActiveTool(i); }
+                      // Pen is the tool users reach for immediately after
+                      // arming Live Edit (start drawing/adding to a shape),
+                      // so arm it by default instead of leaving no edit
+                      // sub-tool selected and making them click Pen first.
+                      else { polygonsAtEditStart.current = polygons; setLiveEdit(true); setActiveTool(i); setPolySubTool("pen"); }
                     } else {
                       // Switching rail tools no longer exits Live Edit —
                       // Select/Group select/Measure/Point query are all
