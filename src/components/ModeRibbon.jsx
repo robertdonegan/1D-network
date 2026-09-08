@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { A, Icon } from "../assets.jsx";
 import FileExplorerModal from "./FileExplorerModal.jsx";
 import PlaceholderModal from "./PlaceholderModal.jsx";
@@ -582,8 +583,17 @@ function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setO
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const inputRef = useRef(null);
+  const btnRef = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   useEffect(() => { if (creating) inputRef.current?.focus(); }, [creating]);
   useEffect(() => { if (!isOpen) { setCreating(false); setName(""); } }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (isOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 2, left: rect.left });
+    }
+  }, [isOpen]);
 
   const submitCreate = () => {
     if (!name.trim()) return;
@@ -596,6 +606,7 @@ function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setO
   return (
     <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
       <button
+        ref={btnRef}
         onClick={() => setOpen(isOpen ? null : FAV_LIST_MENU_ID)}
         style={{
           display: "flex", alignItems: "center", gap: 6, height: 32, padding: "0 10px",
@@ -607,11 +618,11 @@ function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setO
         <span style={{ fontSize: "var(--fs-xs)", fontWeight: 600, whiteSpace: "nowrap" }}>{active?.name || "Favourites"}</span>
         <Icon src={A.keyDown} size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} />
       </button>
-      {isOpen && (
+      {isOpen && createPortal(
         <div style={{
-          position: "absolute", top: "100%", left: 0, marginTop: 2, width: 220,
+          position: "fixed", top: menuPos.top, left: menuPos.left, width: 220,
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 60,
+          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
         }}>
           {creating ? (
             <div style={{ display: "flex", gap: 4, padding: "4px 4px 8px" }}>
@@ -654,7 +665,8 @@ function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setO
               {l.name}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -707,6 +719,14 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
   const groupItems = hasMenu ? ALL_ITEMS.filter((it) => it.top === group.label) : [];
   const isSelected = isOpen;
   const [hover, setHover] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  useLayoutEffect(() => {
+    if (isOpen && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 2, left: rect.left });
+    }
+  }, [isOpen]);
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
@@ -731,16 +751,17 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
           <Icon src={A.keyDown} size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} />
         )}
       </button>
-      {hasMenu && isOpen && (
+      {hasMenu && isOpen && createPortal(
         <div style={{
-          position: "absolute", top: "100%", left: 0, marginTop: 2, width: "max-content",
+          position: "fixed", top: menuPos.top, left: menuPos.left, width: "max-content",
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 50,
+          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
         }}>
           {group.menu.map((it, i) => it.menuSep ? <MenuSep key={i} /> : (
             <MenuItem key={it.label} item={it} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={() => setOpen(null)} />
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -753,9 +774,20 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
 // the same RibbonGroup buttons rather than a bespoke menu, so drag/menu/
 // action behaviour is identical to picking them straight off the bar.
 function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflowOpen, onBeginDrag, onAction, highlightedGroup }) {
+  const btnRef = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
+
+  useLayoutEffect(() => {
+    if (overflowOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 2, right: window.innerWidth - rect.right });
+    }
+  }, [overflowOpen]);
+
   return (
-    <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => setOverflowOpen((v) => !v)}
         title="More ribbon items"
         style={{
@@ -770,19 +802,20 @@ function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflow
         <Icon src={A.keyDown} size={12} style={{ margin: "-3px 0" }} />
         <Icon src={A.keyDown} size={12} style={{ margin: "-3px 0" }} />
       </button>
-      {overflowOpen && (
+      {overflowOpen && createPortal(
         <div style={{
-          position: "absolute", top: "100%", right: 0, marginTop: 2, width: "max-content", minWidth: 180,
+          position: "fixed", top: menuPos.top, right: menuPos.right, width: "max-content", minWidth: 180,
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
-          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 55,
+          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
           display: "flex", flexDirection: "column", gap: 2,
         }}>
           {groups.map((g, i) => g.sep ? <MenuSep key={i} /> : (
             <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
@@ -1030,7 +1063,7 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
         display: "flex", alignItems: "center", gap: 8, height: 48, padding: 8,
         border: mode === "Favourites" && ribbonDrag ? "1px dashed var(--surface-brand)" : "1px solid var(--border-primary)",
         borderRadius: 4, background: "var(--surface-1)",
-        overflowX: "hidden", overflowY: "visible", position: "relative",
+        overflow: "clip", position: "relative",
       }}>
         {/* Off-screen twin of the row below, used purely to measure each
             group's natural width — always renders every group (regardless
@@ -1048,16 +1081,19 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
         </div>
         {(visibleCount === null ? activeRibbon : activeRibbon.slice(0, visibleCount)).map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />)}
         {visibleCount !== null && visibleCount < activeRibbon.length && (
-          <RibbonOverflowButton
-            groups={activeRibbon.slice(visibleCount)}
-            open={open}
-            setOpen={setOpen}
-            overflowOpen={overflowOpen}
-            setOverflowOpen={setOverflowOpen}
-            onBeginDrag={onBeginDrag}
-            onAction={(g) => { onAction(g); setOverflowOpen(false); }}
-            highlightedGroup={highlightedGroup}
-          />
+          <>
+            <div style={{ flex: "1 0 0" }} />
+            <RibbonOverflowButton
+              groups={activeRibbon.slice(visibleCount)}
+              open={open}
+              setOpen={setOpen}
+              overflowOpen={overflowOpen}
+              setOverflowOpen={setOverflowOpen}
+              onBeginDrag={onBeginDrag}
+              onAction={(g) => { onAction(g); setOverflowOpen(false); }}
+              highlightedGroup={highlightedGroup}
+            />
+          </>
         )}
         {mode === "Favourites" && favouriteLists?.length > 0 && (
           <>
