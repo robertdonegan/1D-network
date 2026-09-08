@@ -1036,6 +1036,42 @@ export default function GisCanvas({
     });
   }, []);
 
+  // Box zoom (Zoom tool, click-drag on canvas): rather than a generic
+  // vertical scrub centred on the viewport middle, the rectangle the user
+  // actually dragged out becomes the new view — its centre becomes the new
+  // viewport centre and its screen-space size (relative to the viewport)
+  // sets the scale change, so the area they clicked and held is what gets
+  // zoomed into. `zoomOut` (Alt held, or the box dragged from its
+  // bottom-right corner up to its top-left corner) inverts this: the
+  // *current* view shrinks down to fit inside the drawn box instead.
+  const boxZoom = useCallback((sx, sy, ex, ey, zoomOut) => {
+    const el = wrapRef.current;
+    const w = el ? el.clientWidth : 800,
+      h = el ? el.clientHeight : 600;
+    const p0 = pt({ clientX: sx, clientY: sy }),
+      p1 = pt({ clientX: ex, clientY: ey });
+    const boxW = Math.max(1, Math.abs(p1.x - p0.x)),
+      boxH = Math.max(1, Math.abs(p1.y - p0.y));
+    const cx = (p0.x + p1.x) / 2,
+      cy = (p0.y + p1.y) / 2;
+    setView((v) => {
+      const worldCenter = toWorld(v, cx, cy);
+      const ratio = zoomOut
+        ? Math.min(boxW / w, boxH / h)
+        : Math.min(w / boxW, h / boxH);
+      const newScale = Math.min(
+        MAX_SCALE,
+        Math.max(MIN_SCALE, v.scale * ratio),
+      );
+      return {
+        ...v,
+        scale: newScale,
+        tx: w / 2 - worldCenter.x * newScale,
+        ty: h / 2 - worldCenter.y * newScale,
+      };
+    });
+  }, []);
+
   // Reset view helpers, pivoting around the current viewport centre so the
   // content you're looking at doesn't jump.
   const resetView = () => setView({ scale: 1, tx: 660, ty: 430, rotation: 0 });
@@ -1053,6 +1089,17 @@ export default function GisCanvas({
       if (next) setPanMode(false);
       return next;
     });
+  // Picking any left-hand rail tool (Cursor/Group select/Measure/Point
+  // query/Edit) hands canvas clicks straight to it, so Zoom/Pan mode must
+  // drop out here explicitly. A plain `useEffect` keyed on `activeTool`
+  // isn't enough — reselecting the *tool already active* (e.g. pressing
+  // "V" again while already on Cursor) is a no-op for that piece of state
+  // and wouldn't retrigger anything, which is exactly the bug this fixes.
+  const selectRailTool = (i) => {
+    setActiveTool(i);
+    setZoomMode(false);
+    setPanMode(false);
+  };
   const resetNorth = () => {
     const el = wrapRef.current;
     const cx = el ? el.clientWidth / 2 : 400,
@@ -1112,6 +1159,14 @@ export default function GisCanvas({
         dy = e.clientY - toolDrag.sy;
       if (!toolDrag.moved && Math.hypot(dx, dy) > 4)
         setToolDrag((td) => td && { ...td, moved: true });
+      // Zoom tool dragging directly on the canvas (armed via zoomMode) is a
+      // box zoom, not a scrub — just track the live pointer + modifier
+      // state here so the rubber-band preview can render; boxZoom() runs
+      // once on release (see onUp below).
+      if (toolDrag.tool === "zoom" && toolDrag.viaCanvas) {
+        setToolDrag((td) => td && { ...td, curX: e.clientX, curY: e.clientY, altKey: e.altKey });
+        return;
+      }
       const invert = e.altKey ? -1 : 1;
       const slow = e.shiftKey ? 0.3 : 1;
       const el = wrapRef.current;
@@ -1132,6 +1187,9 @@ export default function GisCanvas({
           ty: cy - (w.x * sin + w.y * cos) * scale,
         }));
       } else if (toolDrag.tool === "zoom") {
+        // Nav-button click-and-hold (not yet armed via zoomMode): still a
+        // quick vertical-scrub shortcut centred on the viewport middle,
+        // since there's no on-canvas click point to anchor a box to here.
         const factor = Math.pow(1.01, -dy * slow * invert);
         const newScale = Math.min(
           MAX_SCALE,
@@ -1159,6 +1217,14 @@ export default function GisCanvas({
         } else if (toolDrag.tool === "zoom") toggleZoomMode();
         else if (toolDrag.tool === "pan") togglePanMode();
         else if (toolDrag.tool === "rotate") resetView();
+      } else if (toolDrag.tool === "zoom" && toolDrag.viaCanvas) {
+        // Box zoom out either via Alt, or by dragging from the box's
+        // bottom-right corner up to its top-left corner (the classic
+        // reversed-diagonal convention for "zoom out to this box").
+        const ex = toolDrag.curX ?? toolDrag.sx,
+          ey = toolDrag.curY ?? toolDrag.sy;
+        const zoomOut = toolDrag.altKey || (ex < toolDrag.sx && ey < toolDrag.sy);
+        boxZoom(toolDrag.sx, toolDrag.sy, ex, ey, zoomOut);
       }
       setToolDrag(null);
     };
@@ -1168,7 +1234,7 @@ export default function GisCanvas({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [toolDrag, zoomBy, resetView, togglePanMode, toggleZoomMode, pt]);
+  }, [toolDrag, zoomBy, boxZoom, resetView, togglePanMode, toggleZoomMode, pt]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => {
@@ -1988,7 +2054,7 @@ export default function GisCanvas({
         // below, so Escape looked like it did nothing while editing.
         // Disarming it also drops the rail back to the default Cursor
         // tool, rather than leaving whatever it happened to be on.
-        if (polySubTool) { setPolySubTool(null); setActiveTool(0); return; }
+        if (polySubTool) { setPolySubTool(null); selectRailTool(0); return; }
         if (selectedPolyVertices.length) return setSelectedPolyVertices([]);
         if (selectedPolyIds.length) { setSelectedPolyIds([]); return setSelectedPolyId(null); }
         if (selectedPolyId) return setSelectedPolyId(null);
@@ -2108,7 +2174,7 @@ export default function GisCanvas({
           const toolKey = { v: 0, g: 1, m: 2, q: 3 }[e.key.toLowerCase()];
           if (toolKey !== undefined) {
             e.preventDefault();
-            setActiveTool(toolKey);
+            selectRailTool(toolKey);
             // Picking a rail tool hands the canvas back to it — whatever
             // Live Edit sub-tool (pen/add vertex/move/etc.) was armed steps
             // aside rather than fighting it for clicks.
@@ -2397,13 +2463,21 @@ export default function GisCanvas({
             { label: "Drop on canvas to place, on a line to insert" },
           ];
     if (toolDrag?.tool === "zoom")
-      return [
-        {
-          icon: "mouseLeftDrag",
-          label: "Drag up/down: zoom in/out",
-        },
-        { label: "Alt inverts · Shift slows" },
-      ];
+      return toolDrag.viaCanvas
+        ? [
+            {
+              icon: "mouseLeftDrag",
+              label: "Drag a box to zoom in",
+            },
+            { label: "Alt, or drag bottom-right→top-left, to zoom out" },
+          ]
+        : [
+            {
+              icon: "mouseLeftDrag",
+              label: "Drag up/down: zoom in/out",
+            },
+            { label: "Alt inverts · Shift slows" },
+          ];
     if (toolDrag?.tool === "rotate")
       return [
         { label: "Drag to rotate" },
@@ -2441,7 +2515,10 @@ export default function GisCanvas({
       ];
     if (dragCurve) return [{ label: "Drag: bend curve" }];
     if (zoomMode)
-      return [{ label: "Click: zoom in" }, { label: "Alt+Click: zoom out" }];
+      return [
+        { label: "Click: zoom in · Alt+click: zoom out" },
+        { label: "Drag a box to zoom to it" },
+      ];
     if (panMode) return [{ label: "Click-drag to pan" }];
     if (selected.length > 1)
       return [
@@ -2598,7 +2675,7 @@ export default function GisCanvas({
                       // arming Live Edit (start drawing/adding to a shape),
                       // so arm it by default instead of leaving no edit
                       // sub-tool selected and making them click Pen first.
-                      else { polygonsAtEditStart.current = polygons; setLiveEdit(true); setActiveTool(i); setPolySubTool("pen"); }
+                      else { polygonsAtEditStart.current = polygons; setLiveEdit(true); selectRailTool(i); setPolySubTool("pen"); }
                     } else {
                       // Switching rail tools no longer exits Live Edit —
                       // Select/Group select/Measure/Point query are all
@@ -2606,7 +2683,7 @@ export default function GisCanvas({
                       // Live Edit sub-tool was armed, same as the keyboard
                       // shortcuts above).
                       if (liveEdit) setPolySubTool(null);
-                      setActiveTool(i);
+                      selectRailTool(i);
                     }
                     if (i === 1) setGroupSelectMenuOpen((v) => !v);
                     if (i === 2) setMeasureMenuOpen((v) => !v);
@@ -2689,7 +2766,7 @@ export default function GisCanvas({
                         key={s.id}
                         onClick={() => {
                           setGroupSelectShape(s.id);
-                          setActiveTool(1);
+                          selectRailTool(1);
                           setGroupSelectMenuOpen(false);
                         }}
                         style={{
@@ -2740,7 +2817,7 @@ export default function GisCanvas({
                     <button
                       onClick={() => {
                         setMeasureArmedMode("measure");
-                        setActiveTool(2);
+                        selectRailTool(2);
                         setMeasureMenuOpen(false);
                       }}
                       style={{
@@ -2767,7 +2844,7 @@ export default function GisCanvas({
                     <button
                       onClick={() => {
                         setMeasureArmedMode("transect");
-                        setActiveTool(2);
+                        selectRailTool(2);
                         setMeasureMenuOpen(false);
                       }}
                       style={{
@@ -2825,7 +2902,7 @@ export default function GisCanvas({
             {
               icon: A.zoomTool,
               tool: "zoom",
-              name: "Zoom (drag up/down) · click = toggle Zoom tool (Z) · while active, click canvas to zoom in (Alt+click to zoom out), or drag up/down on canvas to zoom continuously",
+              name: "Zoom · click = toggle Zoom tool (Z) · while active, click canvas to zoom in (Alt+click to zoom out), or drag a box on canvas to zoom to it (drag bottom-right→top-left, or hold Alt, to zoom out) · drag this button up/down for a quick continuous zoom",
               active: zoomMode,
             },
             {
@@ -3444,6 +3521,23 @@ export default function GisCanvas({
               strokeDasharray="4 3"
             />
           )}
+          {toolDrag?.tool === "zoom" && toolDrag.viaCanvas && toolDrag.moved && (() => {
+            const p0 = pt({ clientX: toolDrag.sx, clientY: toolDrag.sy });
+            const p1 = pt({ clientX: toolDrag.curX ?? toolDrag.sx, clientY: toolDrag.curY ?? toolDrag.sy });
+            const zoomOut = toolDrag.altKey || (p1.x < p0.x && p1.y < p0.y);
+            return (
+              <rect
+                x={Math.min(p0.x, p1.x)}
+                y={Math.min(p0.y, p1.y)}
+                width={Math.abs(p1.x - p0.x)}
+                height={Math.abs(p1.y - p0.y)}
+                fill={zoomOut ? "rgba(225,69,91,0.1)" : "rgba(70,138,243,0.1)"}
+                stroke={zoomOut ? "var(--red-700)" : "var(--blue-700)"}
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+            );
+          })()}
           {marquee && marquee.shape === "ellipse" && (
             <ellipse
               cx={(marquee.x0 + marquee.x1) / 2}

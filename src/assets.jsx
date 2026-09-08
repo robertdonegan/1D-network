@@ -24,6 +24,28 @@ import panel2dResults from "./assets/panel-2d-results.svg";
 import panelTextEditor from "./assets/panel-text-editor.svg";
 import panelDiagnostics from "./assets/panel-diagnostics.svg";
 import tuflowEstry1d from "./assets/tuflow-estry-1d.svg";
+import tuflowAddModel from "./assets/tuflow-add-model.svg";
+import tuflowImportLayers from "./assets/tuflow-import-layers.svg";
+import tuflowTools from "./assets/tuflow-tools.svg";
+import fm2d1d2dLinkGenerator from "./assets/fm2d-1d2d-link-generator.svg";
+import fm2d1dLevelLink from "./assets/fm2d-1d-level-link.svg";
+import fm2d1dFlowLink from "./assets/fm2d-1d-flow-link.svg";
+import fm2d1dWeirLink from "./assets/fm2d-1d-weir-link.svg";
+import fm2dTopoPolygon from "./assets/fm2d-topo-polygon.svg";
+import fm2dTopoPolyline from "./assets/fm2d-topo-polyline.svg";
+import fm2dTopoPoints from "./assets/fm2d-topo-points.svg";
+import fm2dLoadShapefileTopo from "./assets/fm2d-load-shapefile-topo.svg";
+import fm2dLoadGroundElev from "./assets/fm2d-load-ground-elev.svg";
+import fm2dDefineTopo from "./assets/fm2d-define-topo.svg";
+import fm2dRainfallPolygon from "./assets/fm2d-rainfall-polygon.svg";
+import fm2dInfiltrationPolygon from "./assets/fm2d-infiltration-polygon.svg";
+import fm2dLoadRainInfilShapefile from "./assets/fm2d-load-rain-infil-shapefile.svg";
+import fm2dZlinePolyline from "./assets/fm2d-zline-polyline.svg";
+import fm2dZlinePolylineImport from "./assets/fm2d-zline-polyline-import.svg";
+import fm2dZlinePoints from "./assets/fm2d-zline-points.svg";
+import fm2dZlinePointsImport from "./assets/fm2d-zline-points-import.svg";
+import homeDownloadFathomData from "./assets/home-download-fathom-data.svg";
+import homeLoadFathomData from "./assets/home-load-fathom-data.svg";
 import hydroCalcPoints from "./assets/hydro-calc-points.svg";
 import swmmNetworkIcon from "./assets/swmm-network.svg";
 import simLoad from "./assets/sim-load.svg";
@@ -68,6 +90,7 @@ import generalLoss from "./assets/general-loss.svg";
 import labelsColor from "./assets/labels-color.svg";
 import rulesColor from "./assets/rules-color.svg";
 import settingsColor from "./assets/settings-color.svg";
+import fm1dTools from "./assets/fm1d-tools.svg";
 
 import conduitFullArch from "./assets/conduit-full-arch.svg";
 import conduitSprungArch from "./assets/conduit-sprung-arch.svg";
@@ -223,6 +246,10 @@ import ribbonBoundaryCondition from "./assets/ribbon-boundary-condition.svg";
 import ribbonDefineTopo from "./assets/ribbon-define-topo.svg";
 import ribbon1dEmbed from "./assets/ribbon-1d-embed.svg";
 import ribbon1d2dLink from "./assets/ribbon-1d2d-link.svg";
+import fm2dNew2dModel from "./assets/fm2d-new-2d-model.svg";
+import fm2dRoughness from "./assets/fm2d-roughness.svg";
+import fm2dRainInfiltration from "./assets/fm2d-rain-infiltration.svg";
+import fm2dInputConverter from "./assets/fm2d-input-converter.svg";
 import ribbonPolyline from "./assets/ribbon-polyline.svg";
 import ribbonZmod from "./assets/ribbon-zmod.svg";
 import ribbonGenImesh from "./assets/ribbon-gen-imesh.svg";
@@ -244,14 +271,19 @@ export const A = {
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
   filesFolder, arrowLeft, arrowRight,
   panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,
-  tuflowEstry1d, hydroCalcPoints, swmmNetworkIcon, simLoad,
+  tuflowEstry1d, tuflowAddModel, tuflowImportLayers, tuflowTools, hydroCalcPoints, swmmNetworkIcon, simLoad,
+  fm2d1d2dLinkGenerator, fm2d1dLevelLink, fm2d1dFlowLink, fm2d1dWeirLink,
+  fm2dTopoPolygon, fm2dTopoPolyline, fm2dTopoPoints, fm2dLoadShapefileTopo, fm2dLoadGroundElev, fm2dDefineTopo,
+  fm2dRainfallPolygon, fm2dInfiltrationPolygon, fm2dLoadRainInfilShapefile,
+  fm2dZlinePolyline, fm2dZlinePolylineImport, fm2dZlinePoints, fm2dZlinePointsImport,
+  homeDownloadFathomData, homeLoadFathomData,
   load1d, crossSection, interpolate, circularArch, flowTime, normalDepth,
   broadWeir, superBridge, spill, openJunction, blockage,
   floodplain, onlinePond, reservoir, usbprBridge, archBridge, pierLossBridge, breach, pump, generalLoss,
   loadRiverNetwork, newRiverNetwork, saveRiverNetwork, saveAsRiverNetwork,
   cesSection, muskingum, muskingumR, muskingumV, muskingumX, refh2, connectorGaugeV2,
   toolboxChevronCollapsed, toolboxChevronExpanded, toolboxTool, toolboxToolDisabled, toolboxHeaderIcon, toolboxUndock,
-  labelsColor, rulesColor, settingsColor,
+  labelsColor, rulesColor, settingsColor, fm1dTools,
   conduitFullArch, conduitSprungArch, conduitRectangular, conduitSymmetrical, conduitAsymmetrical,
   orifice, invertedSyphon, outfall, floodReliefArch,
   culvertBend, culvertInlet, culvertOutlet,
@@ -285,6 +317,7 @@ export const A = {
   toggleOffX, toggleOnCheck, flowLinesIcon, globalAnimatorIcon,
   mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
   ribbonActiveArea, ribbonBoundaryCondition, ribbonDefineTopo, ribbon1dEmbed, ribbon1d2dLink,
+  fm2dNew2dModel, fm2dRoughness, fm2dRainInfiltration, fm2dInputConverter,
   ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,
   ribbonPoint, ribbonTools, ribbonSwmm1dLink, ribbonSwmm2dLink, ribbonViewLabels,
   ribbonEditNode, ribbonSelectionMode, ribbonAddLink, ribbonSwmmNode,

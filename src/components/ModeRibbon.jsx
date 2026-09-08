@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 import FileExplorerModal from "./FileExplorerModal.jsx";
 import PlaceholderModal from "./PlaceholderModal.jsx";
@@ -8,7 +8,7 @@ export const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", 
 // Home tab's ribbon — project-level actions rather than 1D network units,
 // so none of these are draggable onto the canvas.
 export const HOME_RIBBON = [
-  { id: "saveproject",    icon: "homeNewProject", label: "New Project",     chevron: true, menu: [
+  { id: "saveproject",    icon: "homeNewProject", label: "Project",     chevron: true, menu: [
     { label: "New project",      icon: "homeNewProject" },
     { label: "Load project",     icon: "homeOpenProject" },
     { label: "Save project",     icon: "homeLoadFile" },
@@ -21,8 +21,8 @@ export const HOME_RIBBON = [
     { menuSep: true },
     { label: "Properties",  icon: "placeholder" },
   ] },
-  { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks (TBC)", chevron: true },
-  { id: "notes",          icon: "homeNote",       label: "Notes (TBC)", chevron: true },
+  { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks", chevron: true },
+  { id: "notes",          icon: "homeNote",       label: "Notes", chevron: true },
   { id: "addcontent",     icon: "homeMarker",     label: "Add content",    chevron: true },
   { sep: true },
   { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true, action: "addLayer" },
@@ -33,8 +33,8 @@ export const HOME_RIBBON = [
     { label: "Data Library", icon: "placeholder" },
   ] },
   { id: "fathom",         icon: "homeFathom",     label: "Fathom",         chevron: true, menu: [
-    { label: "Download FATHOM data", icon: "placeholder" },
-    { label: "Load FATHOM data",     icon: "placeholder" },
+    { label: "Download FATHOM data", icon: "homeDownloadFathomData" },
+    { label: "Load FATHOM data",     icon: "homeLoadFathomData" },
     { menuSep: true },
     { label: "Fathom settings",      icon: "settingsColor" },
   ] },
@@ -157,6 +157,15 @@ export const RIBBON = [
     { label: "Rules", icon: "rulesColor" },
   ] },
   { sep: true },
+  { id: "refhtools1d", icon: "hydroRefh", label: "ReFH tools", chevron: true, menu: [
+    { label: "FEH Catchment Descriptors", icon: "placeholder" },
+    { label: "ReFH2 rainfall",            icon: "placeholder" },
+  ] },
+  { id: "fm1dtools", icon: "fm1dTools", label: "FM 1D tools", chevron: true, menu: [
+    { label: "Network check",  icon: "placeholder" },
+    { label: "Renumber nodes", icon: "placeholder" },
+  ] },
+  { sep: true },
   { id: "viewlabels", icon: "labelsColor", label: "View 1D labels", chevron: true },
   { sep: true },
   { id: "settings",   icon: "settingsColor", label: "FM 1D settings", action: "modal" },
@@ -168,21 +177,47 @@ export const RIBBON = [
 // of not-yet-wired actions. Icons without a real uploaded asset use
 // "placeholder", same convention as the FM1D ribbon above.
 export const FM_2D_RIBBON = [
+  { id: "new2dmodel", icon: "fm2dNew2dModel", label: "2D Model", chevron: true, menu: [
+    { label: "New 2D model",  icon: "placeholder" },
+    { label: "Load 2D model", icon: "placeholder" },
+  ] },
+  { sep: true },
   { id: "activearea", icon: "ribbonActiveArea", label: "Active area", chevron: true, menu: [
     { label: "Draw new active area", icon: "placeholder" },
     { label: "Load shape file as active area", icon: "placeholder" },
   ] },
-  { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition", action: "modal" },
-  { id: "definetopo", icon: "ribbonDefineTopo", label: "Define topography", action: "modal" },
+  { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
+  { id: "definetopo", icon: "fm2dDefineTopo", label: "Topography", chevron: true, menu: [
+    { label: "Polygon", icon: "fm2dTopoPolygon" },
+    { label: "Polyline", icon: "fm2dTopoPolyline" },
+    { label: "Points",  icon: "fm2dTopoPoints" },
+    { menuSep: true },
+    { label: "Load existing Shapefile",      icon: "fm2dLoadShapefileTopo" },
+    { label: "Load Ground Elevation Grid",   icon: "fm2dLoadGroundElev" },
+  ] },
+  { sep: true },
+  { id: "roughness2d", icon: "fm2dRoughness", label: "Roughness", chevron: true },
+  { sep: true },
+  { id: "raininfiltration", icon: "fm2dRainfallPolygon", label: "Rain/infiltration", chevron: true, menu: [
+    { label: "Add Rainfall Polygon",     icon: "fm2dRainfallPolygon" },
+    { label: "Add Infiltration Polygon", icon: "fm2dInfiltrationPolygon" },
+    { label: "Load Rain/Infiltration Shapefile", icon: "fm2dLoadRainInfilShapefile" },
+  ] },
   { sep: true },
   { id: "1dstructure", icon: "ribbon1dEmbed", label: "1D structure", action: "file", fileType: "1D structure (*.dat)" },
+  { id: "1d2dlink", icon: "fm2d1d2dLinkGenerator", label: "1D-2D link", chevron: true, menu: [
+    { label: "1D-2D Link Line Generator", icon: "fm2d1d2dLinkGenerator" },
+    { label: "Add 1D Level Link Line",    icon: "fm2d1dLevelLink" },
+    { label: "Add 1D Flow Link Line",     icon: "fm2d1dFlowLink" },
+    { label: "Add 1D Weir Link Line",     icon: "fm2d1dWeirLink" },
+  ] },
   { sep: true },
-  { id: "1d2dlink", icon: "ribbon1d2dLink", label: "1D-2D link", chevron: true },
-  { sep: true },
-  { id: "polyline2d", icon: "ribbonPolyline", label: "Polyline", chevron: true, menu: [
-    { label: "Polyline", icon: "fm2dPolyline" },
-    { label: "Polygon",  icon: "fm2dPolyArea" },
-    { label: "Point",    icon: "guiPolyPoint" },
+  { id: "zline", icon: "fm2dZlinePolyline", label: "Z-line", chevron: true, menu: [
+    { label: "Add Z-line Polyline", icon: "fm2dZlinePolyline" },
+    { label: "Add Z-line Points",   icon: "fm2dZlinePoints" },
+    { menuSep: true },
+    { label: "Import Z-line Polyline", icon: "fm2dZlinePolylineImport" },
+    { label: "Import Z-line Points",   icon: "fm2dZlinePointsImport" },
   ] },
   { id: "zmod", icon: "ribbonZmod", label: "Z-mod", chevron: true, menu: [
     { label: "Z-polygon",          icon: "zmodPolygon" },
@@ -193,18 +228,18 @@ export const FM_2D_RIBBON = [
     { label: "Import Z-mod shapefile", icon: "zmodImport" },
   ] },
   { sep: true },
-  { id: "imesh", icon: "ribbonGenImesh", label: "iMesh", chevron: true, menu: [
-    { label: "New iMesh",    icon: "ribbonGenImesh" },
-    { label: "Modify iMesh", icon: "ribbonModImesh" },
-    { menuSep: true },
-    { label: "iMesh settings", icon: "settingsOutline" },
-  ] },
+  { id: "input2dconverter", icon: "fm2dInputConverter", label: "2D input converter", action: "modal" },
 ];
 
 export const TUFLOW_RIBBON = [
+  { id: "tuflowmodel", icon: "tuflowAddModel", label: "TUFLOW Model", chevron: true, menu: [
+    { label: "New TUFLOW model",  icon: "placeholder" },
+    { label: "Load TUFLOW model", icon: "placeholder" },
+  ] },
+  { sep: true },
   { id: "codelayer", icon: "ribbonActiveArea", label: "Code layer", action: "file", fileType: "TUFLOW Code Layer (*.shp)" },
   { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
-  { id: "topomod", icon: "ribbonDefineTopo", label: "Topographic modification", chevron: true, menu: [
+  { id: "topomod", icon: "ribbonDefineTopo", label: "Topography", chevron: true, menu: [
     { label: "Define new adjustment", icon: "placeholder" },
     { menuSep: true },
     { label: "Load existing topography", icon: "placeholder" },
@@ -214,7 +249,7 @@ export const TUFLOW_RIBBON = [
   { sep: true },
   { id: "1dtuflowlink", icon: "ribbon1d2dLink", label: "1D-TUFLOW link", chevron: true },
   { sep: true },
-  { id: "importtf", icon: "ribbonImport", label: "Import", action: "file", fileType: "TUFLOW import (*.*)" },
+  { id: "importtf", icon: "tuflowImportLayers", label: "Import", action: "file", fileType: "TUFLOW import (*.*)" },
   { sep: true },
   { id: "polylinetf", icon: "ribbonPolyline", label: "Polyline", chevron: true, menu: [
     { label: "Polyline", icon: "fm2dPolyline" },
@@ -222,7 +257,7 @@ export const TUFLOW_RIBBON = [
     { label: "Point",    icon: "guiPolyPoint" },
   ] },
   { sep: true },
-  { id: "tuflowtools", icon: "ribbonTools", label: "Tools", chevron: true, menu: [
+  { id: "tuflowtools", icon: "tuflowTools", label: "TUFLOW tools", chevron: true, menu: [
     { label: "Import check file", icon: "placeholder" },
     { label: "Apply styles",      icon: "placeholder" },
     { label: "Utilities",         icon: "placeholder" },
@@ -250,19 +285,19 @@ export const SWMM_RIBBON = [
     { label: "Divider",      icon: "placeholder" },
     { label: "Subcatchment", icon: "swmmSubcatchment" },
   ] },
-  { id: "editnodes", icon: "ribbonEditNode", label: "Edit SWMM Nodes", chevron: true, menu: [
+  { id: "editnodes", icon: "ribbonEditNode", label: "Edit SWMM nodes", chevron: true, menu: [
     { label: "Node properties", icon: "placeholder" },
     { label: "Link properties", icon: "placeholder" },
     { label: "Multi-edit/view", icon: "placeholder" },
   ] },
   { sep: true },
-  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM Labels", chevron: true, menu: [
-    { label: "View SWMM Labels", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM labels", chevron: true, menu: [
+    { label: "View SWMM labels", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
   ] },
 ];
 
 export const HYDROLOGY_RIBBON = [
-  { id: "hplusproject", icon: "hydroLoadHplus", label: "Hydrology+ project", chevron: true, menu: [
+  { id: "hplusproject", icon: "hydroLoadHplus", label: "Hydrology+ Project", chevron: true, menu: [
     { label: "Zoom to current project", icon: "placeholder" },
     { menuSep: true },
     { label: "New",             icon: "placeholder" },
@@ -279,7 +314,7 @@ export const HYDROLOGY_RIBBON = [
   { sep: true },
   { id: "fsuportal", icon: "hydroFsuPortal", label: "FSU Portal", action: "modal" },
   { sep: true },
-  { id: "riverstations", icon: "hydroRiverStations", label: "View river stations", chevron: true, menu: [
+  { id: "riverstations", icon: "hydroRiverStations", label: "View River Stations", chevron: true, menu: [
     { label: "Environment Agency", icon: "placeholder" },
     { label: "UKCEH NRFA",         icon: "placeholder" },
     { label: "Off (none)",         icon: "placeholder" },
@@ -294,9 +329,11 @@ export const HYDROLOGY_RIBBON = [
     { label: "FEH tabular view",       icon: "placeholder" },
   ] },
   { sep: true },
-  { id: "calcpoints", icon: "hydroCalcPoints", label: "Calculation points", chevron: true, menu: [
+  { id: "calcpoints", icon: "hydroCalcPoints", label: "Calculation Points", chevron: true, menu: [
     { label: "Tabular view", icon: "placeholder" },
   ] },
+  { sep: true },
+  { id: "hplusviewlabels", icon: "labelsColor", label: "View Hydrology+ labels", chevron: true },
   { sep: true },
   { id: "hplussettings", icon: "settingsColor", label: "Hydrology+ settings", action: "modal" },
 ];
@@ -321,22 +358,22 @@ export const GIS_RIBBON = [
 ];
 
 export const SIMULATION_RIBBON = [
-  { id: "new1dsim", icon: "sim1dRiver", label: "New 1D simulation", chevron: true, menu: [
+  { id: "new1dsim", icon: "sim1dRiver", label: "New 1D Simulation", chevron: true, menu: [
     { label: "1D River simulation", icon: "sim1dRiver" },
     { label: "1D SWMM simulation",  icon: "sim1dSwmm" },
   ] },
-  { id: "newqualsim", icon: "simQuality", label: "New Quality simulation", action: "modal" },
+  { id: "newqualsim", icon: "simQuality", label: "New Quality Simulation", action: "modal" },
   { sep: true },
-  { id: "new2dsim", icon: "simNew2d", label: "New 2D simulation", action: "modal" },
-  { id: "newtuflowsim", icon: "simTuflow", label: "New TUFLOW simulation", chevron: true, menu: [
+  { id: "new2dsim", icon: "simNew2d", label: "New 2D Simulation", action: "modal" },
+  { id: "newtuflowsim", icon: "simTuflow", label: "New TUFLOW Simulation", chevron: true, menu: [
     { label: "TUFLOW simulation", icon: "simTuflow" },
     { label: "Estry simulation",  icon: "simEstry" },
   ] },
-  { id: "loadsim", icon: "simLoad", label: "Load sim", action: "file", fileType: "Simulation file (*.bat)" },
+  { id: "loadsim", icon: "simLoad", label: "Load Simulation", action: "file", fileType: "Simulation file (*.bat)" },
   { sep: true },
   { id: "simbuilder", icon: "simBuilder", label: "Simulation Builder", chevron: true },
-  { id: "runsim", icon: "simRun", label: "Run sim", action: "modal" },
-  { id: "runbatch", icon: "simRunBatch", label: "Run Batch", action: "modal" },
+  { id: "runsim", icon: "simRun", label: "Run Simulation", action: "modal" },
+  { id: "runbatch", icon: "simRunBatch", label: "Run batch", action: "modal" },
 ];
 
 export const RESULTS_RIBBON = [
@@ -346,7 +383,7 @@ export const RESULTS_RIBBON = [
     { label: "Cross Section", icon: "placeholder" },
     { label: "XY Series",     icon: "placeholder" },
   ] },
-  { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D flood map", chevron: true },
+  { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D Flood Map", chevron: true },
   { id: "tabularcsv", icon: "resultsTabularCsv", label: "Tabular CSV", action: "file", fileType: "CSV file (*.csv)" },
   { sep: true },
   { id: "results2d", icon: "results2d", label: "2D results", chevron: true, menu: [
@@ -355,8 +392,8 @@ export const RESULTS_RIBBON = [
     { label: "Flow Line",             icon: "placeholder" },
     { label: "Embedded Structures",   icon: "resultEmbeddedStructures" },
   ] },
-  { id: "2dfloodmap", icon: "results2dFloodMap", label: "2D flood map", action: "file", fileType: "Flood map raster (*.tif)" },
-  { id: "damagecalc", icon: "resultsDamageCalculator", label: "Damage calculator", action: "modal" },
+  { id: "2dfloodmap", icon: "results2dFloodMap", label: "2D Flood Map", action: "file", fileType: "Flood map raster (*.tif)" },
+  { id: "damagecalc", icon: "resultsDamageCalculator", label: "Damage Calculator", action: "modal" },
   { sep: true },
   { id: "spatialdiag", icon: "resultsDiagnostics", label: "Spatial diagnostics", chevron: true, menu: [
     { label: "Grid check",   icon: "placeholder" },
@@ -709,6 +746,46 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
   );
 }
 
+// Catch-all "»" button for whichever trailing groups didn't fit in the bar
+// (see the width-measuring effect in ModeRibbon below) — keeps every mode's
+// ribbon usable on narrower screens instead of letting buttons run off the
+// edge uninteractably. Renders the overflowed groups as a vertical list of
+// the same RibbonGroup buttons rather than a bespoke menu, so drag/menu/
+// action behaviour is identical to picking them straight off the bar.
+function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflowOpen, onBeginDrag, onAction, highlightedGroup }) {
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+      <button
+        onClick={() => setOverflowOpen((v) => !v)}
+        title="More ribbon items"
+        style={{
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 32, width: 28,
+          border: "none", borderRadius: 2, cursor: "pointer",
+          background: overflowOpen ? "var(--neutral-400)" : "transparent",
+          color: "var(--text-primary)",
+        }}
+        onMouseOver={(e) => !overflowOpen && (e.currentTarget.style.background = "var(--neutral-200)")}
+        onMouseOut={(e) => !overflowOpen && (e.currentTarget.style.background = "transparent")}
+      >
+        <Icon src={A.keyDown} size={12} style={{ margin: "-3px 0" }} />
+        <Icon src={A.keyDown} size={12} style={{ margin: "-3px 0" }} />
+      </button>
+      {overflowOpen && (
+        <div style={{
+          position: "absolute", top: "100%", right: 0, marginTop: 2, width: "max-content", minWidth: 180,
+          background: "var(--surface-1)", border: "1px solid var(--border-primary)",
+          borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 55,
+          display: "flex", flexDirection: "column", gap: 2,
+        }}>
+          {groups.map((g, i) => g.sep ? <MenuSep key={i} /> : (
+            <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Radio-select basemap options (Home tab). Only "none"/"osm" are wired to a
 // real backdrop (see GisCanvas/OsmBasemap) — the rest are shown for visual
 // completeness, matching the Figma spec, but greyed out since they'd need a
@@ -757,6 +834,14 @@ const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this d
 export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, favouriteLists, activeFavouriteListId, onSelectFavouriteList, onCreateFavouriteList, ribbonDrag, onConsumeRibbonDrag, onAddLayer, highlightedGroup, pendingSearchAction, onConsumeSearchAction }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
+  // Groups that don't fit in the bar at the current width collapse into
+  // the catch-all "»" overflow button instead of running off the edge —
+  // see the measuring effect below. `null` means "not measured yet, show
+  // everything" so there's no flash-of-missing-buttons before the first
+  // layout pass.
+  const [visibleCount, setVisibleCount] = useState(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const measureRefs = useRef([]);
   // Buttons with no dropdown still need to go *somewhere* (matches the
   // updated Figma: plain buttons open either the OS file explorer or a
   // placeholder modal) — `group.action` picks which, `onAction` opens it.
@@ -847,10 +932,50 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     return g;
   });
 
+  // Measure how many groups actually fit in the bar at its current width —
+  // the hidden row below (same items, off-screen) always renders every
+  // group so it can be measured regardless of how many are actually
+  // visible, then this picks the longest leading run that fits, reserving
+  // room for the "»" overflow button only if not everything fits anyway.
+  // Reruns on resize (splitter drag, window resize, sidebar toggle) and
+  // whenever the mode/menu contents change the item list itself.
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const GAP = 8, MORE_WIDTH = 28;
+    const compute = () => {
+      const available = bar.clientWidth - 16; // minus the bar's own 8px+8px padding
+      const widths = measureRefs.current.slice(0, activeRibbon.length).map((el) => (el ? el.offsetWidth : 0));
+      let total = 0;
+      widths.forEach((w, i) => (total += w + (i > 0 ? GAP : 0)));
+      if (total <= available) {
+        setVisibleCount(widths.length);
+        return;
+      }
+      const budget = available - MORE_WIDTH - GAP;
+      let acc = 0, count = 0;
+      for (let i = 0; i < widths.length; i++) {
+        const w = widths[i] + (i > 0 ? GAP : 0);
+        if (acc + w > budget) break;
+        acc += w;
+        count = i + 1;
+      }
+      // A trailing separator with nothing visible after it just reads as a
+      // stray line at the edge of the bar — drop it into the overflow too.
+      while (count > 0 && activeRibbon[count - 1]?.sep) count--;
+      setVisibleCount(count);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(bar);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRibbon]);
+
   // Close any open menu on outside click / Escape
   useEffect(() => {
-    const onDown = (e) => { if (barRef.current && !barRef.current.contains(e.target)) setOpen(null); };
-    const onKey = (e) => { if (e.key === "Escape") setOpen(null); };
+    const onDown = (e) => { if (barRef.current && !barRef.current.contains(e.target)) { setOpen(null); setOverflowOpen(false); } };
+    const onKey = (e) => { if (e.key === "Escape") { setOpen(null); setOverflowOpen(false); } };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
@@ -905,9 +1030,35 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
         display: "flex", alignItems: "center", gap: 8, height: 48, padding: 8,
         border: mode === "Favourites" && ribbonDrag ? "1px dashed var(--surface-brand)" : "1px solid var(--border-primary)",
         borderRadius: 4, background: "var(--surface-1)",
-        overflowX: "visible",
+        overflowX: "hidden", overflowY: "visible", position: "relative",
       }}>
-        {activeRibbon.map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />)}
+        {/* Off-screen twin of the row below, used purely to measure each
+            group's natural width — always renders every group (regardless
+            of how many are actually visible) so shrinking the window back
+            down never loses track of an item's width. */}
+        <div aria-hidden="true" style={{
+          position: "absolute", top: 0, left: 0, visibility: "hidden", pointerEvents: "none",
+          display: "flex", alignItems: "center", gap: 8, zIndex: -1,
+        }}>
+          {activeRibbon.map((g, i) => (
+            <div key={g.id || `sep${i}`} ref={(el) => (measureRefs.current[i] = el)}>
+              {g.sep ? <Sep /> : <RibbonGroup group={g} open={null} setOpen={() => {}} onBeginDrag={() => {}} onAction={() => {}} isHighlighted={false} />}
+            </div>
+          ))}
+        </div>
+        {(visibleCount === null ? activeRibbon : activeRibbon.slice(0, visibleCount)).map((g, i) => g.sep ? <Sep key={i} /> : <RibbonGroup key={g.id} group={g} open={open} setOpen={setOpen} onBeginDrag={onBeginDrag} onAction={onAction} isHighlighted={highlightedGroup === g.label} />)}
+        {visibleCount !== null && visibleCount < activeRibbon.length && (
+          <RibbonOverflowButton
+            groups={activeRibbon.slice(visibleCount)}
+            open={open}
+            setOpen={setOpen}
+            overflowOpen={overflowOpen}
+            setOverflowOpen={setOverflowOpen}
+            onBeginDrag={onBeginDrag}
+            onAction={(g) => { onAction(g); setOverflowOpen(false); }}
+            highlightedGroup={highlightedGroup}
+          />
+        )}
         {mode === "Favourites" && favouriteLists?.length > 0 && (
           <>
             <FavouriteListDropdown
