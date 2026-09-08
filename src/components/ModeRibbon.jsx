@@ -10,17 +10,18 @@ export const modes = ["Home", "FM 1D", "FM 2D", "TUFLOW", "SWMM", "Hydrology+", 
 // so none of these are draggable onto the canvas.
 export const HOME_RIBBON = [
   { id: "saveproject",    icon: "homeNewProject", label: "Project",     chevron: true, menu: [
-    { label: "New project",      icon: "homeNewProject" },
-    { label: "Load project",     icon: "homeOpenProject" },
-    { label: "Save project",     icon: "homeLoadFile" },
-    { label: "Save as project",  icon: "homeLoadFile" },
+    { label: "New Project",      icon: "homeNewProject" },
+    { label: "Load Project",     icon: "homeOpenProject" },
+    { label: "Save Project",     icon: "homeLoadFile" },
+    { label: "Save Project as",  icon: "homeLoadFile" },
   ] },
   { sep: true },
-  { id: "projectextents", icon: "homeExpand",     label: "Project extents", chevron: true, menu: [
-    { label: "Go to X, Y",   icon: "placeholder" },
-    { label: "3D Viewer",    icon: "placeholder" },
+  { id: "projectextents", icon: "homeExpand",     label: "Project extents", chevron: true,
+    desc: "Open one of the options below in a modal — results can be docked for permanency.", menu: [
+    { label: "Go to X, Y",   icon: "homeGoToMap" },
+    { label: "3D Viewer",    icon: "worldTiltRotation" },
     { menuSep: true },
-    { label: "Properties",  icon: "placeholder" },
+    { label: "Properties",  icon: "settingsOutline" },
   ] },
   { id: "bookmarks",      icon: "homeAddBookmark",label: "Bookmarks", chevron: true },
   { id: "notes",          icon: "homeNote",       label: "Notes", chevron: true },
@@ -29,9 +30,9 @@ export const HOME_RIBBON = [
   { id: "addgisdata",     icon: "homeAddGis",     label: "Add GIS data",   chevron: true, action: "addLayer" },
   { id: "basemap",        icon: "homeGoToMap",    label: "Basemap",        chevron: true },
   { id: "onlineservices", icon: "homeMapView",    label: "Online services",chevron: true, menu: [
-    { label: "WMS",          icon: "placeholder" },
-    { label: "WFS",          icon: "placeholder" },
-    { label: "Data Library", icon: "placeholder" },
+    { label: "WMS",          icon: "filesLink" },
+    { label: "WFS",          icon: "worldMapView2" },
+    { label: "Data Library", icon: "moduleLibrary" },
   ] },
   { id: "fathom",         icon: "homeFathom",     label: "Fathom",         chevron: true, menu: [
     { label: "Download FATHOM data", icon: "homeDownloadFathomData" },
@@ -44,13 +45,15 @@ export const HOME_RIBBON = [
 ];
 
 // Ribbon groups. Leaf items with `drag:true` can be dragged onto the canvas.
-// `icon` is a key into A; items without a real uploaded asset use "placeholder".
+// `icon` is a key into A. Optional `desc` on a group is shown as the ribbon
+// button's tooltip (sourced from the Figma "Dropdowns" section's UX-comment
+// annotations where one exists).
 export const RIBBON = [
   { id: "rivernet", icon: "load1d", label: "River Network", primary: true, menu: [
-    { label: "Load 1D network", icon: "loadRiverNetwork" },
-    { label: "New 1D network",  icon: "newRiverNetwork" },
-    { label: "Save 1D network", icon: "saveRiverNetwork" },
-    { label: "Save network as", icon: "saveAsRiverNetwork" },
+    { label: "Load 1D Network", icon: "loadRiverNetwork" },
+    { label: "New 1D Network",  icon: "newRiverNetwork" },
+    { label: "Save 1D Network", icon: "saveRiverNetwork" },
+    { label: "Save Network as", icon: "saveAsRiverNetwork" },
   ] },
   { sep: true },
   { id: "river", icon: "crossSection", label: "River", selected: true, menu: [
@@ -108,14 +111,14 @@ export const RIBBON = [
     { label: "Weir", icon: "broadWeir", shape: "square", drag: true },
     { menuSep: true },
     { label: "Weirs", icon: "broadWeir", sub: [
-      { label: "Broad Crested", icon: "broadWeir",         shape: "square", drag: true },
+      { label: "Broad-Crested", icon: "broadWeir",         shape: "square", drag: true },
       { label: "Crump",         icon: "crumpWeir",          shape: "square", drag: true },
       { label: "Flow Head Control", icon: "flowHeadControl",shape: "square", drag: true },
       { label: "Flat-V",        icon: "flatVWeir",          shape: "square", drag: true },
       { label: "Gated",         icon: "gatedWeir",          shape: "square", drag: true },
       { label: "Labyrinth",     icon: "labyrinthWeir",      shape: "square", drag: true },
       { label: "Notional",      icon: "notionalWeir",       shape: "square", drag: true },
-      { label: "Sharp Crested", icon: "sharpCrestedWeir",   shape: "square", drag: true },
+      { label: "Sharp-Crested", icon: "sharpCrestedWeir",   shape: "square", drag: true },
       { label: "Syphon",        icon: "syphonWeir",         shape: "square", drag: true },
       { label: "General Weir",  icon: "generalWeir",        shape: "square", drag: true },
     ] },
@@ -132,7 +135,7 @@ export const RIBBON = [
     { menuSep: true },
     { label: "USBPR",     icon: "usbprBridge",    shape: "square", drag: true },
     { label: "Arch",      icon: "archBridge",     shape: "square", drag: true },
-    { label: "Pier-loss", icon: "pierLossBridge", shape: "square", drag: true },
+    { label: "Pier-Loss", icon: "pierLossBridge", shape: "square", drag: true },
   ] },
   { sep: true },
   { id: "storage", icon: "spill",        label: "Storage",  menu: [
@@ -154,17 +157,17 @@ export const RIBBON = [
     { label: "Blockage",     icon: "blockage",    shape: "square", drag: true },
     { label: "Breach",       icon: "breach",      shape: "square", drag: true },
     { label: "Pump",         icon: "pump",        shape: "square", drag: true },
-    { label: "General loss", icon: "generalLoss", shape: "square", drag: true },
+    { label: "General Loss", icon: "generalLoss", shape: "square", drag: true },
     { label: "Rules", icon: "rulesColor" },
   ] },
   { sep: true },
   { id: "refhtools1d", icon: "hydroRefh", label: "ReFH tools", chevron: true, menu: [
-    { label: "FEH Catchment Descriptors", icon: "placeholder" },
-    { label: "ReFH2 rainfall",            icon: "placeholder" },
+    { label: "FEH Catchment Descriptors", icon: "hydroCatchDesc" },
+    { label: "ReFH2 rainfall",            icon: "refh2" },
   ] },
   { id: "fm1dtools", icon: "fm1dTools", label: "FM 1D tools", chevron: true, menu: [
-    { label: "Network check",  icon: "placeholder" },
-    { label: "Renumber nodes", icon: "placeholder" },
+    { label: "Network check",  icon: "editorReview" },
+    { label: "Renumber nodes", icon: "arrowsColOrder" },
   ] },
   { sep: true },
   { id: "viewlabels", icon: "labelsColor", label: "View 1D labels", chevron: true },
@@ -175,17 +178,18 @@ export const RIBBON = [
 // Remaining mode ribbons — mostly project/tool actions rather than 1D
 // network units, so (aside from the two Favourites shortcuts back to real
 // FM1D unit types) these are visual-only, matching the Home tab's treatment
-// of not-yet-wired actions. Icons without a real uploaded asset use
-// "placeholder", same convention as the FM1D ribbon above.
+// of not-yet-wired actions.
 export const FM_2D_RIBBON = [
   { id: "new2dmodel", icon: "fm2dNew2dModel", label: "2D Model", chevron: true, menu: [
-    { label: "New 2D model",  icon: "placeholder" },
-    { label: "Load 2D model", icon: "placeholder" },
+    { label: "New 2D Model",  icon: "filesModelLine" },
+    { label: "Load 2D Model", icon: "filesImportModel" },
+    { label: "Save 2D Model",  icon: "filesModelLine" },
+    { label: "Save 2D Model as", icon: "filesImportModel" },
   ] },
   { sep: true },
-  { id: "activearea", icon: "ribbonActiveArea", label: "Active area", chevron: true, menu: [
-    { label: "Draw new active area", icon: "placeholder" },
-    { label: "Load shape file as active area", icon: "placeholder" },
+  { id: "activearea", icon: "ribbonActiveArea", label: "Active Area", chevron: true, menu: [
+    { label: "Draw new Active Area", icon: "generalAddPolygon" },
+    { label: "Load shapefile as Active Area", icon: "filesShapeFile" },
   ] },
   { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
   { id: "definetopo", icon: "fm2dDefineTopo", label: "Topography", chevron: true, menu: [
@@ -234,16 +238,18 @@ export const FM_2D_RIBBON = [
 
 export const TUFLOW_RIBBON = [
   { id: "tuflowmodel", icon: "tuflowAddModel", label: "TUFLOW Model", chevron: true, menu: [
-    { label: "New TUFLOW model",  icon: "placeholder" },
-    { label: "Load TUFLOW model", icon: "placeholder" },
+    { label: "New TUFLOW Model",  icon: "filesModelFill" },
+    { label: "Load TUFLOW Model", icon: "filesImportModel" },
+    { label: "Save TUFLOW Model",  icon: "filesModelFill" },
+    { label: "Save TUFLOW Model as", icon: "filesImportModel" },
   ] },
   { sep: true },
   { id: "codelayer", icon: "ribbonActiveArea", label: "Code layer", action: "file", fileType: "TUFLOW Code Layer (*.shp)" },
-  { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
+  { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary Condition", chevron: true },
   { id: "topomod", icon: "ribbonDefineTopo", label: "Topography", chevron: true, menu: [
-    { label: "Define new adjustment", icon: "placeholder" },
+    { label: "Define new adjustment", icon: "generalEdit" },
     { menuSep: true },
-    { label: "Load existing topography", icon: "placeholder" },
+    { label: "Load existing topography", icon: "filesImportModel" },
   ] },
   { sep: true },
   { id: "estry1d", icon: "tuflowEstry1d", label: "Estry 1D", action: "modal" },
@@ -259,79 +265,85 @@ export const TUFLOW_RIBBON = [
   ] },
   { sep: true },
   { id: "tuflowtools", icon: "tuflowTools", label: "TUFLOW tools", chevron: true, menu: [
-    { label: "Import check file", icon: "placeholder" },
-    { label: "Apply styles",      icon: "placeholder" },
-    { label: "Utilities",         icon: "placeholder" },
+    { label: "Import Check File", icon: "filesTxtFile" },
+    { label: "Apply Styles",      icon: "editorColorLens" },
+    { label: "Utilities",         icon: "generalToolboxIcon" },
   ] },
 ];
 
 export const SWMM_RIBBON = [
   { id: "loadswmm", icon: "swmmNetworkIcon", label: "SWMM Network", chevron: true, menu: [
-    { label: "SWMM Network", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+    { label: "SWMM Network", icon: "swmmNetworkIcon", disabled: true, disabledReason: "Not yet designed in Figma" },
   ] },
   { sep: true },
   { id: "swmm1dlink", icon: "ribbonSwmm1dLink", label: "FM 1D-SWMM link", action: "modal" },
   { id: "swmm2dlink", icon: "ribbonSwmm2dLink", label: "SWMM-2D link", action: "modal" },
   { sep: true },
   { id: "selectionmode", icon: "ribbonSelectionMode", label: "Selection mode", chevron: true, menu: [
-    { label: "Selection mode", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+    { label: "Selection mode", icon: "rectangleSelect", disabled: true, disabledReason: "Not yet designed in Figma" },
   ] },
   { sep: true },
   { id: "addlink", icon: "ribbonAddLink", label: "Add link", action: "modal" },
   { id: "swmmnodes", icon: "ribbonSwmmNode", label: "SWMM nodes", chevron: true, menu: [
     { label: "Junction",     icon: "swmmJunction" },
     { label: "Outfall",      icon: "swmmOutfall" },
-    { label: "Rain gauge",   icon: "swmmRaingauge" },
+    { label: "Rain Gauge",   icon: "swmmRaingauge" },
     { label: "Storage",      icon: "swmmStorage" },
-    { label: "Divider",      icon: "placeholder" },
+    { label: "Divider",      icon: "swmmDivider" },
     { label: "Subcatchment", icon: "swmmSubcatchment" },
   ] },
   { id: "editnodes", icon: "ribbonEditNode", label: "Edit SWMM nodes", chevron: true, menu: [
-    { label: "Node properties", icon: "placeholder" },
-    { label: "Link properties", icon: "placeholder" },
-    { label: "Multi-edit/view", icon: "placeholder" },
+    { label: "Node properties", icon: "settingsOutline" },
+    { label: "Link properties", icon: "filesLink" },
+    { label: "Multi-edit/view", icon: "layoutsTableView2" },
   ] },
   { sep: true },
-  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM labels", chevron: true, menu: [
-    { label: "View SWMM labels", icon: "placeholder", disabled: true, disabledReason: "Not yet designed in Figma" },
+  { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM labels", chevron: true,
+    desc: "Multi-select what labels to display in map view.", menu: [
+    { label: "View SWMM labels", icon: "labelsColor", disabled: true, disabledReason: "Not yet designed in Figma" },
   ] },
 ];
 
 export const HYDROLOGY_RIBBON = [
-  { id: "hplusproject", icon: "hydroLoadHplus", label: "Hydrology+ Project", chevron: true, menu: [
-    { label: "Zoom to current project", icon: "placeholder" },
+  { id: "hplusproject", icon: "hydroLoadHplus", label: "Hydrology+ Project", chevron: true,
+    desc: "Observe the current selected project, zoom to it, or create new/open existing/view details/import/export a project file.", menu: [
+    { label: "Zoom to current project", icon: "guiZoomToFeature" },
     { menuSep: true },
-    { label: "New",             icon: "placeholder" },
-    { label: "Open",            icon: "placeholder" },
-    { label: "Project details", icon: "placeholder" },
-    { label: "Import",          icon: "placeholder" },
-    { label: "Export",          icon: "placeholder" },
+    { label: "New Hydrology+ Project",             icon: "hydroNewHplus" },
+    { label: "Open Hydrology+ Project",            icon: "hydroLoadHplus" },
+    { label: "Project details", icon: "alertsInformation" },
+    { label: "Import Hydrology+ Project",          icon: "filesImportModel" },
+    { label: "Export Hydrology+ Project",          icon: "generalUpload" },
   ] },
   { sep: true },
   { id: "refhtools", icon: "hydroRefh", label: "ReFH tools", chevron: true, menu: [
-    { label: "Optimise storm duration", icon: "placeholder" },
-    { label: "Probabilistic ReFH",      icon: "placeholder" },
+    { label: "Optimise Storm Duration", icon: "generalStopwatch" },
+    { label: "Probabilistic ReFH",      icon: "generalCompute" },
   ] },
   { sep: true },
   { id: "fsuportal", icon: "hydroFsuPortal", label: "FSU Portal", action: "modal" },
   { sep: true },
-  { id: "riverstations", icon: "hydroRiverStations", label: "View River Stations", chevron: true, menu: [
-    { label: "Environment Agency", icon: "placeholder" },
-    { label: "UKCEH NRFA",         icon: "placeholder" },
-    { label: "Off (none)",         icon: "placeholder" },
+  { id: "riverstations", icon: "hydroRiverStations", label: "View River Stations", chevron: true,
+    desc: "View gauge options (EA, NRFA) with sub-options like all gauges/QMED/pooling, or show the on-screen key.", menu: [
+    { label: "Environment Agency", icon: "hydroStationSearch" },
+    { label: "UKCEH NRFA",         icon: "hydroRiverStations" },
+    { label: "Off (none)",         icon: "generalInvisible" },
     { menuSep: true },
-    { label: "Show key", icon: "placeholder" },
+    { label: "Show key", icon: "moduleGlossary" },
   ] },
   { sep: true },
-  { id: "fehcatchments", icon: "hydroCatchDesc", label: "FEH Catchment Descriptors", chevron: true, menu: [
-    { label: "View FEH Catchments",    icon: "placeholder" },
-    { label: "Download from website",  icon: "placeholder" },
-    { label: "Import FEH",             icon: "placeholder" },
-    { label: "FEH tabular view",       icon: "placeholder" },
+  { id: "fehcatchments", icon: "hydroCatchDesc", label: "FEH Catchment Descriptors", chevron: true,
+    desc: "Download FEH CDs from the website, import previously obtained ones, or view them in tabular view.", menu: [
+    { label: "View FEH Catchments",    icon: "hydroCatchDesc" },
+    { label: "Download from website",  icon: "generalDownload" },
+    { label: "Import FEH",             icon: "filesImportModel" },
+    { label: "FEH tabular view",       icon: "layoutsTableView" },
   ] },
   { sep: true },
-  { id: "calcpoints", icon: "hydroCalcPoints", label: "Calculation Points", chevron: true, menu: [
-    { label: "Tabular view", icon: "placeholder" },
+  { id: "calcpoints", icon: "hydroCalcPoints", label: "Calculation Points", chevron: true,
+    desc: "Show/hide calculation points on the map.", menu: [
+      { label: "Tabular view", icon: "layoutsTableView2" },
+      { label: "Tabular view", icon: "layoutsTableView2" },
   ] },
   { sep: true },
   { id: "hplusviewlabels", icon: "labelsColor", label: "View Hydrology+ labels", chevron: true },
@@ -340,19 +352,22 @@ export const HYDROLOGY_RIBBON = [
 ];
 
 export const GIS_RIBBON = [
-  { id: "rastertools", icon: "placeholder", label: "Raster tools (TBC)", chevron: true },
-  { id: "vectortools", icon: "fm2dPolyArea", label: "Vector tools", chevron: true, menu: [
+  { id: "rastertools", icon: "filesRaster", label: "Raster tools (TBC)", chevron: true },
+  { id: "vectortools", icon: "fm2dPolyArea", label: "Vector tools", chevron: true,
+    desc: "Draw a shape with the pen tool — right-click, Escape, or Return to complete it, then save and set its attributes.", menu: [
     { label: "Polyline", icon: "fm2dPolyline" },
     { label: "Polygon",  icon: "fm2dPolyArea" },
     { label: "Point",    icon: "guiPolyPoint" },
   ] },
   { sep: true },
-  { id: "snapping", icon: "settingsOutline", label: "Snapping", chevron: true },
+  { id: "snapping", icon: "settingsOutline", label: "Snapping", chevron: true,
+    desc: "Activates/deactivates the last snap selection — multi-select snapping parameters, or adjust behaviour in settings." },
   { sep: true },
-  { id: "merge", icon: "mergeUnion", label: "Merge", chevron: true, menu: [
+  { id: "merge", icon: "mergeUnion", label: "Merge", chevron: true,
+    desc: "Merge two or more selected shapes using the pathfinder option below.", menu: [
     { label: "Union",     icon: "mergeUnion" },
-    { label: "Combine",   icon: "placeholder" },
-    { label: "Intersect", icon: "placeholder" },
+    { label: "Combine",   icon: "guiCombineShape" },
+    { label: "Intersect", icon: "guiIntersectShape" },
     { label: "Divide",    icon: "mergeDivide" },
     { label: "Subtract",  icon: "mergeSubtract" },
   ] },
@@ -360,15 +375,15 @@ export const GIS_RIBBON = [
 
 export const SIMULATION_RIBBON = [
   { id: "new1dsim", icon: "sim1dRiver", label: "New 1D Simulation", chevron: true, menu: [
-    { label: "1D River simulation", icon: "sim1dRiver" },
-    { label: "1D SWMM simulation",  icon: "sim1dSwmm" },
+    { label: "1D River Simulation", icon: "sim1dRiver" },
+    { label: "1D SWMM Simulation",  icon: "sim1dSwmm" },
   ] },
   { id: "newqualsim", icon: "simQuality", label: "New Quality Simulation", action: "modal" },
   { sep: true },
   { id: "new2dsim", icon: "simNew2d", label: "New 2D Simulation", action: "modal" },
   { id: "newtuflowsim", icon: "simTuflow", label: "New TUFLOW Simulation", chevron: true, menu: [
-    { label: "TUFLOW simulation", icon: "simTuflow" },
-    { label: "Estry simulation",  icon: "simEstry" },
+    { label: "TUFLOW Simulation", icon: "simTuflow" },
+    { label: "Estry Simulation",  icon: "simEstry" },
   ] },
   { id: "loadsim", icon: "simLoad", label: "Load Simulation", action: "file", fileType: "Simulation file (*.bat)" },
   { sep: true },
@@ -379,28 +394,28 @@ export const SIMULATION_RIBBON = [
 
 export const RESULTS_RIBBON = [
   { id: "1dresults", icon: "results1d", label: "1D results", chevron: true, menu: [
-    { label: "Time Series",   icon: "placeholder" },
-    { label: "Long Section",  icon: "placeholder" },
-    { label: "Cross Section", icon: "placeholder" },
-    { label: "XY Series",     icon: "placeholder" },
+    { label: "Time Series",   icon: "chartsReportLine" },
+    { label: "Long Section",  icon: "chartsReportFilled" },
+    { label: "Cross Section", icon: "crossSection" },
+    { label: "XY Series",     icon: "chartsVisTrendDashed" },
   ] },
   { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D Flood Map", chevron: true },
   { id: "tabularcsv", icon: "resultsTabularCsv", label: "Tabular CSV", action: "file", fileType: "CSV file (*.csv)" },
   { sep: true },
   { id: "results2d", icon: "results2d", label: "2D results", chevron: true, menu: [
-    { label: "Time Series",           icon: "placeholder" },
-    { label: "Plot Section",          icon: "placeholder" },
-    { label: "Flow Line",             icon: "placeholder" },
+    { label: "Time Series",           icon: "chartsReportLine" },
+    { label: "Plot Section",          icon: "chartAnalytics" },
+    { label: "Flow Line",             icon: "fm2dLine" },
     { label: "Embedded Structures",   icon: "resultEmbeddedStructures" },
   ] },
   { id: "2dfloodmap", icon: "results2dFloodMap", label: "2D Flood Map", action: "file", fileType: "Flood map raster (*.tif)" },
   { id: "damagecalc", icon: "resultsDamageCalculator", label: "Damage Calculator", action: "modal" },
   { sep: true },
   { id: "spatialdiag", icon: "resultsDiagnostics", label: "Spatial diagnostics", chevron: true, menu: [
-    { label: "Grid check",   icon: "placeholder" },
-    { label: "Domain check", icon: "placeholder" },
-    { label: "Zpt check",    icon: "placeholder" },
-    { label: "Messages & alerts", icon: "placeholder" },
+    { label: "Grid Check",   icon: "guiSnapGrid" },
+    { label: "Domain Check", icon: "generalSelectPolygon" },
+    { label: "Zpt Check",    icon: "zmodPoints" },
+    { label: "Messages & alerts", icon: "alertsNotification" },
   ] },
 ];
 
@@ -737,6 +752,7 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
         onClick={() => hasMenu ? setOpen(isOpen ? null : group.id) : group.action ? onAction(group) : group.chevron ? onAction({ ...group, action: "modal" }) : undefined}
         onMouseOver={() => setHover(true)}
         onMouseOut={() => setHover(false)}
+        title={group.desc}
         style={{
           display: "flex", alignItems: "center", gap: 4, height: 32, padding: "0 8px",
           border: "none", borderRadius: 2, cursor: "pointer",

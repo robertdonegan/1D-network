@@ -266,6 +266,47 @@ import ribbonSelectionMode from "./assets/ribbon-selection-mode.svg";
 import ribbonAddLink from "./assets/ribbon-add-link.svg";
 import ribbonSwmmNode from "./assets/ribbon-swmm-node.svg";
 
+// Dropdown-item icons pulled from the Flood-Icons repo (robertdonegan/Flood-Icons)
+// to replace "placeholder" entries in ModeRibbon.jsx's submenus.
+import worldTiltRotation from "./assets/world-tilt-rotation.svg";
+import moduleLibrary from "./assets/module-library.svg";
+import worldMapView2 from "./assets/world-map-view-2.svg";
+import editorReview from "./assets/editor-review.svg";
+import arrowsColOrder from "./assets/arrows-col-order.svg";
+import filesModelLine from "./assets/files-model-line.svg";
+import filesImportModel from "./assets/files-import-model.svg";
+import generalAddPolygon from "./assets/general-add-polygon.svg";
+import filesShapeFile from "./assets/files-shape-file.svg";
+import filesModelFill from "./assets/files-model-fill.svg";
+import generalEdit from "./assets/general-edit.svg";
+import filesTxtFile from "./assets/files-txt-file.svg";
+import editorColorLens from "./assets/editor-color-lens.svg";
+import generalToolboxIcon from "./assets/general-toolbox-icon.svg";
+import swmmDivider from "./assets/swmm-divider.svg";
+import filesLink from "./assets/files-link.svg";
+import layoutsTableView from "./assets/layouts-table-view.svg";
+import layoutsTableView2 from "./assets/layouts-table-view-2.svg";
+import guiZoomToFeature from "./assets/gui-zoom-to-feature.svg";
+import alertsInformation from "./assets/alerts-information.svg";
+import generalUpload from "./assets/general-upload.svg";
+import generalStopwatch from "./assets/general-stopwatch.svg";
+import generalCompute from "./assets/general-compute.svg";
+import hydroStationSearch from "./assets/hydro-station-search.svg";
+import generalInvisible from "./assets/general-invisible.svg";
+import moduleGlossary from "./assets/module-glossary.svg";
+import generalDownload from "./assets/general-download.svg";
+import guiCombineShape from "./assets/gui-combine-shape.svg";
+import guiIntersectShape from "./assets/gui-intersect-shape.svg";
+import chartsReportLine from "./assets/charts-report-line.svg";
+import chartsReportFilled from "./assets/charts-report-filled.svg";
+import chartsVisTrendDashed from "./assets/charts-vis-trend-dashed.svg";
+import fm2dLine from "./assets/fm2d-line.svg";
+import guiSnapGrid from "./assets/gui-snap-grid.svg";
+import generalSelectPolygon from "./assets/general-select-polygon.svg";
+import alertsNotification from "./assets/alerts-notification.svg";
+import filesRaster from "./assets/files-raster.svg";
+import hydroNewHplus from "./assets/hydro-new-hplus.svg";
+
 export const A = {
   logo, search, add, check, minimise, dock, cancel, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
@@ -321,6 +362,14 @@ export const A = {
   ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,
   ribbonPoint, ribbonTools, ribbonSwmm1dLink, ribbonSwmm2dLink, ribbonViewLabels,
   ribbonEditNode, ribbonSelectionMode, ribbonAddLink, ribbonSwmmNode,
+  worldTiltRotation, moduleLibrary, worldMapView2, editorReview, arrowsColOrder,
+  filesModelLine, filesImportModel, generalAddPolygon, filesShapeFile, filesModelFill,
+  generalEdit, filesTxtFile, editorColorLens, generalToolboxIcon, swmmDivider, filesLink,
+  layoutsTableView, layoutsTableView2, guiZoomToFeature, alertsInformation, generalUpload,
+  generalStopwatch, generalCompute, hydroStationSearch, generalInvisible, moduleGlossary,
+  generalDownload, guiCombineShape, guiIntersectShape, chartsReportLine, chartsReportFilled,
+  chartsVisTrendDashed, fm2dLine, guiSnapGrid, generalSelectPolygon,
+  alertsNotification, filesRaster, hydroNewHplus,
 };
 
 // Small helper for a fixed-size icon <img>
