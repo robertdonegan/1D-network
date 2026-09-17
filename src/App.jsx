@@ -4,6 +4,7 @@ import ModeRibbon, { modes, DEFAULT_FAVOURITES, DEFAULT_FAVOURITE_LISTS } from "
 import PanelSlot from "./components/PanelSlot.jsx";
 import GisCanvas from "./components/GisCanvas.jsx";
 import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
+import ChangelogModal from "./components/ChangelogModal.jsx";
 import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import AddLayerModal from "./components/AddLayerModal.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
@@ -21,16 +22,37 @@ import { mockFlowForEdge } from "./flowMock.js";
 // a real, recognisable bend instead of an arbitrary straight line. See
 // GisCanvas's default `view` for the matching pan/zoom.
 const INIT_NODES = [
-  { id: "n0", icon: "flowTime",     shape: "square",  x: -488, y: -915, label: "M014",  unitLabel: "Flow-Time" },
-  { id: "n1", icon: "crossSection", shape: "square",  x: -623, y: -686, label: "M015",  unitLabel: "River Section" },
-  { id: "n2", icon: "interpolate",  shape: "diamond", x: -567, y: -428, label: "M0155", unitLabel: "Interpolate" },
-  { id: "n3", icon: "crossSection", shape: "square",  x: -368, y: -255, label: "M016",  unitLabel: "River Section" },
-  { id: "n4", icon: "calcPointWeir",shape: "square",  x: -111, y: -172, label: "M017",  unitLabel: "Calc Point Weir" },
-  { id: "n5", icon: "interpolate",  shape: "diamond", x: -2,   y: 64,   label: "M0175", unitLabel: "Interpolate" },
-  { id: "n6", icon: "crossSection", shape: "square",  x: -29,  y: 333,  label: "M018",  unitLabel: "River Section" },
-  { id: "n7", icon: "normalDepth",  shape: "square",  x: -193, y: 531,  label: "M026",  unitLabel: "Normal Depth" },
+  // Node order follows the flow path: M014 upstream Flow-Time boundary down
+  // to M036 at the downstream end — labels renumbered consecutively in that
+  // sequence (they previously carried gaps from how they were drawn). The
+  // Bridge unit was removed from the default network (g59 connects straight
+  // on to n3), leaving a gap for the user to drop a Bridge in during demos.
+  // Node ids/coords/icons are the ones exported via "River Network > Save 1D Network".
+  { id: "n0",  icon: "flowTime",      shape: "square", x: -484.0834134685749,  y: -939.1060011430448,  label: "M014", unitLabel: "Flow-Time" },
+  { id: "g83", icon: "crossSection",  shape: "square", x: -539.3540827876677,  y: -893.1398396550942,  label: "M015", unitLabel: "River Section" },
+  { id: "g80", icon: "crossSection",  shape: "square", x: -583.4622099856098,  y: -839.211995836694,   label: "M016", unitLabel: "River Section" },
+  { id: "g77", icon: "crossSection",  shape: "square", x: -611.283624363134,   y: -782.4888356209584,  label: "M017", unitLabel: "River Section" },
+  { id: "n1",  icon: "crossSection",  shape: "square", x: -629.2224512607742,  y: -723.2819749268424,  label: "M018", unitLabel: "River Section" },
+  { id: "g74", icon: "crossSection",  shape: "square", x: -636.261070016792,   y: -650.7542656735401,  label: "M019", unitLabel: "River Section" },
+  { id: "g71", icon: "crossSection",  shape: "square", x: -636.9213220315564,  y: -602.1308548370907,  label: "M020", unitLabel: "River Section" },
+  { id: "g68", icon: "crossSection",  shape: "square", x: -628.5643516230992,  y: -534.2161842878825,  label: "M021", unitLabel: "River Section" },
+  { id: "g65", icon: "crossSection",  shape: "square", x: -595.3934428738781,  y: -467.22001217608084, label: "M022", unitLabel: "River Section" },
+  { id: "g62", icon: "crossSection",  shape: "square", x: -558.5440383719997,  y: -401.17497358626724, label: "M023", unitLabel: "River Section" },
+  { id: "g59", icon: "crossSection",  shape: "square", x: -505.9087550941922,  y: -336.12132259954535, label: "M024", unitLabel: "River Section" },
+  { id: "n3",  icon: "crossSection",  shape: "square", x: -360.28209752571416, y: -258.6462242691814,  label: "M025", unitLabel: "River Section" },
+  { id: "g29", icon: "crossSection",  shape: "square", x: -263.31393936136715, y: -226.24216151820593, label: "M026", unitLabel: "River Section" },
+  { id: "g32", icon: "crossSection",  shape: "square", x: -169.67228884574322, y: -206.05748484966708, label: "M027", unitLabel: "River Section" },
+  { id: "g35", icon: "crossSection",  shape: "square", x: -84.59944867625106,  y: -154.1840856949196,  label: "M028", unitLabel: "River Section" },
+  { id: "g38", icon: "crossSection",  shape: "square", x: -33.821760433843224, y: -70.8784415759841,   label: "M029", unitLabel: "River Section" },
+  { id: "g41", icon: "crossSection",  shape: "square", x: -13.915682088578517, y: 19.07151490615105,   label: "M030", unitLabel: "River Section" },
+  { id: "g44", icon: "crossSection",  shape: "square", x: -11.181019718357765, y: 117.88055453921893,  label: "M031", unitLabel: "River Section" },
+  { id: "g47", icon: "crossSection",  shape: "square", x: -26.84645510794635,  y: 214.11696001419168,  label: "M032", unitLabel: "River Section" },
+  { id: "n6",  icon: "crossSection",  shape: "square", x: -35.48027094831626,  y: 309.9573553688984,   label: "M033", unitLabel: "River Section" },
+  { id: "g50", icon: "crossSection",  shape: "square", x: -61.539424777805145, y: 402.91323017289227,  label: "M034", unitLabel: "River Section" },
+  { id: "g53", icon: "crossSection",  shape: "square", x: -114.53707575400215, y: 468.6661477105294,   label: "M035", unitLabel: "River Section" },
+  { id: "n7",  icon: "normalDepth",   shape: "square", x: -195.5388388753148,  y: 512.2420388698287,   label: "M036", unitLabel: "Normal Depth" },
 ];
-const INIT_EDGES = [["n0","n1"],["n1","n2"],["n2","n3"],["n3","n4"],["n4","n5"],["n5","n6"],["n6","n7"]]
+const INIT_EDGES = [["n3","g29"],["g29","g32"],["g32","g35"],["g35","g38"],["g38","g41"],["g41","g44"],["g44","g47"],["g47","n6"],["n6","g50"],["g50","g53"],["g53","n7"],["g59","n3"],["g62","g59"],["g65","g62"],["g68","g65"],["g71","g68"],["n1","g74"],["g74","g71"],["g77","n1"],["g80","g77"],["n0","g83"],["g83","g80"]]
   .map((e, i) => ({ id: "e" + i, from: e[0], to: e[1], points: [] }));
 
 // Two demo shapefiles the user drew in-app with the Pen tool, exported via
@@ -253,6 +275,7 @@ function FloatingToolbox({ pos, setPos, onDock, onClose }) {
 export default function App() {
   const [mode, setMode] = useState("FM 1D");
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [projectW, setProjectW] = useState(232);
   const [networkW, setNetworkW] = useState(232);
   // Which view each side panel slot currently shows — see PanelSlot.jsx's
@@ -326,6 +349,15 @@ export default function App() {
     setBasemapRaw(id);
   };
   const toggleBasemap = () => setBasemapRaw((b) => (b === "none" ? lastBasemapRef.current : "none"));
+  // Shift+B steps through every backdrop the demo can actually render (the
+  // same enabled entries as the Basemap menus — see BASEMAP_SOURCES). B alone
+  // still just snaps between the grid and the last-selected backdrop.
+  const BASEMAP_CYCLE = ["none", "osm", "os-satellite"];
+  const cycleBasemap = () => setBasemapRaw((cur) => {
+    const next = BASEMAP_CYCLE[(BASEMAP_CYCLE.indexOf(cur) + 1) % BASEMAP_CYCLE.length];
+    if (next !== "none") lastBasemapRef.current = next;
+    return next;
+  });
   // One-shot "pan/zoom here" request from the top-bar location search — same
   // consume-once pattern as ribbonDrag. Turning on the OSM backdrop when a
   // location is picked gives the jump somewhere to actually land visually.
@@ -334,11 +366,76 @@ export default function App() {
     setFlyTo({ lat, lon, key: Date.now() });
     if (basemap === "none") setBasemap("osm");
   };
+  // One-shot "fit these world-space bounds" request — the Project panel's
+  // layer right-click → Zoom to layer. Same consume-once pattern as flyTo;
+  // GisCanvas fits the bbox. No-op for a layer with no polygons yet.
+  const [zoomExtent, setZoomExtent] = useState(null);
+  const zoomToLayer = (layerId) => {
+    const pts = (polygons || [])
+      .filter((p) => (p.layerId || "example") === layerId)
+      .flatMap((p) => p.points || []);
+    if (!pts.length) return;
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    setZoomExtent({
+      bounds: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+      key: Date.now(),
+    });
+  };
   // In-progress ribbon → canvas drag: { items, index, x, y }. Shared between
   // ModeRibbon/OSWindow (start it, cycle it with Tab) and GisCanvas (consumes it on drop).
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
+
+  // "River Network > Save 1D Network" — serialises the canvas network as a
+  // JSON file, mirroring the INIT_NODES/INIT_EDGES seed format above, so it
+  // can be handed back to re-seed the default network (or reloaded as a
+  // project). Nodes keep their geometry/icon/shape/label; edges keep their
+  // endpoints, drawn intermediate points and any reach override.
+  const exportNetwork = async () => {
+    const data = {
+      format: "fm-1d-network",
+      version: 1,
+      nodes: nodes.map((n) => ({
+        id: n.id, icon: n.icon, shape: n.shape || "square",
+        x: n.x, y: n.y, label: n.label, unitLabel: n.unitLabel,
+      })),
+      edges: edges.map((e) => ({
+        id: e.id, from: e.from, to: e.to, points: e.points || [],
+        ...(e.curves ? { curves: e.curves } : {}),
+        ...(e.reach ? { reach: e.reach } : {}),
+      })),
+    };
+    const json = JSON.stringify(data, null, 2);
+    const fileName = "1d-network.json";
+    // Native "Save As" location picker where the browser supports the File
+    // System Access API (Chrome/Edge). Firefox/Safari fall back to a plain
+    // download, which lands in the browser's default downloads folder.
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: "1D Network JSON", accept: { "application/json": [".json"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        return;
+      } catch (err) {
+        if (err?.name === "AbortError") return; // user cancelled the dialog
+        // fall through to the download fallback
+      }
+    }
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // User-managed Favourites (Favourites tab): the tab now holds several
   // named, independent lists (Figma "FMv8.0 Modes / Ribbons" node
@@ -548,10 +645,12 @@ export default function App() {
       // Toggle the map backdrop between the grid and the last-selected
       // basemap — same bare-letter convention as the canvas's V/G/M/Q/X/Z
       // tool shortcuts (see GisCanvas), so it lives here rather than there
-      // since the basemap selection itself is owned by App.
+      // since the basemap selection itself is owned by App. Shift+B instead
+      // cycles through every available backdrop in turn.
       if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e) && e.key.toLowerCase() === "b") {
         e.preventDefault();
-        toggleBasemap();
+        if (e.shiftKey) cycleBasemap();
+        else toggleBasemap();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -598,17 +697,18 @@ export default function App() {
     polygons, layers, activeLayerId, tab: projectTab, setTab: setProjectTab,
     onSetActiveLayer: setActiveLayerId, onToggleLayerVisibility: toggleLayerVisibility,
     onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
+    onZoomToLayer: zoomToLayer,
   };
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
-      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onGoToLocation={goToLocation}
+      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onOpenChangelog={() => setShowChangelog(true)} onGoToLocation={goToLocation}
         flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} onOpenToolbox={() => setToolboxFloat(true)}
         basemap={basemap} setBasemap={setBasemap}
         isFavourite={isFavourite} onToggleFavourite={toggleFavourite}
         recentSearches={recentSearches} onSelectResult={handleSelectSearchResult}
         onCreateLayer={() => setAddLayerModalOpen(true)} />
-      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap}
+      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap} onExportNetwork={exportNetwork}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
         onOpenAnnotationSettings={() => setShowAnnotationSettings(true)}
         favourites={favourites} onDropFavourite={handleFavouriteDrop} onRemoveFavourite={removeFavourite}
@@ -633,6 +733,7 @@ export default function App() {
             selected={selected} setSelected={setSelected}
             basemap={basemap}
             flyTo={flyTo} onConsumeFlyTo={() => setFlyTo(null)}
+            zoomExtent={zoomExtent} onConsumeZoomExtent={() => setZoomExtent(null)}
             ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
             edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
             reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
@@ -685,6 +786,7 @@ export default function App() {
       )}
 
       {showShortcuts && <KeyboardShortcuts onClose={() => setShowShortcuts(false)} />}
+      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
       {addLayerModalOpen && <AddLayerModal onCreate={addLayer} onClose={() => setAddLayerModalOpen(false)} />}
       {toolboxFloat && (
         <FloatingToolbox

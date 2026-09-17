@@ -1,5 +1,6 @@
 // All real SVG assets, imported so Vite bundles them (no CDN, no expiry).
 import logo from "./assets/logo.svg";
+import runFailed from "./assets/run-failed.svg";
 import search from "./assets/search.svg";
 import add from "./assets/add.svg";
 import check from "./assets/check.svg";
@@ -47,10 +48,8 @@ import fm2dZlinePointsImport from "./assets/fm2d-zline-points-import.svg";
 import homeDownloadFathomData from "./assets/home-download-fathom-data.svg";
 import homeLoadFathomData from "./assets/home-load-fathom-data.svg";
 import hydroCalcPoints from "./assets/hydro-calc-points.svg";
-import swmmNetworkIcon from "./assets/swmm-network.svg";
 import simLoad from "./assets/sim-load.svg";
 
-import load1d from "./assets/load-1d-nwrk.svg";
 import crossSection from "./assets/cross-section-node.svg";
 import interpolate from "./assets/interpolate-node.svg";
 import circularArch from "./assets/circular-arch.svg";
@@ -140,7 +139,6 @@ import zmodPolygon from "./assets/zmod-polygon.svg";
 import zmodPolyline from "./assets/zmod-polyline.svg";
 import zmodPoints from "./assets/zmod-points.svg";
 import zmodVertice from "./assets/zmod-vertice.svg";
-import zmodImport from "./assets/zmod-import.svg";
 import settingsOutline from "./assets/settings-outline.svg";
 import swmmJunction from "./assets/swmm-junction.svg";
 import swmmOutfall from "./assets/swmm-outfall.svg";
@@ -151,7 +149,6 @@ import mergeUnion from "./assets/merge-union.svg";
 import mergeDivide from "./assets/merge-divide.svg";
 import mergeSubtract from "./assets/merge-subtract.svg";
 import sim1dRiver from "./assets/sim-1d-river.svg";
-import sim1dSwmm from "./assets/sim-1d-swmm.svg";
 import simTuflow from "./assets/sim-tuflow.svg";
 import simEstry from "./assets/sim-estry.svg";
 import resultEmbeddedStructures from "./assets/result-embedded-structures.svg";
@@ -171,7 +168,6 @@ import resultsTabularCsv from "./assets/results-tabular-csv.svg";
 import results2d from "./assets/results-2d.svg";
 import results2dFloodMap from "./assets/results-2d-flood-map.svg";
 import resultsDamageCalculator from "./assets/results-damage-calculator.svg";
-import resultsDiagnostics from "./assets/results-diagnostics.svg";
 import resultsComments from "./assets/results-comments.svg";
 import favStar from "./assets/fav-star.svg";
 import chartAnalytics from "./assets/chart-analytics.svg";
@@ -182,6 +178,20 @@ import lhs0 from "./assets/lhs-0.svg";
 import lhs1 from "./assets/lhs-1.svg";
 import lhs2 from "./assets/lhs-2.svg";
 import lhs3 from "./assets/lhs-3.svg";
+import lhsList from "./assets/lhs-list.svg";
+import lhsFm2d from "./assets/lhs-fm2d.svg";
+import lhsDataLibrary from "./assets/lhs-data-library.svg";
+import lhsChevronRight from "./assets/lhs-chevron-right.svg";
+import lhsChevronDown from "./assets/lhs-chevron-down.svg";
+import simChevron from "./assets/sim-chevron.svg";
+import lhsPlus from "./assets/lhs-plus.svg";
+import lhsMinus from "./assets/lhs-minus.svg";
+import lhsRaster from "./assets/lhs-raster.svg";
+import lhsRasterHide from "./assets/lhs-raster-hide.svg";
+import lhsTxtFile from "./assets/lhs-txt-file.svg";
+import lhsPolygon from "./assets/lhs-polygon.svg";
+import lhsLink from "./assets/lhs-link.svg";
+import lhsPolyline from "./assets/lhs-polyline.svg";
 import rectangleSelect from "./assets/rectangle-select.svg";
 import ellipticalSelect from "./assets/elliptical-select.svg";
 import freeformSelect from "./assets/freeform-select.svg";
@@ -271,54 +281,105 @@ import ribbonSwmmNode from "./assets/ribbon-swmm-node.svg";
 import worldTiltRotation from "./assets/world-tilt-rotation.svg";
 import moduleLibrary from "./assets/module-library.svg";
 import worldMapView2 from "./assets/world-map-view-2.svg";
-import editorReview from "./assets/editor-review.svg";
-import arrowsColOrder from "./assets/arrows-col-order.svg";
-import filesModelLine from "./assets/files-model-line.svg";
-import filesImportModel from "./assets/files-import-model.svg";
-import generalAddPolygon from "./assets/general-add-polygon.svg";
-import filesShapeFile from "./assets/files-shape-file.svg";
-import filesModelFill from "./assets/files-model-fill.svg";
 import generalEdit from "./assets/general-edit.svg";
 import filesTxtFile from "./assets/files-txt-file.svg";
 import editorColorLens from "./assets/editor-color-lens.svg";
 import generalToolboxIcon from "./assets/general-toolbox-icon.svg";
 import swmmDivider from "./assets/swmm-divider.svg";
 import filesLink from "./assets/files-link.svg";
-import layoutsTableView from "./assets/layouts-table-view.svg";
-import layoutsTableView2 from "./assets/layouts-table-view-2.svg";
-import guiZoomToFeature from "./assets/gui-zoom-to-feature.svg";
-import alertsInformation from "./assets/alerts-information.svg";
-import generalUpload from "./assets/general-upload.svg";
-import generalStopwatch from "./assets/general-stopwatch.svg";
-import generalCompute from "./assets/general-compute.svg";
-import hydroStationSearch from "./assets/hydro-station-search.svg";
 import generalInvisible from "./assets/general-invisible.svg";
-import moduleGlossary from "./assets/module-glossary.svg";
-import generalDownload from "./assets/general-download.svg";
 import guiCombineShape from "./assets/gui-combine-shape.svg";
 import guiIntersectShape from "./assets/gui-intersect-shape.svg";
 import chartsReportLine from "./assets/charts-report-line.svg";
 import chartsReportFilled from "./assets/charts-report-filled.svg";
 import chartsVisTrendDashed from "./assets/charts-vis-trend-dashed.svg";
 import fm2dLine from "./assets/fm2d-line.svg";
-import guiSnapGrid from "./assets/gui-snap-grid.svg";
-import generalSelectPolygon from "./assets/general-select-polygon.svg";
-import alertsNotification from "./assets/alerts-notification.svg";
 import filesRaster from "./assets/files-raster.svg";
 import hydroNewHplus from "./assets/hydro-new-hplus.svg";
+import swmmNew from "./assets/swmm-new.svg";
+import swmmLoad from "./assets/swmm-load.svg";
+import swmmSave from "./assets/swmm-save.svg";
+import swmmSaveAs from "./assets/swmm-save-as.svg";
+import swmmSelection from "./assets/swmm-selection.svg";
+
+// Second Figma sync pass (Modes & Ribbons node 1-1071 / Dropdowns node 3619-76488) —
+// icons pulled from the fuller robertdonegan/Flood-Icons source tree (flood-icons/icons/,
+// not the smaller published dist/api snapshot, which lags behind).
+import hydroStormDuration from "./assets/hydro-storm-duration.svg";
+import fm1dResGen from "./assets/fm1d-res-gen.svg";
+import fm1dSpillGen from "./assets/fm1d-spill-gen.svg";
+import fm1dCrossSectionGen from "./assets/fm1d-cross-section-gen.svg";
+import resultsTinShapefile from "./assets/results-tin-shapefile.svg";
+import resultsTinCrossSection from "./assets/results-tin-cross-section.svg";
+import resultsAdd1dTin from "./assets/results-add-1d-tin.svg";
+import results2dUpload from "./assets/results-2d-upload.svg";
+import resultsGlobalPlayer from "./assets/results-global-player.svg";
+import resultsMultiPlayer from "./assets/results-multi-player.svg";
+import fm2dNewModel from "./assets/fm2d-new-model.svg";
+import fm2dLoadModel from "./assets/fm2d-load-model.svg";
+import fm2dSaveModel from "./assets/fm2d-save-model.svg";
+import fm2dSaveAsModel from "./assets/fm2d-save-as-model.svg";
+import fm2dShapefileActiveArea from "./assets/fm2d-shapefile-active-area.svg";
+import fm2dBoundaryCond from "./assets/fm2d-boundary-cond.svg";
+import fm2dShapefileBoundLine from "./assets/fm2d-shapefile-bound-line.svg";
+import fm2dDepthVaryPoly from "./assets/fm2d-depth-vary-poly.svg";
+import fm2dLandUsePolygon from "./assets/fm2d-land-use-polygon.svg";
+import fm2dLoadRoughShapefile from "./assets/fm2d-load-rough-shapefile.svg";
+import fm2dBoundaryPoints from "./assets/fm2d-boundary-points.svg";
+import fm2dBoundaryPolygon from "./assets/fm2d-boundary-polygon.svg";
+import fm2dEmbed1dOrifice from "./assets/fm2d-embed-1d-orifice.svg";
+import fm2dEmbed1dCulvert from "./assets/fm2d-embed-1d-culvert.svg";
+import fm2dEmbed1dWeir from "./assets/fm2d-embed-1d-weir.svg";
+import fm2dLoadEmbed1dStructure from "./assets/fm2d-load-embed-1d-structure.svg";
+import fm2dEmbed1dGeneric from "./assets/fm2d-embed-1d-generic.svg";
+import fm2dEmbed1dCrumpWeir from "./assets/fm2d-embed-1d-crump-weir.svg";
+import fm2dEmbed1dSharpCrestWeir from "./assets/fm2d-embed-1d-sharp-crest-weir.svg";
+import fm2dEmbed1dRoundNoseWeir from "./assets/fm2d-embed-1d-round-nose-weir.svg";
+import fm2d1dManualLink from "./assets/fm2d-1d-manual-link.svg";
+import tuflowAdd from "./assets/tuflow-add.svg";
+import tuflowLoad from "./assets/tuflow-load.svg";
+import tuflowSave from "./assets/tuflow-save.svg";
+import tuflowSaveAs from "./assets/tuflow-save-as.svg";
+import tuflow1dNodes from "./assets/tuflow-1d-nodes.svg";
+import swmmEditNode from "./assets/swmm-edit-node.svg";
+import swmmEditLink from "./assets/swmm-edit-link.svg";
+import swmmMultiEdit from "./assets/swmm-multi-edit.svg";
+import hydroReportBuilder from "./assets/hydro-report-builder.svg";
+import hydroSaveHplus from "./assets/hydro-save-hplus.svg";
+import hydroZoomToHplus from "./assets/hydro-zoom-to-hplus.svg";
+import hydroHplusProjectDetails from "./assets/hydro-hplus-project-details.svg";
+import hydroImportHplus from "./assets/hydro-import-hplus.svg";
+import hydroExportHplus from "./assets/hydro-export-hplus.svg";
+import hydroStationEa from "./assets/hydro-station-ea.svg";
+import hydroStationEaLevel from "./assets/hydro-station-ea-level.svg";
+import hydroStationEaFlow from "./assets/hydro-station-ea-flow.svg";
+import hydroStationNrfa from "./assets/hydro-station-nrfa.svg";
+import hydroStationNrfaQmed from "./assets/hydro-station-nrfa-qmed.svg";
+import hydroStationNrfaPooling from "./assets/hydro-station-nrfa-pooling.svg";
+import hydroStationShowKey from "./assets/hydro-station-show-key.svg";
+import hydroDownloadCatchDesc from "./assets/hydro-download-catch-desc.svg";
+import hydroCatchDescTable from "./assets/hydro-catch-desc-table.svg";
+import hydroImportCatchDesc from "./assets/hydro-import-catch-desc.svg";
+import hydroViewCalcPoint from "./assets/hydro-view-calc-point.svg";
+import hydroCalcPointTable from "./assets/hydro-calc-point-table.svg";
+import simNewSwmm from "./assets/sim-new-swmm.svg";
+import favListSave from "./assets/fav-list-save.svg";
+import fm2dZPolygonImport from "./assets/fm2d-z-polygon-import.svg";
+import fm2dZPolylineImport from "./assets/fm2d-z-polyline-import.svg";
+import fm2dZPointsImport from "./assets/fm2d-z-points-import.svg";
 
 export const A = {
-  logo, search, add, check, minimise, dock, cancel, layers,
+  logo, search, add, check, minimise, dock, cancel, runFailed, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
   filesFolder, arrowLeft, arrowRight,
   panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,
-  tuflowEstry1d, tuflowAddModel, tuflowImportLayers, tuflowTools, hydroCalcPoints, swmmNetworkIcon, simLoad,
+  tuflowEstry1d, tuflowAddModel, tuflowImportLayers, tuflowTools, hydroCalcPoints, simLoad,
   fm2d1d2dLinkGenerator, fm2d1dLevelLink, fm2d1dFlowLink, fm2d1dWeirLink,
   fm2dTopoPolygon, fm2dTopoPolyline, fm2dTopoPoints, fm2dLoadShapefileTopo, fm2dLoadGroundElev, fm2dDefineTopo,
   fm2dRainfallPolygon, fm2dInfiltrationPolygon, fm2dLoadRainInfilShapefile,
   fm2dZlinePolyline, fm2dZlinePolylineImport, fm2dZlinePoints, fm2dZlinePointsImport,
   homeDownloadFathomData, homeLoadFathomData,
-  load1d, crossSection, interpolate, circularArch, flowTime, normalDepth,
+  crossSection, interpolate, circularArch, flowTime, normalDepth,
   broadWeir, superBridge, spill, openJunction, blockage,
   floodplain, onlinePond, reservoir, usbprBridge, archBridge, pierLossBridge, breach, pump, generalLoss,
   loadRiverNetwork, newRiverNetwork, saveRiverNetwork, saveAsRiverNetwork,
@@ -336,17 +397,18 @@ export const A = {
   hydrographGenRainfall, hydrographFeh, hydrographRefh, hydrographFrqsim, hydrographFssr,
   connectorEnergyJunction, connectorLateral, connectorManhole, connectorGauge,
   fm2dPolyline, fm2dPolyArea, guiPolyPoint,
-  zmodPolygon, zmodPolyline, zmodPoints, zmodVertice, zmodImport,
-  settingsOutline,
+  zmodPolygon, zmodPolyline, zmodPoints, zmodVertice, settingsOutline,
   swmmJunction, swmmOutfall, swmmRaingauge, swmmStorage, swmmSubcatchment,
   mergeUnion, mergeDivide, mergeSubtract,
-  sim1dRiver, sim1dSwmm, simTuflow, simEstry,
+  sim1dRiver, simTuflow, simEstry,
   resultEmbeddedStructures,
   hydroLoadHplus, hydroRefh, hydroFsuPortal, hydroRiverStations, hydroCatchDesc,
   simQuality, simNew2d, simBuilder, simRun, simRunBatch,
   results1d, results1dFloodMap, resultsTabularCsv, results2d, results2dFloodMap,
-  resultsDamageCalculator, resultsDiagnostics, resultsComments, favStar, chartAnalytics,
-  cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3,
+  resultsDamageCalculator, resultsComments, favStar, chartAnalytics,
+  cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3, lhsList, lhsFm2d, lhsDataLibrary,
+  lhsChevronRight, lhsChevronDown, lhsPlus, lhsTxtFile, lhsPolygon, lhsLink, lhsPolyline,
+  lhsMinus, lhsRaster, lhsRasterHide, simChevron,
   rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, editStop, northStar, comment,
   editPenTool, editAddVertex, editMovePolygon, editSnapPoint, editLayers, editViewAttribute, editSave, editSaveAs,
   editUndo, editRedo, editRevert, editMoveVertex, editDeleteVertex, editRotateShape, editReverseShape, editDeleteShape,
@@ -362,14 +424,31 @@ export const A = {
   ribbonPolyline, ribbonZmod, ribbonGenImesh, ribbonModImesh, ribbonImport, ribbonPolygon,
   ribbonPoint, ribbonTools, ribbonSwmm1dLink, ribbonSwmm2dLink, ribbonViewLabels,
   ribbonEditNode, ribbonSelectionMode, ribbonAddLink, ribbonSwmmNode,
-  worldTiltRotation, moduleLibrary, worldMapView2, editorReview, arrowsColOrder,
-  filesModelLine, filesImportModel, generalAddPolygon, filesShapeFile, filesModelFill,
-  generalEdit, filesTxtFile, editorColorLens, generalToolboxIcon, swmmDivider, filesLink,
-  layoutsTableView, layoutsTableView2, guiZoomToFeature, alertsInformation, generalUpload,
-  generalStopwatch, generalCompute, hydroStationSearch, generalInvisible, moduleGlossary,
-  generalDownload, guiCombineShape, guiIntersectShape, chartsReportLine, chartsReportFilled,
-  chartsVisTrendDashed, fm2dLine, guiSnapGrid, generalSelectPolygon,
-  alertsNotification, filesRaster, hydroNewHplus,
+  worldTiltRotation, moduleLibrary, worldMapView2, generalEdit, filesTxtFile, editorColorLens, generalToolboxIcon, swmmDivider, filesLink,
+  generalInvisible, guiCombineShape, guiIntersectShape, chartsReportLine, chartsReportFilled,
+  chartsVisTrendDashed, fm2dLine, filesRaster, hydroNewHplus,
+  swmmNew, swmmLoad, swmmSave, swmmSaveAs, swmmSelection,
+  hydroStormDuration, fm1dResGen, fm1dSpillGen, fm1dCrossSectionGen,
+  resultsTinShapefile, resultsTinCrossSection, resultsAdd1dTin, results2dUpload,
+  resultsGlobalPlayer, resultsMultiPlayer,
+  fm2dNewModel, fm2dLoadModel, fm2dSaveModel, fm2dSaveAsModel,
+  fm2dShapefileActiveArea, fm2dBoundaryCond, fm2dShapefileBoundLine,
+  fm2dDepthVaryPoly, fm2dLandUsePolygon, fm2dLoadRoughShapefile,
+  fm2dBoundaryPoints, fm2dBoundaryPolygon,
+  fm2dEmbed1dOrifice, fm2dEmbed1dCulvert, fm2dEmbed1dWeir, fm2dLoadEmbed1dStructure,
+  fm2dEmbed1dGeneric, fm2dEmbed1dCrumpWeir, fm2dEmbed1dSharpCrestWeir, fm2dEmbed1dRoundNoseWeir,
+  fm2d1dManualLink,
+  tuflowAdd, tuflowLoad, tuflowSave, tuflowSaveAs, tuflow1dNodes,
+  swmmEditNode, swmmEditLink, swmmMultiEdit,
+  hydroReportBuilder, hydroSaveHplus, hydroZoomToHplus, hydroHplusProjectDetails,
+  hydroImportHplus, hydroExportHplus,
+  hydroStationEa, hydroStationEaLevel, hydroStationEaFlow,
+  hydroStationNrfa, hydroStationNrfaQmed, hydroStationNrfaPooling,
+  hydroStationShowKey, hydroDownloadCatchDesc, hydroCatchDescTable, hydroImportCatchDesc,
+  hydroViewCalcPoint, hydroCalcPointTable,
+  simNewSwmm,
+  fm2dZPolygonImport, fm2dZPolylineImport, fm2dZPointsImport,
+  favListSave,
 };
 
 // Small helper for a fixed-size icon <img>

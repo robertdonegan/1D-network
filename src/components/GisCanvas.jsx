@@ -5,6 +5,7 @@ import ReachPicker from "./ReachPicker.jsx";
 import OsmBasemap, {
   lonLatToWorld,
   METERS_PER_WORLD_UNIT,
+  BASEMAP_SOURCES,
 } from "./OsmBasemap.jsx";
 import MapFooter from "./MapFooter.jsx";
 import TransectPopup from "./TransectPopup.jsx";
@@ -35,6 +36,10 @@ const OUTER = 28,
   ICONSZ = 20;
 const DIAMOND = 16,
   DIAMOND_ICONSZ = 14;
+// Live Edit node-merge: dropping a dragged unit within half a footprint of
+// another drops it on top and merges the two (see mergeNodesInto).
+const MERGE_DIST = OUTER / 2;
+const MERGE_MIN_DRAG = 3; // world units — below this a "drag" was really a click
 // Rect-shaped units (e.g. Spill) render wider-than-tall so they stay visually
 // distinct from square/diamond units, but keep the same OUTER logical
 // footprint as squares (for line-attachment/hit-testing/ports math) — the
@@ -46,6 +51,46 @@ const MIN_SCALE = 0.25,
   MAX_SCALE = 4;
 const WHEEL_ZOOM_FACTOR = 1.05; // per wheel notch — gentle
 const KEY_ZOOM_FACTOR = 1.2; // per +/- keypress — a deliberate step
+// A marquee/select/zoom box this small is a click, not a drag — don't paint
+// the blue selection overlay or commit a selection for it (a stray taps
+// with the Group-select tool or a held Shift/Ctrl used to flash a whole
+// screen-filling box on "drag runs" that were meant to be panning).
+const MARQUEE_MIN = 4;
+// If a drag covers more than MARQUEE_MIN within this window it's a quick
+// "fling" of the mouse, almost always meant as panning — so a marquee (blue
+// box) that starts that fast is turned into a pan instead. A deliberate
+// box-select is slower than this, so real marquee use is unaffected.
+const FLING_MS = 200;
+
+// Snapshot helpers for the network undo/redo (nodes + reach edges). Nodes
+// are the "map view" state this project is built around, so Cmd/Ctrl+Z and
+// Cmd/Ctrl+Shift+Z step through these snapshots.
+const snapNet = (nodes, edges) => ({
+  nodes: JSON.parse(JSON.stringify(nodes)),
+  edges: JSON.parse(JSON.stringify(edges)),
+});
+const eqNet = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const MAX_NET_HISTORY = 60;
+
+// Absorb node `fromId` into `toId` (Live Edit drag-and-drop merge): the
+// absorbed unit disappears and every reach touching it is redirected to the
+// survivor. Reaches that collapse to a self-loop, or that duplicate an
+// existing connection in the same direction, are dropped rather than left
+// stacked on one another.
+const mergeNodesInto = (nodes, edges, fromId, toId) => {
+  const out = [];
+  const seen = new Set();
+  for (const ed of edges) {
+    const from = ed.from === fromId ? toId : ed.from;
+    const to = ed.to === fromId ? toId : ed.to;
+    if (from === to) continue;
+    const key = from + ">" + to;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(from === ed.from && to === ed.to ? ed : { ...ed, from, to });
+  }
+  return { nodes: nodes.filter((n) => n.id !== fromId), edges: out };
+};
 
 let uid = 0;
 const genId = () => "g" + uid++;
@@ -296,6 +341,8 @@ export default function GisCanvas({
   basemap,
   flyTo,
   onConsumeFlyTo,
+  zoomExtent,
+  onConsumeZoomExtent,
   ribbonDrag,
   onConsumeRibbonDrag,
   edgeColors,
@@ -325,7 +372,7 @@ export default function GisCanvas({
   layers,
   activeLayerId,
 }) {
-  const showBasemap = basemap === "osm";
+  const showBasemap = !!BASEMAP_SOURCES[basemap];
   const [hovered, setHovered] = useState(null);
   const [dragNode, setDragNode] = useState(null);
   const [dragVertex, setDragVertex] = useState(null);
@@ -421,6 +468,62 @@ export default function GisCanvas({
     setPolyPast((p) => [...p, polygons]);
     setPolygons(polyFuture[0]);
     setPolyFuture((f) => f.slice(1));
+  };
+
+  // Network undo/redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z): a snapshot stack of
+  // { nodes, edges }. Refs, not state, because nothing renders it — this
+  // sidesteps stale-closure issues when the keys are rolled rapidly. A
+  // "begin" snapshot is captured when a gesture starts (node/vertex/curve
+  // drag) and committed once on completion; discrete one-shot mutations
+  // (drops, links, deletes, curve adds) push their before-state directly.
+  // If an undo entry turns out to have made no actual change (e.g. an
+  // idempotent curve click, or a drag that never moved), it's skipped.
+  const netPastRef = useRef([]);
+  const netFutureRef = useRef([]);
+  const netBeginRef = useRef(null);
+  const pushNet = (pre) => {
+    netPastRef.current = [...netPastRef.current, pre].slice(-MAX_NET_HISTORY);
+    netFutureRef.current = [];
+  };
+  const reconcileNetSelection = (state) => {
+    const ids = new Set(state.nodes.map((n) => n.id));
+    setSelected((sel) => sel.filter((id) => ids.has(id)));
+    setSelectedVertex((v) => {
+      if (!v) return null;
+      const edge = state.edges.find((e) => e.id === v.edgeId);
+      return edge && edge.points.some((p) => p.id === v.pid) ? v : null;
+    });
+    setConfirmIds(null);
+    setPicker(null);
+    setWire(null);
+  };
+  const undoNet = () => {
+    const past = netPastRef.current;
+    let pruned = past;
+    while (pruned.length) {
+      const prev = pruned[pruned.length - 1];
+      if (eqNet(prev, { nodes, edges })) {
+        pruned = pruned.slice(0, -1);
+        continue;
+      }
+      netFutureRef.current = [...netFutureRef.current, { nodes, edges }];
+      reconcileNetSelection(prev);
+      setNodes(prev.nodes);
+      setEdges(prev.edges);
+      netPastRef.current = pruned.slice(0, -1);
+      return;
+    }
+    netPastRef.current = pruned;
+  };
+  const redoNet = () => {
+    const future = netFutureRef.current;
+    if (!future.length) return;
+    const next = future[future.length - 1];
+    netPastRef.current = [...netPastRef.current, { nodes, edges }].slice(-MAX_NET_HISTORY);
+    reconcileNetSelection(next);
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    netFutureRef.current = future.slice(0, -1);
   };
   const POLY_SNAP_PX = 10;
   const ADD_VERTEX_PRECISE_PX = 8; // tight — right on a line, any shape
@@ -772,10 +875,10 @@ export default function GisCanvas({
   const [navHover, setNavHover] = useState(null);
   // tx/ty/scale centre+fit the default view on the demo network's real-
   // georeferenced Upton-upon-Severn coordinates (see App.jsx's INIT_NODES —
-  // 8 points traced along the actual River Severn, spanning ~1450 world
-  // units north-south). Scale is dialled back from 1 to keep the whole
+  // 23 nodes the user drew in-app, spanning ~1450 world units north-south
+  // along the River Severn). Scale is dialled back from 1 to keep the whole
   // reach in view on load instead of only showing a zoomed-in fragment.
-  const [view, setView] = useState({ scale: 0.5, tx: 689, ty: 479, rotation: 0 });
+  const [view, setView] = useState({ scale: 0.45, tx: 746, ty: 416, rotation: 0 });
   const [panMode, setPanMode] = useState(false);
   const [zoomMode, setZoomMode] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
@@ -783,7 +886,7 @@ export default function GisCanvas({
   const [toolDrag, setToolDrag] = useState(null);
   const [picker, setPicker] = useState(null);
   const [reachPicker, setReachPicker] = useState(null);
-  const [confirmId, setConfirmId] = useState(null);
+  const [confirmIds, setConfirmIds] = useState(null);
   const [cursorWorld, setCursorWorld] = useState(null);
   const [groups, setGroups] = useState([]); // { id, name, memberIds, collapsed }
   const [contextMenu, setContextMenu] = useState(null); // { x, y, items }
@@ -806,6 +909,9 @@ export default function GisCanvas({
   const [groupSelectShape, setGroupSelectShape] = useState("rect");
   const [groupSelectMenuOpen, setGroupSelectMenuOpen] = useState(false);
   const [marquee, setMarquee] = useState(null); // { mode, shape, x0,y0,x1,y1, path:[{x,y}] }
+  // Fling guard: on the first onMove that takes the drag past MARQUEE_MIN we
+  // check how fast the drag started; a lightning-quick start becomes a pan.
+  const marqueeFirstRef = useRef(false);
 
   // Measure tool: click to add points, Enter/double-click to finish. Each
   // segment shows its own distance plus a running total; `mode` distinguishes
@@ -948,11 +1054,11 @@ export default function GisCanvas({
     } else if (ids.length > 1) {
       items.push({ label: "Create Group", onClick: () => createGroup(ids) });
     }
-    if (ids.length === 1 && !groupOfNode[ids[0]]) {
+    if (ids.length > 0 && !(ids.length === 1 && groupOfNode[ids[0]])) {
       items.push({
-        label: "Delete",
+        label: ids.length > 1 ? `Delete ${ids.length} units` : "Delete",
         danger: true,
-        onClick: () => setConfirmId(ids[0]),
+        onClick: () => setConfirmIds(ids),
       });
     }
     return items;
@@ -963,16 +1069,14 @@ export default function GisCanvas({
     e.stopPropagation();
     const ids = selected.includes(id) && selected.length > 1 ? selected : [id];
     if (!(selected.includes(id) && selected.length > 1)) setSelected([id]);
-    const p = pt(e);
-    setContextMenu({ x: p.x, y: p.y, items: buildMenuItems(ids) });
+    setContextMenu({ x: e.clientX, y: e.clientY, items: buildMenuItems(ids) });
   };
 
   const onGroupContext = (e, g) => {
     e.preventDefault();
     e.stopPropagation();
     setSelected(g.memberIds);
-    const p = pt(e);
-    setContextMenu({ x: p.x, y: p.y, items: buildMenuItems(g.memberIds) });
+    setContextMenu({ x: e.clientX, y: e.clientY, items: buildMenuItems(g.memberIds) });
   };
 
   // Mousedown on a group's box (expanded bbox or collapsed representative)
@@ -1131,6 +1235,27 @@ export default function GisCanvas({
     });
     onConsumeFlyTo();
   }, [flyTo, onConsumeFlyTo]);
+
+  // One-shot "zoom to these bounds" request (Project panel's layer
+  // right-click → Zoom to layer). Fits the layer's feature bbox centred in
+  // the viewport with a little padding, north-up, so the whole layer lands
+  // on screen whatever the current pan/zoom/rotation.
+  useEffect(() => {
+    if (!zoomExtent) return;
+    const el = wrapRef.current;
+    const w = el ? el.clientWidth : 800,
+      h = el ? el.clientHeight : 600;
+    const { minX, minY, maxX, maxY } = zoomExtent.bounds;
+    const pad = 48;
+    const bw = Math.max(1e-6, maxX - minX), bh = Math.max(1e-6, maxY - minY);
+    const scale = Math.min(
+      MAX_SCALE,
+      Math.max(MIN_SCALE, Math.min((w - pad * 2) / bw, (h - pad * 2) / bh)),
+    );
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    setView({ scale, rotation: 0, tx: w / 2 - cx * scale, ty: h / 2 - cy * scale });
+    onConsumeZoomExtent();
+  }, [zoomExtent, onConsumeZoomExtent]);
 
   // Wheel = zoom, centred on the cursor. Attached natively so preventDefault
   // reliably stops page scroll (React's onWheel is passive by default).
@@ -1364,6 +1489,23 @@ export default function GisCanvas({
         return;
       }
       if (marquee) {
+        // Quick-start guard: the first onMove to cross MARQUEE_MIN decides
+        // intent. If the pointer covered that distance in under FLING_MS the
+        // drag "run" was really a fling meant as panning, so drop the blue
+        // box and pan instead. (marquee stores its birth time; the ref makes
+        // this decision once per drag.)
+        if (
+          !marqueeFirstRef.current &&
+          (Math.abs(p.x - marquee.x0) > MARQUEE_MIN ||
+            Math.abs(p.y - marquee.y0) > MARQUEE_MIN) &&
+          Date.now() - marquee.t < FLING_MS
+        ) {
+          marqueeFirstRef.current = true;
+          setMarquee(null);
+          setPanDrag({ sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty });
+          return;
+        }
+        marqueeFirstRef.current = true;
         setMarquee(
           (m) => m && { ...m, x1: p.x, y1: p.y, path: [...m.path, p] },
         );
@@ -1562,6 +1704,14 @@ export default function GisCanvas({
           x1 = Math.max(marquee.x0, marquee.x1);
         const y0 = Math.min(marquee.y0, marquee.y1),
           y1 = Math.max(marquee.y0, marquee.y1);
+        // Click, not a drag — don't commit a box selection. Replace-mode
+        // still acts as a plain click (empty canvas deselects); add/subtract
+        // mode does nothing so a stray modifier+click can't nuke a selection.
+        if (x1 - x0 <= MARQUEE_MIN && y1 - y0 <= MARQUEE_MIN) {
+          if (marquee.mode === "replace") setSelected([]);
+          setMarquee(null);
+          return;
+        }
         const inMarquee = (c) => {
           if (marquee.shape === "ellipse") {
             const rx = (x1 - x0) / 2,
@@ -1603,6 +1753,7 @@ export default function GisCanvas({
       if (ribbonDrag) {
         const p = pt(e);
         const item = ribbonDrag.items[ribbonDrag.index];
+        const preRibbon = snapNet(nodes, edges);
         // Only genuine placeable 1D units (FM 1D/SWMM 1D/Hydrology+ 1D —
         // the only entries ever flagged `drag: true`, see ModeRibbon's
         // RIBBON/SWMM_RIBBON/HYDROLOGY_RIBBON) can actually be dropped as a
@@ -1645,6 +1796,7 @@ export default function GisCanvas({
               return Object.keys(out).length ? out : undefined;
             };
             const w = toWorld(view, hoverSplice.x, hoverSplice.y);
+            pushNet(preRibbon);
             setNodes((ns) => [
               ...ns,
               {
@@ -1688,6 +1840,7 @@ export default function GisCanvas({
         }
 
         const w = toWorld(view, p.x, p.y);
+        pushNet(preRibbon);
         setNodes((ns) => [
           ...ns,
           {
@@ -1716,11 +1869,13 @@ export default function GisCanvas({
               (e2.from === wire.fromId && e2.to === snapTo) ||
               (e2.from === snapTo && e2.to === wire.fromId),
           );
-          if (!dup)
+          if (!dup) {
+            pushNet(snapNet(nodes, edges));
             setEdges((es) => [
               ...es,
               { id: genId(), from: wire.fromId, to: snapTo, points: [] },
             ]);
+          }
         } else {
           openPicker(wire.x2, wire.y2, {
             mode: "create",
@@ -1728,6 +1883,39 @@ export default function GisCanvas({
             atWorld: toWorld(view, wire.x2, wire.y2),
           });
         }
+      }
+      // A single dragged unit dropped "exactly" on top of another (within
+      // half a footprint, and only if it actually travelled far enough to be
+      // a drag rather than a click) merges the two into one. The dragged node
+      // is absorbed into the one it lands on; the survivor stays selected.
+      // Runs before the undo commit below so the whole drag-and-merge is a
+      // single undo step.
+      if (dragNode && dragNode.ids.length === 1) {
+        const id = dragNode.ids[0];
+        const dragged = nodes.find((n) => n.id === id);
+        const start = dragNode.startPositions[id];
+        const travelled = dragged && start
+          ? Math.hypot(dragged.x - start.x, dragged.y - start.y)
+          : 0;
+        if (dragged && travelled > MERGE_MIN_DRAG) {
+          const target = nodes.find(
+            (n) => n.id !== id && Math.hypot(n.x - dragged.x, n.y - dragged.y) <= MERGE_DIST,
+          );
+          if (target) {
+            const merged = mergeNodesInto(nodes, edges, id, target.id);
+            setNodes(merged.nodes);
+            setEdges(merged.edges);
+            setSelected([target.id]);
+          }
+        }
+      }
+      // End of a position/vertex/curve drag — commit the before-snapshot as
+      // a single undo step (skipped if nothing actually moved).
+      if (netBeginRef.current) {
+        const pre = netBeginRef.current;
+        netBeginRef.current = null;
+        if ((dragNode || dragVertex || dragCurve) && !eqNet(pre, { nodes, edges }))
+          pushNet(pre);
       }
       setDragNode(null);
       setDragVertex(null);
@@ -1746,6 +1934,9 @@ export default function GisCanvas({
       onConsumeRibbonDrag,
       marquee,
       nodes,
+      dragNode,
+      dragVertex,
+      dragCurve,
       hoverSplice,
       annotateDraft,
       annotationStyle,
@@ -1760,6 +1951,7 @@ export default function GisCanvas({
   // starting a position-drag. Idempotent — clicking the same point again
   // leaves an already-curved segment alone rather than flattening it back.
   const addCurvesAt = (pointId) => {
+    pushNet(snapNet(nodes, edges));
     setEdges((es) =>
       es.map((ed) => {
         const chain = [ed.from, ...ed.points.map((p) => p.id), ed.to];
@@ -1783,6 +1975,7 @@ export default function GisCanvas({
   // Alt/Option+click directly on a reach segment bends *that* segment,
   // bowing toward the clicked point — idempotent, same as addCurvesAt.
   const addCurveToSegment = (edgeId, key, screenPoint) => {
+    pushNet(snapNet(nodes, edges));
     const w = toWorld(view, screenPoint.x, screenPoint.y);
     setEdges((es) =>
       es.map((ed) =>
@@ -1797,12 +1990,10 @@ export default function GisCanvas({
   };
 
   const nodeDown = (e, id) => {
-    // While a Live Edit polygon tool is armed, the 1D network layer is
-    // "read-only" so clicks land on the polygon layer underneath instead
-    // (e.g. drawing/moving a polygon that happens to sit under a unit) —
-    // without this, a node's own drag handler wins the click every time,
-    // since it's painted on top of the polygon layer.
-    if (liveEdit && polySubTool) return;
+    // Nodes stay draggable even while a Live Edit polygon sub-tool is armed,
+    // so you can rearrange the network mid-edit. (The polygon layer still
+    // receives clicks anywhere a node isn't; a node drop on top of another
+    // merges them — see onUp.)
     e.stopPropagation();
     setSelectedVertex(null);
     // Alt+click deselects this specific unit (Keyboard Shortcuts spec —
@@ -1830,6 +2021,7 @@ export default function GisCanvas({
       const n = nodes.find((x) => x.id === nid);
       if (n) startPositions[nid] = { x: n.x, y: n.y };
     });
+    netBeginRef.current = snapNet(nodes, edges);
     setDragNode({ ids: dragIds, startWorld, startPositions });
   };
   const portDown = (e, fromId, px, py) => {
@@ -1848,6 +2040,7 @@ export default function GisCanvas({
     const v = edge.points.find((x) => x.id === pid);
     const p = pt(e);
     const s = toScreen(view, v.x, v.y);
+    netBeginRef.current = snapNet(nodes, edges);
     setSelected([]);
     setSelectedVertex({ edgeId, pid });
     setDragVertex({ edgeId, pid, ox: p.x - s.x, oy: p.y - s.y });
@@ -1862,6 +2055,7 @@ export default function GisCanvas({
   // Deleting a midpoint vertex merges its two segments back into one — the
   // inverse of addVertex — and drops any curve handle anchored to it.
   const deleteVertex = (edgeId, pid) => {
+    pushNet(snapNet(nodes, edges));
     setEdges((es) =>
       es.map((ed) => {
         if (ed.id !== edgeId) return ed;
@@ -1886,9 +2080,11 @@ export default function GisCanvas({
     const c = edge.curves[key];
     const p = pt(e);
     const s = toScreen(view, c.x, c.y);
+    netBeginRef.current = snapNet(nodes, edges);
     setDragCurve({ edgeId, key, ox: p.x - s.x, oy: p.y - s.y });
   };
   const addVertex = (edgeId, segIndex, worldMid) => {
+    pushNet(snapNet(nodes, edges));
     setEdges((es) =>
       es.map((ed) => {
         if (ed.id !== edgeId) return ed;
@@ -1899,16 +2095,25 @@ export default function GisCanvas({
     );
   };
 
-  const delNode = (id) => {
-    setNodes((ns) => ns.filter((n) => n.id !== id));
-    setEdges((es) => es.filter((e) => e.from !== id && e.to !== id));
+  // Deletes any number of nodes in a single pass — used for both single
+  // deletes and shift/ctrl-click multi-selections (the old code only ever
+  // deleted `selected[0]`, so deleting a group silently dropped everybody
+  // but the first unit). Removes their connected edges and strips the ids
+  // out of any groups, then clears the selection.
+  const delNodes = (ids) => {
+    const gone = new Set(ids);
+    pushNet(snapNet(nodes, edges));
+    setNodes((ns) => ns.filter((n) => !gone.has(n.id)));
+    setEdges((es) => es.filter((e) => !gone.has(e.from) && !gone.has(e.to)));
     setGroups((gs) =>
       gs
-        .map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => m !== id) }))
+        .map((g) => ({ ...g, memberIds: g.memberIds.filter((m) => !gone.has(m)) }))
         .filter((g) => g.memberIds.length > 1),
     );
     setSelected([]);
   };
+
+  const delNode = (id) => delNodes([id]);
 
   // Commits the in-progress text-box annotation (on blur, Escape, or when a
   // new one is started) — a blank box is discarded rather than left as a
@@ -1968,9 +2173,11 @@ export default function GisCanvas({
     if (!picker) return;
     const shape = item.shape || "square";
     const sz = shape === "diamond" ? DIAMOND : OUTER;
+    const prePick = snapNet(nodes, edges);
     if (picker.mode === "create") {
       const id = genId();
       const label = "M0" + mCounter++;
+      pushNet(prePick);
       setNodes((ns) => [
         ...ns,
         {
@@ -1999,6 +2206,7 @@ export default function GisCanvas({
         const label = "M0" + mCounter++;
         const e1 = { id: genId(), from: edge.from, to: id, points: before };
         const e2 = { id: genId(), from: id, to: edge.to, points: after };
+        pushNet(prePick);
         setNodes((ns) => [
           ...ns,
           {
@@ -2030,6 +2238,7 @@ export default function GisCanvas({
     };
     const onKey = (e) => {
       if (e.key === "Escape") {
+        if (saveModalOpen) return handleEditCancel();
         if (textEditing) {
           commitTextEditing();
           return;
@@ -2038,7 +2247,7 @@ export default function GisCanvas({
         if (contextMenu) return setContextMenu(null);
         if (picker) return setPicker(null);
         if (reachPicker) return setReachPicker(null);
-        if (confirmId) return setConfirmId(null);
+        if (confirmIds) return setConfirmIds(null);
         if (transectPopup) return setTransectPopup(null);
         if (measure) return setMeasure(null);
         if (marquee) return setMarquee(null);
@@ -2060,6 +2269,12 @@ export default function GisCanvas({
         if (selectedPolyId) return setSelectedPolyId(null);
         if (selectedVertex) return setSelectedVertex(null);
         if (annotateTool) return setAnnotateTool(null);
+        // With nothing more specific in progress, Escape exits Live Edit mode —
+        // which prompts the Save changes dialog first if there are unsaved edits.
+        if (liveEdit) {
+          handleStopEdit();
+          return;
+        }
         return setSelected([]);
       }
       if (
@@ -2082,34 +2297,39 @@ export default function GisCanvas({
       }
       if (
         (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey &&
-        liveEdit && !isTyping(e)
+        !isTyping(e)
       ) {
         e.preventDefault();
-        undoPoly();
+        // Inside Live Edit the polygon history owns the shortcut (matching
+        // the Edit toolbar's Undo); otherwise it undoes network edits —
+        // node moves, unit drops, link changes, deletes — via the snapshot stack.
+        if (liveEdit && polyPast.length) undoPoly();
+        else undoNet();
         return;
       }
       if (
         (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z" &&
-        liveEdit && !isTyping(e)
+        !isTyping(e)
       ) {
         e.preventDefault();
-        redoPoly();
+        if (liveEdit && polyFuture.length) redoPoly();
+        else redoNet();
         return;
       }
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
         selected.length &&
-        !confirmId &&
+        !confirmIds &&
         !picker &&
         !isTyping(e)
       ) {
         e.preventDefault();
-        setConfirmId(selected[0]);
+        setConfirmIds(selected.slice());
       }
       if (
         (e.key === "Delete" || e.key === "Backspace") &&
         selectedVertex &&
-        !confirmId &&
+        !confirmIds &&
         !picker &&
         !isTyping(e)
       ) {
@@ -2248,7 +2468,7 @@ export default function GisCanvas({
   }, [
     selected,
     selectedVertex,
-    confirmId,
+    confirmIds,
     picker,
     reachPicker,
     wire,
@@ -2256,6 +2476,9 @@ export default function GisCanvas({
     zoomBy,
     resetView,
     nodes,
+    edges,
+    polyPast,
+    polyFuture,
     togglePanMode,
     toggleZoomMode,
     measure,
@@ -2364,6 +2587,7 @@ export default function GisCanvas({
     if (activeTool === 1 && e.target === e.currentTarget && e.button === 0) {
       const p = pt(e);
       const mode = e.shiftKey ? "add" : e.altKey ? "subtract" : "replace";
+      marqueeFirstRef.current = false;
       setMarquee({
         mode,
         shape: groupSelectShape,
@@ -2372,6 +2596,7 @@ export default function GisCanvas({
         x1: p.x,
         y1: p.y,
         path: [p],
+        t: Date.now(),
       });
       return;
     }
@@ -2390,6 +2615,7 @@ export default function GisCanvas({
     if (e.target === e.currentTarget && e.button === 0) {
       const p = pt(e);
       if (e.ctrlKey || e.shiftKey) {
+        marqueeFirstRef.current = false;
         setMarquee({
           mode: "add",
           shape: "rect",
@@ -2398,10 +2624,12 @@ export default function GisCanvas({
           x1: p.x,
           y1: p.y,
           path: [p],
+          t: Date.now(),
         });
         return;
       }
       if (e.altKey) {
+        marqueeFirstRef.current = false;
         setMarquee({
           mode: "subtract",
           shape: "rect",
@@ -2410,6 +2638,7 @@ export default function GisCanvas({
           x1: p.x,
           y1: p.y,
           path: [p],
+          t: Date.now(),
         });
         return;
       }
@@ -2433,14 +2662,14 @@ export default function GisCanvas({
     }
   };
 
-  const confirmNode = confirmId ? nodes.find((n) => n.id === confirmId) : null;
+  const confirmNode = confirmIds ? nodes.find((n) => n.id === confirmIds[0]) : null;
   const isPanning = panMode || spaceHeld;
 
   // Footer guide: reflects whatever the user is actually doing right now,
   // most-specific state first. Falls through to MapFooter's own baseline
   // (Select/Zoom/Options) when nothing below applies.
   const guideItems = (() => {
-    if (confirmId)
+    if (confirmIds)
       return [{ label: "Click Delete: confirm" }, { label: "Esc: cancel" }];
     if (textEditing)
       return [{ label: "Type your note" }, { label: "Click away/Esc: finish" }];
@@ -2624,22 +2853,24 @@ export default function GisCanvas({
         {showBasemap && (
           <OsmBasemap
             view={view}
+            basemap={basemap}
             width={wrapRef.current?.clientWidth}
             height={wrapRef.current?.clientHeight}
           />
         )}
 
-        {/* Left tool rail */}
+        {/* Left tool rail — hugged to the map's left edge (FM v8.0 GIS
+            toolbar sits flush against the perimeter). */}
         <div
           style={{
             position: "absolute",
-            top: 6,
-            left: 6,
+            top: 2,
+            left: 2,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
             gap: 2,
-            padding: 4,
+            padding: 3,
             background: "var(--surface-1)",
             border: "1px solid var(--border-primary)",
             borderRadius: 4,
@@ -2883,8 +3114,8 @@ export default function GisCanvas({
         <div
           style={{
             position: "absolute",
-            top: 6,
-            right: 6,
+            top: 2,
+            right: 2,
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
@@ -3501,7 +3732,7 @@ export default function GisCanvas({
             pointerEvents: "none",
           }}
         >
-          {marquee && marquee.shape === "rect" && (
+          {marquee && marquee.shape === "rect" && (Math.abs(marquee.x1 - marquee.x0) > MARQUEE_MIN || Math.abs(marquee.y1 - marquee.y0) > MARQUEE_MIN) && (
             <rect
               x={Math.min(marquee.x0, marquee.x1)}
               y={Math.min(marquee.y0, marquee.y1)}
@@ -3538,7 +3769,7 @@ export default function GisCanvas({
               />
             );
           })()}
-          {marquee && marquee.shape === "ellipse" && (
+          {marquee && marquee.shape === "ellipse" && (Math.abs(marquee.x1 - marquee.x0) > MARQUEE_MIN || Math.abs(marquee.y1 - marquee.y0) > MARQUEE_MIN) && (
             <ellipse
               cx={(marquee.x0 + marquee.x1) / 2}
               cy={(marquee.y0 + marquee.y1) / 2}
@@ -3558,7 +3789,7 @@ export default function GisCanvas({
               strokeDasharray="4 3"
             />
           )}
-          {marquee && marquee.shape === "freeform" && (
+          {marquee && marquee.shape === "freeform" && marquee.path.length > 1 && (
             <polygon
               points={marquee.path.map((p) => `${p.x},${p.y}`).join(" ")}
               fill={
@@ -4444,6 +4675,7 @@ export default function GisCanvas({
               const currentKey = reachKeyOfEdge?.[reachPicker.edgeId];
               const groupEdgeIds = (currentKey &&
                 edgesByReach?.[currentKey]) || [reachPicker.edgeId];
+              pushNet(snapNet(nodes, edges));
               onReassignReach(groupEdgeIds, key);
               setReachPicker(null);
             }}
@@ -4476,8 +4708,9 @@ export default function GisCanvas({
                 }}
               >
                 <div style={{ fontSize: "var(--fs-xs)", marginBottom: 8 }}>
-                  Delete {confirmNode.label}? This removes the unit and its
-                  connected reaches.
+                  {confirmIds.length > 1
+                    ? `Delete ${confirmIds.length} selected units? This removes them and their connected reaches.`
+                    : `Delete ${confirmNode.label}? This removes the unit and its connected reaches.`}
                 </div>
                 <div
                   style={{
@@ -4486,13 +4719,13 @@ export default function GisCanvas({
                     gap: 6,
                   }}
                 >
-                  <button onClick={() => setConfirmId(null)} style={btnStyle}>
+                  <button onClick={() => setConfirmIds(null)} style={btnStyle}>
                     Cancel
                   </button>
                   <button
                     onClick={() => {
-                      delNode(confirmId);
-                      setConfirmId(null);
+                      delNodes(confirmIds);
+                      setConfirmIds(null);
                     }}
                     style={{
                       ...btnStyle,
@@ -4646,6 +4879,7 @@ export default function GisCanvas({
             cursorWorld={cursorWorld}
             scale={view.scale}
             guideItems={guideItems}
+            attribution={BASEMAP_SOURCES[basemap]?.attribution}
           />
         </div>
 

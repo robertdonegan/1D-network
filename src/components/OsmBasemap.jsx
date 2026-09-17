@@ -16,6 +16,25 @@ const ANCHOR_LON = -2.2, ANCHOR_LAT = 52.058;
 // when the backdrop itself is toggled off.
 export const METERS_PER_WORLD_UNIT = (156543.03392 * Math.cos((ANCHOR_LAT * Math.PI) / 180)) / 2 ** BASE_ZOOM;
 
+// Real, keyless raster backdrops this demo can actually render (the OS/ordnance
+// layers the Figma menus also list need an API key, so they stay disabled
+// there). `url(z, x, y)` returns the standard slippy-map tile for a source;
+// MapFooter attribution is read from here too so it always names the right
+// provider. "os-satellite" uses Esri World Imagery as a stand-in for the OS
+// satellite layer the design calls for, matching this demo's keyless spirit.
+export const BASEMAP_SOURCES = {
+  osm: {
+    url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+    attribution: "© OpenStreetMap contributors",
+    opacity: 0.85,
+  },
+  "os-satellite": {
+    url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+    attribution: "Esri, Maxar, Earthstar Geographics",
+    opacity: 1,
+  },
+};
+
 function lonLatToTilePx(lon, lat, zoom) {
   const n = 2 ** zoom;
   const x = ((lon + 180) / 360) * n * TILE_SIZE;
@@ -33,7 +52,8 @@ export function lonLatToWorld(lon, lat) {
   return { x: p.x - anchorPx.x, y: p.y - anchorPx.y };
 }
 
-export default function OsmBasemap({ view, width, height }) {
+export default function OsmBasemap({ view, width, height, basemap = "osm" }) {
+  const source = BASEMAP_SOURCES[basemap] || BASEMAP_SOURCES.osm;
   const rotation = view.rotation || 0;
   const tiles = useMemo(() => {
     const w = width || 800, h = height || 600;
@@ -78,8 +98,8 @@ export default function OsmBasemap({ view, width, height }) {
       }}>
         {tiles.map(({ tx, ty, wrappedX }) => (
           <img key={tx + "_" + ty} alt="" width={TILE_SIZE} height={TILE_SIZE} draggable={false}
-            src={`https://tile.openstreetmap.org/${BASE_ZOOM}/${wrappedX}/${ty}.png`}
-            style={{ position: "absolute", left: tx * TILE_SIZE - anchorPx.x, top: ty * TILE_SIZE - anchorPx.y, opacity: 0.85 }} />
+            src={source.url(BASE_ZOOM, wrappedX, ty)}
+            style={{ position: "absolute", left: tx * TILE_SIZE - anchorPx.x, top: ty * TILE_SIZE - anchorPx.y, opacity: source.opacity }} />
         ))}
       </div>
     </div>

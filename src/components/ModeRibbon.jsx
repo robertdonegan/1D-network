@@ -49,11 +49,11 @@ export const HOME_RIBBON = [
 // button's tooltip (sourced from the Figma "Dropdowns" section's UX-comment
 // annotations where one exists).
 export const RIBBON = [
-  { id: "rivernet", icon: "load1d", label: "River Network", primary: true, menu: [
-    { label: "Load 1D Network", icon: "loadRiverNetwork" },
-    { label: "New 1D Network",  icon: "newRiverNetwork" },
-    { label: "Save 1D Network", icon: "saveRiverNetwork" },
-    { label: "Save Network as", icon: "saveAsRiverNetwork" },
+  { id: "rivernet", icon: "newRiverNetwork", label: "River Network", primary: true, menu: [
+    { label: "New 1D Network",     icon: "newRiverNetwork" },
+    { label: "Load 1D Network",    icon: "loadRiverNetwork" },
+    { label: "Save 1D Network",    icon: "saveRiverNetwork", action: "export" },
+    { label: "Save 1D Network as", icon: "saveAsRiverNetwork", action: "export" },
   ] },
   { sep: true },
   { id: "river", icon: "crossSection", label: "River", selected: true, menu: [
@@ -68,7 +68,6 @@ export const RIBBON = [
       { label: "Muskingum X", icon: "muskingumX",  shape: "square", drag: true },
     ] },
   ] },
-  { sep: true },
   { id: "conduits", icon: "circularArch", label: "Conduits", menu: [
     { label: "Full Arch",     icon: "conduitFullArch",     shape: "square", drag: true },
     { label: "Sprung Arch",   icon: "conduitSprungArch",   shape: "square", drag: true },
@@ -88,7 +87,6 @@ export const RIBBON = [
       { label: "Outlet", icon: "culvertOutlet", shape: "square", drag: true },
     ] },
   ] },
-  { sep: true },
   { id: "boundaries", icon: "flowTime", label: "Boundaries", menu: [
     { label: "Hydrographs", icon: "flowTime", sub: [
       { label: "Flow-Time",              icon: "flowTime",              shape: "square", drag: true },
@@ -106,7 +104,6 @@ export const RIBBON = [
     { label: "Flow-Head",          icon: "boundaryFlowHead",     shape: "square", drag: true },
     { label: "Normal Depth",       icon: "normalDepth",          shape: "square", drag: true },
   ] },
-  { sep: true },
   { id: "weirs",   icon: "broadWeir",    label: "Weirs",    menu: [
     { label: "Weir", icon: "broadWeir", shape: "square", drag: true },
     { menuSep: true },
@@ -129,7 +126,6 @@ export const RIBBON = [
     { label: "Bernoulli Loss", icon: "bernoulliLoss", shape: "square", drag: true },
     { label: "Leaky Dam",      icon: "leakyDam",      shape: "square", drag: true },
   ] },
-  { sep: true },
   { id: "bridges", icon: "superBridge",  label: "Bridges",  menu: [
     { label: "Bridge",    icon: "superBridge",    shape: "square", drag: true },
     { menuSep: true },
@@ -137,14 +133,12 @@ export const RIBBON = [
     { label: "Arch",      icon: "archBridge",     shape: "square", drag: true },
     { label: "Pier-Loss", icon: "pierLossBridge", shape: "square", drag: true },
   ] },
-  { sep: true },
   { id: "storage", icon: "spill",        label: "Storage",  menu: [
     { label: "Spill",       icon: "spill",       shape: "rect", drag: true },
     { label: "Floodplain",  icon: "floodplain",  shape: "square", drag: true },
     { label: "Online Pond", icon: "onlinePond",  shape: "square", drag: true },
     { label: "Reservoir",   icon: "reservoir",   shape: "square", drag: true },
   ] },
-  { sep: true },
   { id: "junction",icon: "openJunction", label: "Junction", menu: [
     { label: "Open Junction",   icon: "openJunction",           shape: "square", drag: true },
     { label: "Energy Junction", icon: "connectorEnergyJunction",shape: "square", drag: true },
@@ -162,16 +156,16 @@ export const RIBBON = [
   ] },
   { sep: true },
   { id: "refhtools1d", icon: "hydroRefh", label: "ReFH tools", chevron: true, menu: [
-    { label: "FEH Catchment Descriptors", icon: "hydroCatchDesc" },
-    { label: "ReFH2 rainfall",            icon: "refh2" },
+    { label: "ReFH Probabilistic tool",  icon: "hydroRefh" },
+    { label: "ReFH Storm Duration tool", icon: "hydroStormDuration" },
   ] },
   { id: "fm1dtools", icon: "fm1dTools", label: "FM 1D tools", chevron: true, menu: [
-    { label: "Network check",  icon: "editorReview" },
-    { label: "Renumber nodes", icon: "arrowsColOrder" },
+    { label: "Reservoir Generator",      icon: "fm1dResGen" },
+    { label: "Spill Generator",          icon: "fm1dSpillGen" },
+    { label: "Cross-Section Generator",  icon: "fm1dCrossSectionGen" },
   ] },
   { sep: true },
   { id: "viewlabels", icon: "labelsColor", label: "View 1D labels", chevron: true },
-  { sep: true },
   { id: "settings",   icon: "settingsColor", label: "FM 1D settings", action: "modal" },
 ];
 
@@ -181,17 +175,20 @@ export const RIBBON = [
 // of not-yet-wired actions.
 export const FM_2D_RIBBON = [
   { id: "new2dmodel", icon: "fm2dNew2dModel", label: "2D Model", chevron: true, menu: [
-    { label: "New 2D Model",  icon: "filesModelLine" },
-    { label: "Load 2D Model", icon: "filesImportModel" },
-    { label: "Save 2D Model",  icon: "filesModelLine" },
-    { label: "Save 2D Model as", icon: "filesImportModel" },
+    { label: "New 2D Model",  icon: "fm2dNewModel" },
+    { label: "Load 2D Model", icon: "fm2dLoadModel" },
+    { label: "Save 2D Model",  icon: "fm2dSaveModel" },
+    { label: "Save 2D Model as", icon: "fm2dSaveAsModel" },
   ] },
   { sep: true },
-  { id: "activearea", icon: "ribbonActiveArea", label: "Active Area", chevron: true, menu: [
-    { label: "Draw new Active Area", icon: "generalAddPolygon" },
-    { label: "Load shapefile as Active Area", icon: "filesShapeFile" },
+  { id: "activearea", icon: "ribbonActiveArea", label: "Active area", chevron: true, menu: [
+    { label: "Add Active Area", icon: "ribbonActiveArea" },
+    { label: "Load shapefile as Active Area", icon: "fm2dShapefileActiveArea" },
   ] },
-  { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true },
+  { id: "boundarycondition2d", icon: "ribbonBoundaryCondition", label: "Boundary condition", chevron: true, menu: [
+    { label: "Add Boundary Line", icon: "fm2dBoundaryCond" },
+    { label: "Load shapefile as Boundary Line", icon: "fm2dShapefileBoundLine" },
+  ] },
   { id: "definetopo", icon: "fm2dDefineTopo", label: "Topography", chevron: true, menu: [
     { label: "Polygon", icon: "fm2dTopoPolygon" },
     { label: "Polyline", icon: "fm2dTopoPolyline" },
@@ -201,7 +198,12 @@ export const FM_2D_RIBBON = [
     { label: "Load Ground Elevation Grid",   icon: "fm2dLoadGroundElev" },
   ] },
   { sep: true },
-  { id: "roughness2d", icon: "fm2dRoughness", label: "Roughness", chevron: true },
+  { id: "roughness2d", icon: "fm2dRoughness", label: "Roughness", chevron: true, menu: [
+    { label: "Add Roughness Polygon",              icon: "fm2dRoughness" },
+    { label: "Add Depth-Varying Roughness Polygon", icon: "fm2dDepthVaryPoly" },
+    { label: "Add Land-Use Polygon",                icon: "fm2dLandUsePolygon" },
+    { label: "Load Roughness Shapefile",            icon: "fm2dLoadRoughShapefile" },
+  ] },
   { sep: true },
   { id: "raininfiltration", icon: "fm2dRainfallPolygon", label: "Rain/infiltration", chevron: true, menu: [
     { label: "Add Rainfall Polygon",     icon: "fm2dRainfallPolygon" },
@@ -209,7 +211,17 @@ export const FM_2D_RIBBON = [
     { label: "Load Rain/Infiltration Shapefile", icon: "fm2dLoadRainInfilShapefile" },
   ] },
   { sep: true },
-  { id: "1dstructure", icon: "ribbon1dEmbed", label: "1D structure", action: "file", fileType: "1D structure (*.dat)" },
+  { id: "1dstructure", icon: "ribbon1dEmbed", label: "1D structure", chevron: true, menu: [
+    { label: "Add Embedded 1D Orifice",  icon: "fm2dEmbed1dOrifice" },
+    { label: "Add Embedded 1D Culvert",  icon: "fm2dEmbed1dCulvert" },
+    { label: "Add Embedded 1D Weir",     icon: "fm2dEmbed1dWeir", sub: [
+      { label: "Add Embedded 1D Generic Weir",       icon: "fm2dEmbed1dGeneric" },
+      { label: "Add Embedded 1D Crump Weir",         icon: "fm2dEmbed1dCrumpWeir" },
+      { label: "Add Embedded 1D Sharp-Crested Weir", icon: "fm2dEmbed1dSharpCrestWeir" },
+      { label: "Add Embedded 1D Round-Nosed Weir",   icon: "fm2dEmbed1dRoundNoseWeir" },
+    ] },
+    { label: "Load Embedded 1D Structure Shapefile", icon: "fm2dLoadEmbed1dStructure" },
+  ] },
   { id: "1d2dlink", icon: "fm2d1d2dLinkGenerator", label: "1D-2D link", chevron: true, menu: [
     { label: "1D-2D Link Line Generator", icon: "fm2d1d2dLinkGenerator" },
     { label: "Add 1D Level Link Line",    icon: "fm2d1dLevelLink" },
@@ -225,12 +237,15 @@ export const FM_2D_RIBBON = [
     { label: "Import Z-line Points",   icon: "fm2dZlinePointsImport" },
   ] },
   { id: "zmod", icon: "ribbonZmod", label: "Z-mod", chevron: true, menu: [
-    { label: "Z-polygon",          icon: "zmodPolygon" },
-    { label: "Z-polyline",         icon: "zmodPolyline" },
-    { label: "Z-points",           icon: "zmodPoints" },
-    { label: "Z-mod auto-vertice", icon: "zmodVertice" },
+    { label: "Add Z-mod Polygon",         icon: "zmodPolygon" },
+    { label: "Add Z-mod Polyline",        icon: "zmodPolyline" },
+    { label: "Add Z-mod Points",          icon: "zmodPoints" },
     { menuSep: true },
-    { label: "Import Z-mod shapefile", icon: "zmodImport" },
+    { label: "Z-mod Auto-Vertice tool",   icon: "zmodVertice" },
+    { menuSep: true },
+    { label: "Import Z-mod Polygon Shapefile",  icon: "fm2dZPolygonImport" },
+    { label: "Import Z-mod Polyline Shapefile", icon: "fm2dZPolylineImport" },
+    { label: "Import Z-mod Points Shapefile",   icon: "fm2dZPointsImport" },
   ] },
   { sep: true },
   { id: "input2dconverter", icon: "fm2dInputConverter", label: "2D input converter", action: "modal" },
@@ -238,23 +253,40 @@ export const FM_2D_RIBBON = [
 
 export const TUFLOW_RIBBON = [
   { id: "tuflowmodel", icon: "tuflowAddModel", label: "TUFLOW Model", chevron: true, menu: [
-    { label: "New TUFLOW Model",  icon: "filesModelFill" },
-    { label: "Load TUFLOW Model", icon: "filesImportModel" },
-    { label: "Save TUFLOW Model",  icon: "filesModelFill" },
-    { label: "Save TUFLOW Model as", icon: "filesImportModel" },
+    { label: "New TUFLOW Model",  icon: "tuflowAdd" },
+    { label: "Load TUFLOW Model", icon: "tuflowLoad" },
+    { label: "Save TUFLOW Model",  icon: "tuflowSave" },
+    { label: "Save TUFLOW Model as", icon: "tuflowSaveAs" },
   ] },
   { sep: true },
-  { id: "codelayer", icon: "ribbonActiveArea", label: "Code layer", action: "file", fileType: "TUFLOW Code Layer (*.shp)" },
-  { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary Condition", chevron: true },
+  { id: "codelayer", icon: "ribbonActiveArea", label: "Code layer", chevron: true, menu: [
+    { label: "Add Code Layer", icon: "ribbonActiveArea" },
+    { label: "Load shapefile as Code Layer", icon: "fm2dShapefileActiveArea" },
+  ] },
+  { id: "boundaryconditiontf", icon: "ribbonBoundaryCondition", label: "Boundary Condition", chevron: true, menu: [
+    { label: "Add Boundary Line",    icon: "fm2dBoundaryCond" },
+    { label: "Add Boundary Points",  icon: "fm2dBoundaryPoints" },
+    { label: "Add Boundary Polygon", icon: "fm2dBoundaryPolygon" },
+    { label: "Load shapefile as Boundary Layer", icon: "fm2dShapefileBoundLine" },
+  ] },
   { id: "topomod", icon: "ribbonDefineTopo", label: "Topography", chevron: true, menu: [
-    { label: "Define new adjustment", icon: "generalEdit" },
+    { label: "Define new adjustment", icon: "generalEdit", sub: [
+      { label: "Add points",   icon: "fm2dTopoPoints" },
+      { label: "Add polyline", icon: "fm2dTopoPolyline" },
+      { label: "Add polygon",  icon: "fm2dTopoPolygon" },
+    ] },
     { menuSep: true },
-    { label: "Load existing topography", icon: "filesImportModel" },
+    { label: "Load existing topography", icon: "fm2dLoadShapefileTopo" },
   ] },
   { sep: true },
   { id: "estry1d", icon: "tuflowEstry1d", label: "Estry 1D", action: "modal" },
   { sep: true },
-  { id: "1dtuflowlink", icon: "ribbon1d2dLink", label: "1D-TUFLOW link", chevron: true },
+  { id: "1dtuflowlink", icon: "ribbon1d2dLink", label: "1D-TUFLOW link", chevron: true, menu: [
+    { label: "Auto-create new 1D Link Lines",     icon: "fm2d1d2dLinkGenerator" },
+    { label: "Manually add new 1D Link Lines",    icon: "fm2d1dManualLink" },
+  ] },
+  { sep: true },
+  { id: "convertfm1dnodes", icon: "tuflow1dNodes", label: "Convert FM 1D nodes", action: "modal" },
   { sep: true },
   { id: "importtf", icon: "tuflowImportLayers", label: "Import", action: "file", fileType: "TUFLOW import (*.*)" },
   { sep: true },
@@ -272,15 +304,18 @@ export const TUFLOW_RIBBON = [
 ];
 
 export const SWMM_RIBBON = [
-  { id: "loadswmm", icon: "swmmNetworkIcon", label: "SWMM Network", chevron: true, menu: [
-    { label: "SWMM Network", icon: "swmmNetworkIcon", disabled: true, disabledReason: "Not yet designed in Figma" },
+  { id: "loadswmm", icon: "swmmNew", label: "SWMM Network", chevron: true, menu: [
+    { label: "New SWMM Network",  icon: "swmmNew" },
+    { label: "Load SWMM Network", icon: "swmmLoad" },
+    { label: "Save SWMM Network", icon: "swmmSave" },
+    { label: "Save SWMM Network as", icon: "swmmSaveAs" },
   ] },
   { sep: true },
   { id: "swmm1dlink", icon: "ribbonSwmm1dLink", label: "FM 1D-SWMM link", action: "modal" },
   { id: "swmm2dlink", icon: "ribbonSwmm2dLink", label: "SWMM-2D link", action: "modal" },
   { sep: true },
   { id: "selectionmode", icon: "ribbonSelectionMode", label: "Selection mode", chevron: true, menu: [
-    { label: "Selection mode", icon: "rectangleSelect", disabled: true, disabledReason: "Not yet designed in Figma" },
+    { label: "1D Urban", icon: "swmmSelection" },
   ] },
   { sep: true },
   { id: "addlink", icon: "ribbonAddLink", label: "Add link", action: "modal" },
@@ -293,9 +328,9 @@ export const SWMM_RIBBON = [
     { label: "Subcatchment", icon: "swmmSubcatchment" },
   ] },
   { id: "editnodes", icon: "ribbonEditNode", label: "Edit SWMM nodes", chevron: true, menu: [
-    { label: "Node properties", icon: "settingsOutline" },
-    { label: "Link properties", icon: "filesLink" },
-    { label: "Multi-edit/view", icon: "layoutsTableView2" },
+    { label: "Node properties", icon: "swmmEditNode" },
+    { label: "Link properties", icon: "swmmEditLink" },
+    { label: "Multi-edit/view", icon: "swmmMultiEdit" },
   ] },
   { sep: true },
   { id: "viewlabelsswmm", icon: "ribbonViewLabels", label: "View SWMM labels", chevron: true,
@@ -305,55 +340,65 @@ export const SWMM_RIBBON = [
 ];
 
 export const HYDROLOGY_RIBBON = [
-  { id: "hplusproject", icon: "hydroLoadHplus", label: "Hydrology+ Project", chevron: true,
+  { id: "hplusproject", icon: "hydroNewHplus", label: "Hydrology+ Project", chevron: true,
     desc: "Observe the current selected project, zoom to it, or create new/open existing/view details/import/export a project file.", menu: [
-    { label: "Zoom to current project", icon: "guiZoomToFeature" },
+    { label: "Zoom to current project", icon: "hydroZoomToHplus" },
     { menuSep: true },
     { label: "New Hydrology+ Project",             icon: "hydroNewHplus" },
-    { label: "Open Hydrology+ Project",            icon: "hydroLoadHplus" },
-    { label: "Project details", icon: "alertsInformation" },
-    { label: "Import Hydrology+ Project",          icon: "filesImportModel" },
-    { label: "Export Hydrology+ Project",          icon: "generalUpload" },
+    { label: "Load Hydrology+ Project",            icon: "hydroLoadHplus" },
+    { label: "Save Hydrology+ Project",            icon: "hydroSaveHplus" },
+    { label: "Import Hydrology+ Project",          icon: "hydroImportHplus" },
+    { label: "Export Hydrology+ Project",          icon: "hydroExportHplus" },
+    { menuSep: true },
+    { label: "Hydrology+ Project details", icon: "hydroHplusProjectDetails" },
   ] },
+  { id: "reportbuilder", icon: "hydroReportBuilder", label: "Report Builder", action: "modal" },
   { sep: true },
   { id: "refhtools", icon: "hydroRefh", label: "ReFH tools", chevron: true, menu: [
-    { label: "Optimise Storm Duration", icon: "generalStopwatch" },
-    { label: "Probabilistic ReFH",      icon: "generalCompute" },
+    { label: "Probabilistic ReFH",      icon: "hydroRefh" },
+    { label: "Optimise Storm Duration", icon: "hydroStormDuration" },
   ] },
   { sep: true },
   { id: "fsuportal", icon: "hydroFsuPortal", label: "FSU Portal", action: "modal" },
   { sep: true },
   { id: "riverstations", icon: "hydroRiverStations", label: "View River Stations", chevron: true,
     desc: "View gauge options (EA, NRFA) with sub-options like all gauges/QMED/pooling, or show the on-screen key.", menu: [
-    { label: "Environment Agency", icon: "hydroStationSearch" },
-    { label: "UKCEH NRFA",         icon: "hydroRiverStations" },
+    { label: "Environment Agency", icon: "hydroStationEa", sub: [
+      { label: "All",   icon: "hydroStationEa" },
+      { label: "Level", icon: "hydroStationEaLevel" },
+      { label: "Flow",  icon: "hydroStationEaFlow" },
+    ] },
+    { label: "UKCEH NRFA",         icon: "hydroStationNrfa", sub: [
+      { label: "All",     icon: "hydroStationNrfa" },
+      { label: "QMED",    icon: "hydroStationNrfaQmed" },
+      { label: "Pooling", icon: "hydroStationNrfaPooling" },
+    ] },
     { label: "Off (none)",         icon: "generalInvisible" },
     { menuSep: true },
-    { label: "Show key", icon: "moduleGlossary" },
+    { label: "Show key", icon: "hydroStationShowKey" },
   ] },
   { sep: true },
   { id: "fehcatchments", icon: "hydroCatchDesc", label: "FEH Catchment Descriptors", chevron: true,
     desc: "Download FEH CDs from the website, import previously obtained ones, or view them in tabular view.", menu: [
-    { label: "View FEH Catchments",    icon: "hydroCatchDesc" },
-    { label: "Download from website",  icon: "generalDownload" },
-    { label: "Import FEH",             icon: "filesImportModel" },
-    { label: "FEH tabular view",       icon: "layoutsTableView" },
+    { label: "View FEH Catchment Descriptors",       icon: "hydroCatchDesc" },
+    { label: "Download from FEH website",            icon: "hydroDownloadCatchDesc" },
+    { label: "View FEH Catchment Descriptors table", icon: "hydroCatchDescTable" },
+    { label: "Import FEH Catchment Descriptors",     icon: "hydroImportCatchDesc" },
   ] },
   { sep: true },
   { id: "calcpoints", icon: "hydroCalcPoints", label: "Calculation Points", chevron: true,
     desc: "Show/hide calculation points on the map.", menu: [
-      { label: "Tabular view", icon: "layoutsTableView2" },
-      { label: "Tabular view", icon: "layoutsTableView2" },
+      { label: "View Calculation Points on map", icon: "hydroViewCalcPoint" },
+      { label: "View Calculation Points table",  icon: "hydroCalcPointTable" },
   ] },
   { sep: true },
   { id: "hplusviewlabels", icon: "labelsColor", label: "View Hydrology+ labels", chevron: true },
-  { sep: true },
   { id: "hplussettings", icon: "settingsColor", label: "Hydrology+ settings", action: "modal" },
 ];
 
 export const GIS_RIBBON = [
   { id: "rastertools", icon: "filesRaster", label: "Raster tools (TBC)", chevron: true },
-  { id: "vectortools", icon: "fm2dPolyArea", label: "Vector tools", chevron: true,
+  { id: "vectortools", icon: "fm2dPolyArea", label: "Vector tools (TBC)", chevron: true,
     desc: "Draw a shape with the pen tool — right-click, Escape, or Return to complete it, then save and set its attributes.", menu: [
     { label: "Polyline", icon: "fm2dPolyline" },
     { label: "Polygon",  icon: "fm2dPolyArea" },
@@ -376,7 +421,7 @@ export const GIS_RIBBON = [
 export const SIMULATION_RIBBON = [
   { id: "new1dsim", icon: "sim1dRiver", label: "New 1D Simulation", chevron: true, menu: [
     { label: "1D River Simulation", icon: "sim1dRiver" },
-    { label: "1D SWMM Simulation",  icon: "sim1dSwmm" },
+    { label: "1D SWMM Simulation",  icon: "simNewSwmm" },
   ] },
   { id: "newqualsim", icon: "simQuality", label: "New Quality Simulation", action: "modal" },
   { sep: true },
@@ -387,7 +432,11 @@ export const SIMULATION_RIBBON = [
   ] },
   { id: "loadsim", icon: "simLoad", label: "Load Simulation", action: "file", fileType: "Simulation file (*.bat)" },
   { sep: true },
-  { id: "simbuilder", icon: "simBuilder", label: "Simulation Builder", chevron: true },
+  { id: "simbuilder", icon: "simBuilder", label: "Simulation Builder", chevron: true, menu: [
+    { label: "Recent Simulation Build", icon: "simBuilder" },
+    { label: "Recent Simulation Build", icon: "simBuilder" },
+    { label: "Recent Simulation Build", icon: "simBuilder" },
+  ] },
   { id: "runsim", icon: "simRun", label: "Run Simulation", action: "modal" },
   { id: "runbatch", icon: "simRunBatch", label: "Run batch", action: "modal" },
 ];
@@ -399,24 +448,30 @@ export const RESULTS_RIBBON = [
     { label: "Cross Section", icon: "crossSection" },
     { label: "XY Series",     icon: "chartsVisTrendDashed" },
   ] },
-  { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D Flood Map", chevron: true },
+  { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D Flood Map", chevron: true, menu: [
+    { label: "1D Flood Map", icon: "results1dFloodMap" },
+    { label: "Create TIN from shapefile",              icon: "resultsTinShapefile" },
+    { label: "Create TIN from River Cross-Sections",   icon: "resultsTinCrossSection" },
+    { label: "Add 1D results to TIN",                  icon: "resultsAdd1dTin" },
+  ] },
   { id: "tabularcsv", icon: "resultsTabularCsv", label: "Tabular CSV", action: "file", fileType: "CSV file (*.csv)" },
   { sep: true },
   { id: "results2d", icon: "results2d", label: "2D results", chevron: true, menu: [
-    { label: "Time Series",           icon: "chartsReportLine" },
-    { label: "Plot Section",          icon: "chartAnalytics" },
-    { label: "Flow Line",             icon: "fm2dLine" },
+    { label: "Time Series Plot",      icon: "chartsReportLine" },
+    { label: "Cross-Section Plot",    icon: "chartAnalytics" },
+    { label: "Flow Line Plot",        icon: "fm2dLine" },
     { label: "Embedded Structures",   icon: "resultEmbeddedStructures" },
+    { menuSep: true },
+    { label: "Load 2D results",       icon: "results2dUpload" },
   ] },
   { id: "2dfloodmap", icon: "results2dFloodMap", label: "2D Flood Map", action: "file", fileType: "Flood map raster (*.tif)" },
-  { id: "damagecalc", icon: "resultsDamageCalculator", label: "Damage Calculator", action: "modal" },
   { sep: true },
-  { id: "spatialdiag", icon: "resultsDiagnostics", label: "Spatial diagnostics", chevron: true, menu: [
-    { label: "Grid Check",   icon: "guiSnapGrid" },
-    { label: "Domain Check", icon: "generalSelectPolygon" },
-    { label: "Zpt Check",    icon: "zmodPoints" },
-    { label: "Messages & alerts", icon: "alertsNotification" },
+  { id: "animateresults", icon: "resultsGlobalPlayer", label: "Animate results", chevron: true, menu: [
+    { label: "Animate single result",    icon: "resultsGlobalPlayer" },
+    { label: "Animate multiple results", icon: "resultsMultiPlayer" },
   ] },
+  { sep: true },
+  { id: "damagecalc", icon: "resultsDamageCalculator", label: "Damage Calculator", action: "modal" },
 ];
 
 const RIBBON_BY_MODE = {
@@ -509,7 +564,7 @@ export const DEFAULT_FAVOURITES = [
 // "+ Create new list".
 export const DEFAULT_FAVOURITE_LISTS = [
   { id: "1d2d-model-build", name: "1D/2D Model Build" },
-  { id: "reservoir-design", name: "Reservoir design" },
+  { id: "reservoir-design", name: "Reservoir Design" },
   { id: "flood-risk-management", name: "Flood Risk Management" },
 ];
 
@@ -533,7 +588,7 @@ function MenuSep() {
 // or plain click actions (`onClick`) — e.g. a checkbox-style toggle or a
 // radio-style selection, optionally showing a checkmark (`checked`) instead
 // of the item's own icon. `disabled` greys the row out and blocks Both.
-function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
+function MenuItem({ item, groupItems, onBeginDrag, onCloseAll, onAction }) {
   const [subOpen, setSubOpen] = useState(false);
   const hasSub = !!item.sub;
   const hasCheck = item.checked !== undefined;
@@ -553,10 +608,13 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
         onClick={item.disabled ? undefined : item.onClick ? () => {
           item.onClick();
           if (!item.keepOpen) onCloseAll();
+        } : item.action ? () => {
+          onAction?.(item);
+          onCloseAll();
         } : undefined}
         style={{
           display: "flex", alignItems: "center", gap: 10, padding: "7px 10px",
-          cursor: item.disabled ? "default" : (item.drag || item.onClick) ? "pointer" : "default",
+          cursor: item.disabled ? "default" : (item.drag || item.onClick || item.action) ? "pointer" : "default",
           whiteSpace: "nowrap", borderRadius: 2, opacity: item.disabled ? 0.4 : 1,
           background: item.active ? "var(--surface-4)" : "transparent",
         }}
@@ -577,7 +635,7 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll }) {
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 60,
         }}>
           {item.sub.map((s, i) => s.menuSep ? <MenuSep key={i} /> : (
-            <MenuItem key={s.label} item={s} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={onCloseAll} />
+            <MenuItem key={`${s.label}-${i}`} item={s} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={onCloseAll} onAction={onAction} />
           ))}
         </div>
       )}
@@ -629,12 +687,12 @@ function FavouriteListDropdown({ lists, activeId, onSelect, onCreate, open, setO
           background: isOpen ? "var(--neutral-400)" : "transparent",
         }}
       >
-        <Icon src={A.favStar} size={16} />
+        <Icon src={A.favListSave} size={16} />
         <span style={{ fontSize: "var(--fs-xs)", fontWeight: 600, whiteSpace: "nowrap" }}>{active?.name || "Favourites"}</span>
         <Icon src={A.keyDown} size={12} style={{ transform: isOpen ? "rotate(180deg)" : "none" }} />
       </button>
       {isOpen && createPortal(
-        <div style={{
+        <div data-fm-menu="favlists" style={{
           position: "fixed", top: menuPos.top, left: menuPos.left, width: 220,
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
@@ -717,12 +775,11 @@ function FavouriteChip({ item, onBeginDrag, onRemove, ribbonDrag, isDragOver, on
         onClick={(e) => { e.stopPropagation(); onRemove(item); }}
         title="Remove from Favourites"
         style={{
-          width: 16, height: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          border: "none", borderRadius: "50%", cursor: "pointer", padding: 0, fontSize: 12, lineHeight: 1,
-          background: hover ? "var(--neutral-400)" : "transparent",
-          color: hover ? "#fff" : "transparent",
+          width: 18, height: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          border: "none", background: "transparent", cursor: "pointer", padding: 0,
+          opacity: hover ? 1 : 0,
         }}
-      >×</button>
+      ><Icon src={A.runFailed} size={18} style={{ filter: "drop-shadow(0 0 0 transparent)" }} /></button>
     </div>
   );
 }
@@ -768,13 +825,13 @@ function RibbonGroup({ group, open, setOpen, onBeginDrag, onAction, isHighlighte
         )}
       </button>
       {hasMenu && isOpen && createPortal(
-        <div style={{
+        <div data-fm-menu="ribbon" style={{
           position: "fixed", top: menuPos.top, left: menuPos.left, width: "max-content",
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
         }}>
           {group.menu.map((it, i) => it.menuSep ? <MenuSep key={i} /> : (
-            <MenuItem key={it.label} item={it} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={() => setOpen(null)} />
+            <MenuItem key={`${it.label}-${i}`} item={it} groupItems={groupItems} onBeginDrag={onBeginDrag} onCloseAll={() => setOpen(null)} onAction={onAction} />
           ))}
         </div>,
         document.body
@@ -819,7 +876,7 @@ function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflow
         <Icon src={A.keyDown} size={12} style={{ margin: "-3px 0" }} />
       </button>
       {overflowOpen && createPortal(
-        <div style={{
+        <div data-fm-menu="overflow" style={{
           position: "fixed", top: menuPos.top, right: menuPos.right, width: "max-content", minWidth: 180,
           background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4, zIndex: 200,
@@ -835,14 +892,15 @@ function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflow
   );
 }
 
-// Radio-select basemap options (Home tab). Only "none"/"osm" are wired to a
-// real backdrop (see GisCanvas/OsmBasemap) — the rest are shown for visual
-// completeness, matching the Figma spec, but greyed out since they'd need a
-// real API key this demo doesn't have.
+// Radio-select basemap options (Home tab). "none"/"osm"/"os-satellite" are
+// wired to a real backdrop (see GisCanvas/BASEMAP_SOURCES) — the remaining
+// ordnance/azure layers are shown for visual completeness, matching the Figma
+// spec, but greyed out since they'd need a real API key this demo doesn't have.
 const BASEMAP_OPTIONS = [
   { id: "none", label: "None" },
   { sep: true },
   { id: "osm", label: "Open Street Map" },
+  { id: "os-satellite", label: "OS Satellite" },
   { id: "os-roads", label: "OS Roads", disabled: true },
   { id: "os-light", label: "OS Light", disabled: true },
   { id: "os-outdoor", label: "OS Outdoor", disabled: true },
@@ -880,7 +938,7 @@ const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this d
 // that ribbon button would (open its file-explorer/placeholder modal, or
 // expand its dropdown menu), not just switch tab + pulse; consumed via
 // `onConsumeSearchAction` so the same item can be re-triggered later.
-export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, favouriteLists, activeFavouriteListId, onSelectFavouriteList, onCreateFavouriteList, ribbonDrag, onConsumeRibbonDrag, onAddLayer, highlightedGroup, pendingSearchAction, onConsumeSearchAction }) {
+export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBasemap, annotateTool, setAnnotateTool, onOpenAnnotationSettings, favourites, onDropFavourite, onRemoveFavourite, favouriteLists, activeFavouriteListId, onSelectFavouriteList, onCreateFavouriteList, ribbonDrag, onConsumeRibbonDrag, onAddLayer, onExportNetwork, highlightedGroup, pendingSearchAction, onConsumeSearchAction }) {
   const [open, setOpen] = useState(null);
   const barRef = useRef(null);
   // Groups that don't fit in the bar at the current width collapse into
@@ -900,6 +958,7 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     if (group.action === "file") setFileModal(group);
     else if (group.action === "modal") setPlaceholderModal(group);
     else if (group.action === "addLayer") onAddLayer?.();
+    else if (group.action === "export") onExportNetwork?.();
   };
 
   // Search/Recents picked something that isn't a placeable unit — replay
@@ -926,6 +985,8 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
   const toggleSwmmLabel = (key) => setSwmmLabelToggles((t) => ({ ...t, [key]: !t[key] }));
   const [snapToggles, setSnapToggles] = useState({ grid: true, object: true, vertice: true });
   const toggleSnap = (key) => setSnapToggles((t) => ({ ...t, [key]: !t[key] }));
+  const [hplusLabelToggles, setHplusLabelToggles] = useState({ calcPoints: true, riverStation: false });
+  const toggleHplusLabel = (key) => setHplusLabelToggles((t) => ({ ...t, [key]: !t[key] }));
 
   const basemapMenu = [
     ...BASEMAP_OPTIONS.map((opt) => opt.sep ? { menuSep: true } : {
@@ -943,9 +1004,13 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     { menuSep: true },
     { label: "Labels", checked: labelToggles.labels, keepOpen: true, onClick: () => toggleLabel("labels") },
     { label: "Overlaps", checked: labelToggles.overlaps, keepOpen: true, onClick: () => toggleLabel("overlaps") },
-    { label: "1D River nodes", checked: labelToggles.nodes, keepOpen: true, onClick: () => toggleLabel("nodes") },
-    { label: "1D River icons", checked: labelToggles.icons, keepOpen: true, onClick: () => toggleLabel("icons") },
-    { label: "1D River links", checked: labelToggles.links, keepOpen: true, onClick: () => toggleLabel("links") },
+    { label: "1D River Nodes", checked: labelToggles.nodes, keepOpen: true, onClick: () => toggleLabel("nodes") },
+    { label: "1D River Icons", checked: labelToggles.icons, keepOpen: true, onClick: () => toggleLabel("icons") },
+    { label: "1D River Links", checked: labelToggles.links, keepOpen: true, onClick: () => toggleLabel("links") },
+  ];
+  const hplusViewLabelsMenu = [
+    { label: "Calculation Points", checked: hplusLabelToggles.calcPoints, keepOpen: true, onClick: () => toggleHplusLabel("calcPoints") },
+    { label: "River Station",      checked: hplusLabelToggles.riverStation, keepOpen: true, onClick: () => toggleHplusLabel("riverStation") },
   ];
   const swmmViewLabelsMenu = [
     { label: "Labels", checked: swmmLabelToggles.labels, keepOpen: true, onClick: () => toggleSwmmLabel("labels") },
@@ -977,6 +1042,7 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     if (mode === "Home" && g.id === "addcontent") return { ...g, menu: addContentMenu };
     if (mode === "FM 1D" && g.id === "viewlabels") return { ...g, menu: viewLabelsMenu };
     if (mode === "SWMM" && g.id === "viewlabelsswmm") return { ...g, menu: swmmViewLabelsMenu };
+    if (mode === "Hydrology+" && g.id === "hplusviewlabels") return { ...g, menu: hplusViewLabelsMenu };
     if (mode === "GIS" && g.id === "snapping") return { ...g, menu: snappingMenu };
     return g;
   });
@@ -1021,9 +1087,15 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRibbon]);
 
-  // Close any open menu on outside click / Escape
-  useEffect(() => {
-    const onDown = (e) => { if (barRef.current && !barRef.current.contains(e.target)) { setOpen(null); setOverflowOpen(false); } };
+// Close any open menu on outside click / Escape. Menu drop-downs render
+    // via createPortal into document.body (outside `barRef`), so a mousedown
+    // on a menu item must NOT be treated as an outside click — otherwise the
+    // menu unmounts on mousedown and the item's click never fires.
+    useEffect(() => {
+      const onDown = (e) => {
+        if (e.target?.closest?.("[data-fm-menu]")) return;
+        if (barRef.current && !barRef.current.contains(e.target)) { setOpen(null); setOverflowOpen(false); }
+      };
     const onKey = (e) => { if (e.key === "Escape") { setOpen(null); setOverflowOpen(false); } };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -1046,7 +1118,7 @@ export default function ModeRibbon({ onBeginDrag, mode, setMode, basemap, setBas
   };
 
   return (
-    <div style={{ flexShrink: 0, padding: "0 8px", background: "var(--surface-1)", position: "relative", zIndex: 30 }}>
+    <div style={{ flexShrink: 0, padding: "0 8px", background: "var(--surface-3)", position: "relative", zIndex: 30 }}>
       {/* Mode tabs */}
       <div style={{ display: "flex", alignItems: "center", height: 32, paddingLeft: 16 }}>
         {modes.map((m) => {

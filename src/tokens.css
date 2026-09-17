@@ -8,6 +8,7 @@
   --surface-1-invert: #333333;
   --surface-brand: #0a7dff;
   --surface-brand-invert: #0a7dff;
+  --surface-warning: #cc334f;
 
   /* text */
   --text-primary: #333333;
@@ -67,7 +68,14 @@ body {
 }
 button { font-family: inherit; }
 
-/* thin scrollbars to match the dense desktop UI */
+/* Thin scrollbars to match the dense desktop UI. The thumb stays invisible
+   (transparent) until the pointer is over the scrolling element, so panel
+   sections read as clean content rather than permanent scroll rails — the
+   track still reserves its width, so nothing reflows on hover. */
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: var(--neutral-700); border-radius: 4px; }
+*::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--neutral-700); }
+*:hover::-webkit-scrollbar-thumb { background: var(--neutral-700); }
 *::-webkit-scrollbar-track { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: var(--neutral-700) transparent; }

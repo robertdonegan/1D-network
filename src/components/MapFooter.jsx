@@ -65,7 +65,7 @@ const DEFAULT_GUIDE = [
 // ordered hint (icon optional) reflecting whatever the user is currently
 // doing — hovering/selecting a unit, dragging, an open picker, etc. Falls
 // back to the baseline Select/Zoom/Options guide when nothing is active.
-export default function MapFooter({ cursorWorld, scale, guideItems }) {
+export default function MapFooter({ cursorWorld, scale, guideItems, attribution }) {
   const items = guideItems && guideItems.length ? guideItems : DEFAULT_GUIDE;
   const metersPerPx = METERS_PER_WORLD_UNIT / scale;
   const meters = pickScale(metersPerPx);
@@ -106,7 +106,7 @@ export default function MapFooter({ cursorWorld, scale, guideItems }) {
         </div>
         <div style={{ minWidth: 0, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
           <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-primary)", whiteSpace: "nowrap" }}>
-            © OpenStreetMap contributors
+            {attribution || "© OpenStreetMap contributors"}
           </span>
         </div>
       </div>

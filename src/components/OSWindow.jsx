@@ -4,6 +4,11 @@ import { flattenRibbonItems } from "./ModeRibbon.jsx";
 
 const ALL_ITEMS = flattenRibbonItems();
 
+// How long a sub-menu stays open after the pointer leaves its parent row —
+// long enough to cross the small gap to the flyout (Base map > options)
+// without the menu snapping shut mid-trail.
+const SUBMENU_CLOSE_DELAY_MS = 250;
+
 // Small hand-drawn glyphs for the couple of icons this file needs that
 // don't have a dedicated uploaded asset yet (same convention as
 // GlobalAnimatorPanel's Play/Pause glyphs).
@@ -90,9 +95,10 @@ function ResultRow({ it, isFavourite, onToggleFavourite, onPick }) {
 // Figma "fm-v8.0-os-menu" spec (nodes 1:24153-1:24158) — General/Project/
 // Layer/Window/Toolbox/Help are visual-only chrome (matching the Home
 // ribbon's not-yet-built dropdowns convention), except "Open Toolbox..."
-// (id:"open-toolbox") and "Keyboard shortcuts..." (id:"shortcuts"), which
-// are genuinely wired. Disabled rows mirror the Figma mockup exactly
-// (e.g. no project is "dirty" yet, so Save/Close project are greyed).
+// (id:"open-toolbox"), "Keyboard shortcuts..." (id:"shortcuts") and Help's
+// "Dev – changelog" (id:"changelog"), which are genuinely wired. Disabled
+// rows mirror the Figma mockup exactly (e.g. no project is "dirty" yet, so
+// Save/Close project are greyed).
 const GENERAL_MENU = [
   { label: "Start-up screen", shortcut: "Ctrl+\\" },
   { label: "About Flood Modeller..." },
@@ -172,21 +178,28 @@ const HELP_MENU = [
   { label: "System info..." },
   { label: "Legal summary", external: true },
   { label: "Open data notices", external: true },
-  { label: "Third party software", external: true },
+  { label: "Third party software", external: true, sep: true },
+  { label: "Dev – changelog", id: "changelog" },
 ];
 
 // View > Base map submenu (fm-v8.0-menu-view-base-map spec, node 13:13958)
-// — only Open Street Map / None are wired to real basemap state (same two
-// options the Home ribbon's Basemap dropdown supports); the OS Ordnance
-// Survey layers all need an API key this demo doesn't have.
+// — Open Street Map / OS Satellite / None are wired to real basemap state
+// (same options the Home ribbon's Basemap dropdown supports; the satellite
+// entry renders Esri imagery as a keyless stand-in, see BASEMAP_SOURCES);
+// the remaining Ordnance Survey layers all need an API key this demo doesn't
+// have.
 const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this demo";
+const BASEMAP_ENABLED = ["osm", "os-satellite", "none"];
 function buildBaseMapSubmenu(basemap, setBasemap) {
-  const opt = (id, label) => ({
-    id: `basemap-${id}`, label, checked: basemap === id,
-    onClick: id === "osm" || id === "none" ? () => setBasemap(id) : undefined,
-    disabled: !(id === "osm" || id === "none"),
-    disabledReason: id === "osm" || id === "none" ? undefined : BASEMAP_DISABLED_REASON,
-  });
+  const opt = (id, label) => {
+    const enabled = BASEMAP_ENABLED.includes(id);
+    return {
+      id: `basemap-${id}`, label, checked: basemap === id,
+      onClick: enabled ? () => setBasemap(id) : undefined,
+      disabled: !enabled,
+      disabledReason: enabled ? undefined : BASEMAP_DISABLED_REASON,
+    };
+  };
   return [
     opt("osm", "Open Street Map"),
     opt("os-satellite", "OS Satellite"),
@@ -272,8 +285,9 @@ function SubmenuFlyout({ items, onPick }) {
 // with an `id` do anything (`onItemClick`); rows with a `submenu` open a
 // flyout on hover (e.g. View > Base map); the rest are visual-only,
 // matching the Figma mockup exactly (including which rows are greyed out).
-function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checkedIds }) {
+function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checkedIds, onHover }) {
   const ref = useRef(null);
+  const subTimer = useRef(null);
   const [subOpen, setSubOpen] = useState(null);
   useEffect(() => {
     if (!isOpen) return;
@@ -283,12 +297,14 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
   }, [isOpen, onClose]);
-  useEffect(() => { if (!isOpen) setSubOpen(null); }, [isOpen]);
+  useEffect(() => { if (!isOpen) { clearTimeout(subTimer.current); setSubOpen(null); } }, [isOpen]);
+  useEffect(() => () => clearTimeout(subTimer.current), []);
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <div
         onClick={onToggle}
+        onMouseEnter={onHover}
         style={{
           height: 32, display: "flex", alignItems: "center", justifyContent: "center",
           padding: "0 8px", fontSize: "var(--fs-xs)", cursor: "pointer", whiteSpace: "nowrap",
@@ -310,8 +326,8 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
               <div
                 key={i}
                 style={{ position: "relative" }}
-                onMouseEnter={() => hasSub && setSubOpen(i)}
-                onMouseLeave={() => hasSub && setSubOpen((v) => (v === i ? null : v))}
+                onMouseEnter={() => { if (hasSub) { clearTimeout(subTimer.current); setSubOpen(i); } }}
+                onMouseLeave={() => { if (hasSub) { clearTimeout(subTimer.current); subTimer.current = setTimeout(() => setSubOpen((v) => (v === i ? null : v)), SUBMENU_CLOSE_DELAY_MS); } }}
               >
                 <div
                   onClick={clickable ? () => onItemClick(it) : undefined}
@@ -367,7 +383,7 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
 // `onSelectResult(item)` — called whenever a result (or Recents entry) is
 // picked up, so App can record it as a recent and highlight its ribbon
 // group (see App.jsx's `handleSelectSearchResult`).
-export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, recentSearches, onSelectResult, onCreateLayer }) {
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, recentSearches, onSelectResult, onCreateLayer }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [places, setPlaces] = useState([]);
@@ -394,7 +410,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
     const t = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&q=${encodeURIComponent(query)}`,
+          `https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=5&countrycodes=gb&q=${encodeURIComponent(query)}`,
         );
         const data = await res.json();
         if (!cancelled) setPlaces(data);
@@ -424,6 +440,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
 
   const handleItemClick = (it) => {
     if (it.id === "shortcuts") onOpenShortcuts();
+    if (it.id === "changelog") onOpenChangelog?.();
     if (it.id === "open-toolbox") onOpenToolbox();
     if (it.id === "flowlines") setFlowLinesOn((v) => !v);
     if (it.id === "create-layer") onCreateLayer?.();
@@ -459,6 +476,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
                 isOpen={openMenu === m.label}
                 onToggle={() => setOpenMenu((v) => (v === m.label ? null : m.label))}
                 onClose={() => setOpenMenu((v) => (v === m.label ? null : v))}
+                onHover={() => { if (openMenu && openMenu !== m.label) setOpenMenu(m.label); }}
                 onItemClick={handleItemClick}
                 checkedIds={checkedIds}
               />
@@ -540,7 +558,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onGoToLocation,
                 onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
                 onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
                 title="Go to this location on the map">
-                <Icon src={A.homeMarker} size={16} />
+                <Icon src={A.worldMapView2} size={16} style={{ filter: "invert(33%) sepia(88%) saturate(3800%) hue-rotate(195deg) brightness(101%) contrast(113%)" }} />
                 <span style={{ fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.display_name}</span>
               </div>
             ))}
