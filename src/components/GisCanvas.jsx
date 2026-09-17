@@ -1472,8 +1472,12 @@ export default function GisCanvas({
       // preview the point that would be inserted if the user clicked right
       // now, so hovering a shape's edge (or, once a shape's active,
       // anywhere near two of its vertices) signals "you can add a vertex
-      // here" before committing to the click.
-      if (liveEdit && (polySubTool === "addVertex" || polySubTool === "pen")) {
+      // here" before committing to the click. A 1D unit being dragged takes
+      // precedence over the ghost so nodes stay draggable mid-Live-Edit.
+      if (
+        !dragNode && !dragVertex && !dragCurve &&
+        liveEdit && (polySubTool === "addVertex" || polySubTool === "pen")
+      ) {
         const target = findAddVertexTarget(p, toWorld(view, p.x, p.y), selectedPolyId);
         setPolyHoverSeg(target ? target.world : null);
         return;
