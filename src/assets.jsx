@@ -242,6 +242,7 @@ import homeHighlighter from "./assets/home-highlighter.svg";
 import homeArrowTool from "./assets/home-arrow-tool.svg";
 import toggleOffX from "./assets/toggle-off-x.svg";
 import flowLinesIcon from "./assets/flow-lines.svg";
+import panelToolbox from "./assets/panel-toolbox.svg";
 import globalAnimatorIcon from "./assets/global-animator.svg";
 import toggleOnCheck from "./assets/toggle-on-check.svg";
 
@@ -428,6 +429,7 @@ export const A = {
   homeGoToMap, homeMapView, homeFathom, homeOpenProject, homeNewProject,
   homeTextBox, homeHighlighter, homeArrowTool,
   toggleOffX, toggleOnCheck, flowLinesIcon, globalAnimatorIcon,
+  panelToolbox,
   mouseLeft, mouseScroll, mouseRight, mouseLeftDrag, mouseLeftDrag2,
   ribbonActiveArea, ribbonBoundaryCondition, ribbonDefineTopo, ribbon1dEmbed, ribbon1d2dLink,
   fm2dNew2dModel, fm2dRoughness, fm2dRainInfiltration, fm2dInputConverter,

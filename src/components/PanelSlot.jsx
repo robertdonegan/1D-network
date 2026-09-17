@@ -20,7 +20,7 @@ export const PANEL_VIEWS = {
   timesteps: { icon: "panelTimesteps", title: "Timesteps" },
   texteditor: { icon: "panelTextEditor", title: "Text editor" },
   diagnostics1d: { icon: "panelDiagnostics", title: "1D Diagnostics" },
-  toolbox: { icon: "edit", title: "Toolbox", Body: ToolboxPanelBody },
+  toolbox: { icon: "panelToolbox", title: "Toolbox", Body: ToolboxPanelBody },
   flowlines: { icon: "flowLinesIcon", title: "1D Flow Lines", Body: FlowLinesPanelBody },
 };
 const VIEW_ORDER = [
