@@ -311,6 +311,14 @@ import fm1dSpillGen from "./assets/fm1d-spill-gen.svg";
 import fm1dCrossSectionGen from "./assets/fm1d-cross-section-gen.svg";
 import resultsTinShapefile from "./assets/results-tin-shapefile.svg";
 import resultsTinCrossSection from "./assets/results-tin-cross-section.svg";
+import results1dTimeSeries from "./assets/results-1d-time-series.svg";
+import results1dLongSection from "./assets/results-1d-long-section.svg";
+import results1dCrossSection from "./assets/results-1d-cross-section.svg";
+import results1dXyChart from "./assets/results-1d-xy-chart.svg";
+import results2dTimeSeries from "./assets/results-2d-time-series.svg";
+import results2dPlotSections from "./assets/results-2d-plot-sections.svg";
+import results2dFlowLines from "./assets/results-2d-flow-lines.svg";
+import results2dEmbedStructure from "./assets/results-2d-embed-structure.svg";
 import resultsAdd1dTin from "./assets/results-add-1d-tin.svg";
 import results2dUpload from "./assets/results-2d-upload.svg";
 import resultsGlobalPlayer from "./assets/results-global-player.svg";
@@ -405,6 +413,8 @@ export const A = {
   hydroLoadHplus, hydroRefh, hydroFsuPortal, hydroRiverStations, hydroCatchDesc,
   simQuality, simNew2d, simBuilder, simRun, simRunBatch,
   results1d, results1dFloodMap, resultsTabularCsv, results2d, results2dFloodMap,
+  results1dTimeSeries, results1dLongSection, results1dCrossSection, results1dXyChart,
+  results2dTimeSeries, results2dPlotSections, results2dFlowLines, results2dEmbedStructure,
   resultsDamageCalculator, resultsComments, favStar, chartAnalytics,
   cursorSelect, calcPointWeir, lhs0, lhs1, lhs2, lhs3, lhsList, lhsFm2d, lhsDataLibrary,
   lhsChevronRight, lhsChevronDown, lhsPlus, lhsTxtFile, lhsPolygon, lhsLink, lhsPolyline,

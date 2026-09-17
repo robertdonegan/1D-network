@@ -373,7 +373,7 @@ export const HYDROLOGY_RIBBON = [
       { label: "QMED",    icon: "hydroStationNrfaQmed" },
       { label: "Pooling", icon: "hydroStationNrfaPooling" },
     ] },
-    { label: "Off (none)",         icon: "generalInvisible" },
+    { label: "Off (none)" },
     { menuSep: true },
     { label: "Show key", icon: "hydroStationShowKey" },
   ] },
@@ -443,10 +443,10 @@ export const SIMULATION_RIBBON = [
 
 export const RESULTS_RIBBON = [
   { id: "1dresults", icon: "results1d", label: "1D results", chevron: true, menu: [
-    { label: "Time Series",   icon: "chartsReportLine" },
-    { label: "Long Section",  icon: "chartsReportFilled" },
-    { label: "Cross Section", icon: "crossSection" },
-    { label: "XY Series",     icon: "chartsVisTrendDashed" },
+    { label: "Time Series",   icon: "results1dTimeSeries" },
+    { label: "Long Section",  icon: "results1dLongSection" },
+    { label: "Cross Section", icon: "results1dCrossSection" },
+    { label: "XY Series",     icon: "results1dXyChart" },
   ] },
   { id: "1dfloodmap", icon: "results1dFloodMap", label: "1D Flood Map", chevron: true, menu: [
     { label: "1D Flood Map", icon: "results1dFloodMap" },
@@ -457,10 +457,10 @@ export const RESULTS_RIBBON = [
   { id: "tabularcsv", icon: "resultsTabularCsv", label: "Tabular CSV", action: "file", fileType: "CSV file (*.csv)" },
   { sep: true },
   { id: "results2d", icon: "results2d", label: "2D results", chevron: true, menu: [
-    { label: "Time Series Plot",      icon: "chartsReportLine" },
-    { label: "Cross-Section Plot",    icon: "chartAnalytics" },
-    { label: "Flow Line Plot",        icon: "fm2dLine" },
-    { label: "Embedded Structures",   icon: "resultEmbeddedStructures" },
+    { label: "Time Series Plot",      icon: "results2dTimeSeries" },
+    { label: "Cross-Section Plot",    icon: "results2dPlotSections" },
+    { label: "Flow Line Plot",        icon: "results2dFlowLines" },
+    { label: "Embedded Structures",   icon: "results2dEmbedStructure" },
     { menuSep: true },
     { label: "Load 2D results",       icon: "results2dUpload" },
   ] },
@@ -624,7 +624,7 @@ function MenuItem({ item, groupItems, onBeginDrag, onCloseAll, onAction }) {
       >
         {hasCheck
           ? (item.checked && <Icon src={A.check} size={16} />) || <div style={{ width: 16, height: 16, flexShrink: 0 }} />
-          : <Icon src={A[item.icon]} size={16} />}
+          : (item.icon && <Icon src={A[item.icon]} size={16} />) || <div style={{ width: 16, height: 16, flexShrink: 0 }} />}
         <span style={{ fontSize: "var(--fs-xs)", flex: "1 0 0" }}>{item.label}</span>
         {hasSub && <Icon src={A.keyDown} size={12} style={{ transform: "rotate(-90deg)", opacity: 0.6 }} />}
       </div>

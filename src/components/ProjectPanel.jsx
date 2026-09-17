@@ -359,7 +359,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
   // unless that's added. Any GIS tool (QGIS, ArcGIS, mapshaper.org) can
   // re-save this straight to .shp if a real shapefile is needed.
   const exportLayer = (layer) => {
-    const feats = (polygons || []).filter((p) => (p.layerId || "example") === layer.id);
+    const feats = (polygons || []).filter((p) => (p.layerId || "demo-shapefile") === layer.id);
     const geojson = {
       type: "FeatureCollection",
       features: feats.map((p) => ({
@@ -450,7 +450,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
           — see `openLayerMenu`. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 8px", flex: "1 0 0", overflow: "auto" }}>
         {(layers || []).map((l) => {
-          const count = (polygons || []).filter((p) => (p.layerId || "example") === l.id).length;
+          const count = (polygons || []).filter((p) => (p.layerId || "demo-shapefile") === l.id).length;
           const active = l.id === activeLayerId;
           return (
             <LayerRow

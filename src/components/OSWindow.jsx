@@ -66,7 +66,7 @@ function ResultRow({ it, isFavourite, onToggleFavourite, onPick }) {
       onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
       onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
       title={it.drag ? "Drag onto the canvas to place" : "Go to this tool in the ribbon"}>
-      <Icon src={A[it.icon]} size={16} />
+      {(it.icon && <Icon src={A[it.icon]} size={16} />) || <div style={{ width: 16, height: 16, flexShrink: 0 }} />}
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
         <span style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{it.label}</span>
         <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{it.group}</span>

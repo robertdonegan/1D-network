@@ -416,9 +416,8 @@ export default function GisCanvas({
 
   // --- Polygon editing (Live Edit phase 3) -----------------------------
   // Real editable vector layer, gated to Live Edit — `polygons`/
-  // `setPolygons` are lifted to App.jsx (shown as "Example polygon layer"
-  // in the left Project panel) so they persist across Live Edit sessions;
-  // `polySubTool`/`snapOn` are controlled here and passed down to
+  // `setPolygons` are lifted to App.jsx so they persist across Live Edit
+  // sessions; `polySubTool`/`snapOn` are controlled here and passed down to
   // EditToolbar so its buttons reflect real state instead of being
   // decorative. Undo/redo is a plain snapshot stack — simple and correct
   // at this data scale (a handful of polygons, not thousands).
@@ -616,7 +615,7 @@ export default function GisCanvas({
   const finishDrawPoly = () => {
     if (!drawPoly || drawPoly.points.length < 3) { setDrawPoly(null); return; }
     pushPolyHistory();
-    const layerId = activeLayerId || "example";
+    const layerId = activeLayerId || "demo-shapefile";
     const mode = polySubTool; // "pen" | "pathfinderPunch" | "pathfinderUnion"
     const standalone = (ps) => [...ps, {
       id: genId(), name: "Polygon " + (ps.length + 1), layerId,
@@ -3196,7 +3195,7 @@ export default function GisCanvas({
             hit-testing here, and newly-drawn shapes are tagged onto
             whichever layer is currently active for drawing. */}
         {(() => {
-          const layerById = (id) => (layers || []).find((l) => l.id === (id || "example"));
+          const layerById = (id) => (layers || []).find((l) => l.id === (id || "demo-shapefile"));
           const visible = polygons.filter((p) => (layerById(p.layerId)?.visible ?? true));
           return (
           <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>

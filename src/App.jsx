@@ -58,7 +58,7 @@ const INIT_EDGES = [["n3","g29"],["g29","g32"],["g32","g35"],["g35","g38"],["g38
 // Two demo shapefiles the user drew in-app with the Pen tool, exported via
 // the Layers tab's right-click "Export" and supplied back to seed every
 // user's default view with a real, accurate shapefile (rather than the
-// blank "Example polygon layer" alone) — same world-space coordinates as
+// same world-space coordinates as
 // INIT_NODES above, so they sit exactly where drawn relative to the demo
 // network and OSM backdrop, roughly bracketing the river's northern
 // (Hanley/Ryall) and southern (Upton/Ryall) floodplain-shaped bends.
@@ -296,9 +296,8 @@ export default function App() {
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Vector polygon layers (Live Edit phase 3) — any number of user-created
-  // layers (see "Add GIS data" in the Home ribbon / AddLayerModal), plus
-  // one seeded "Example polygon layer" for parity with the old single-layer
-  // demo. `polygons` stays one flat array (each entry tagged `layerId`) so
+  // layers (see "Add GIS data" in the Home ribbon / AddLayerModal).
+  // `polygons` stays one flat array (each entry tagged `layerId`) so
   // GisCanvas's existing single-array editing/undo machinery didn't need
   // splitting apart; `layers` is just the per-layer metadata (name, colour,
   // visibility) shown as real, addable/removable/toggleable rows in the
@@ -306,12 +305,9 @@ export default function App() {
   // layer is `activeLayerId` is where the Pen tool's next new polygon goes.
   const [polygons, setPolygons] = useState(INIT_POLYGONS);
   const [layers, setLayers] = useState([
-    { id: "example", name: "Example polygon layer", color: "var(--orange-900)", visible: true },
-    // The two demo shapefiles seeded into INIT_POLYGONS above — blue outline
-    // matches the reference screenshot's supplied shapefile styling.
     { id: "demo-shapefile", name: "Demo shapefile", color: "var(--blue-700)", visible: true },
   ]);
-  const [activeLayerId, setActiveLayerId] = useState("example");
+  const [activeLayerId, setActiveLayerId] = useState("demo-shapefile");
   const [addLayerModalOpen, setAddLayerModalOpen] = useState(false);
   // Which of the Project panel's own footer tabs is showing — lifted up
   // here (not left as ProjectPanel-local state) purely so creating a layer
@@ -329,8 +325,8 @@ export default function App() {
   };
   const deleteLayer = (id) => {
     setLayers((ls) => ls.filter((l) => l.id !== id));
-    setPolygons((ps) => ps.filter((p) => (p.layerId || "example") !== id));
-    setActiveLayerId((cur) => (cur === id ? (layers.find((l) => l.id !== id)?.id ?? "example") : cur));
+    setPolygons((ps) => ps.filter((p) => (p.layerId || "demo-shapefile") !== id));
+    setActiveLayerId((cur) => (cur === id ? (layers.find((l) => l.id !== id)?.id ?? "demo-shapefile") : cur));
   };
   const toggleLayerVisibility = (id) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, visible: l.visible === false } : l)));
   // Shared with NetworkPanel so a row click selects the node on the canvas.
@@ -372,7 +368,7 @@ export default function App() {
   const [zoomExtent, setZoomExtent] = useState(null);
   const zoomToLayer = (layerId) => {
     const pts = (polygons || [])
-      .filter((p) => (p.layerId || "example") === layerId)
+      .filter((p) => (p.layerId || "demo-shapefile") === layerId)
       .flatMap((p) => p.points || []);
     if (!pts.length) return;
     const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
