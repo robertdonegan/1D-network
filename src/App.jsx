@@ -7,6 +7,8 @@ import KeyboardShortcuts from "./components/KeyboardShortcuts.jsx";
 import ChangelogModal from "./components/ChangelogModal.jsx";
 import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import AddLayerModal from "./components/AddLayerModal.jsx";
+import WeirModal from "./components/WeirModal.jsx";
+import LongSectionModal from "./components/LongSectionModal.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
@@ -132,6 +134,22 @@ const INIT_POLYGONS = [
 let layerUid = 1;
 
 const PANEL_MIN = 180, PANEL_MAX = 520;
+
+// Which side/bottom panels each Mode ribbon tab opens (Figma FMv8.0 "Modes
+// and ribbons", node 1:1071). Modes missing from this map keep whatever
+// panels are currently open; the modes below actively re-arrange them when
+// selected. View ids come from PanelSlot's PANEL_VIEWS registry.
+const MODE_LAYOUTS = {
+  "FM 1D": { right: { view: "network", width: 232 } },
+  "FM 2D": { right: { view: "network", width: 232 } },
+  TUFLOW: { right: { view: "tuflow", width: 552 } },
+  SWMM: { right: { view: "network", width: 232 } },
+  "Hydrology+": { right: { view: "network", width: 232 } },
+  Results: {
+    right: { view: "results2d", width: 232 },
+    bottom: { view: "globalanimator", height: 172 },
+  },
+};
 
 // Thin vertical drag bar between a side panel and the canvas; `onDrag`
 // receives the per-move pixel delta (positive = pointer moved right).
@@ -309,6 +327,41 @@ export default function App() {
   ]);
   const [activeLayerId, setActiveLayerId] = useState("demo-shapefile");
   const [addLayerModalOpen, setAddLayerModalOpen] = useState(false);
+  // 1D Weir unit form: `weirModal` is the open form (only ever edit mode —
+  // it opens on double-click of an existing Weir), `weirCommit` is the
+  // confirmed form data handed to GisCanvas to save onto the node.
+  const [weirModal, setWeirModal] = useState(null);
+  const [weirCommit, setWeirCommit] = useState(null);
+  // Long Section plot: node ids to plot, opened from the map right-click menu
+  // or the 1D Network table's context menu on a multi-selection.
+  const [longSectionIds, setLongSectionIds] = useState(null);
+  // Mode-driven panels (Figma "Modes and ribbons" FMv8.0 spec): switching
+  // modes also rewires the right dock (which panel + how wide) and optionally
+  // opens the bottom dock, matching what the Figma frame for each mode shows.
+  // Modes without a `right` entry hide the right panel entirely (Home,
+  // Simulation, GIS views, Favourites); FM 1D/2D, SWMM and Hydrology+ show
+  // the 1D Network at 232px; TUFLOW shows the wider TUFLOW editor at 552px;
+  // Results shows the 2D-results viewer at 232px plus the Global Animator
+  // opened below the map. `savedRightWidth` remembers each right view's
+  // canvas-resized width so switching modes never clobbers a user resize.
+  const savedRightWidth = useRef({ network: 232, tuflow: 552, results2d: 232 });
+  useEffect(() => {
+    if (rightView) savedRightWidth.current[rightView] = networkW;
+  }, [networkW, rightView]);
+  const changeMode = (m) => {
+    setMode(m);
+    const layout = MODE_LAYOUTS[m];
+    if (layout?.right) {
+      setRightView(layout.right.view);
+      setNetworkW(savedRightWidth.current[layout.right.view] ?? layout.right.width);
+    }
+    if (layout?.bottom) {
+      setBottomPanelView(layout.bottom.view);
+      if (bottomPanelH === 0) setBottomPanelH(layout.bottom.height);
+    } else {
+      setBottomPanelH(0);
+    }
+  };
   // Which of the Project panel's own footer tabs is showing — lifted up
   // here (not left as ProjectPanel-local state) purely so creating a layer
   // can force it to "layers", since that's the whole point of the "Create
@@ -345,10 +398,13 @@ export default function App() {
     setBasemapRaw(id);
   };
   const toggleBasemap = () => setBasemapRaw((b) => (b === "none" ? lastBasemapRef.current : "none"));
-  // Shift+B steps through every backdrop the demo can actually render (the
-  // same enabled entries as the Basemap menus — see BASEMAP_SOURCES). B alone
-  // still just snaps between the grid and the last-selected backdrop.
-  const BASEMAP_CYCLE = ["none", "osm", "os-satellite"];
+  // Shift+B steps through every keyless backdrop the demo can actually render
+  // (the same enabled entries as the Basemap menus — see BASEMAP_SOURCES). B
+  // alone still just snaps between the grid and the last-selected backdrop.
+  const BASEMAP_CYCLE = [
+    "none", "osm", "os-satellite", "osm-hot", "osm-topo",
+    "esri-streets", "esri-topo",
+  ];
   const cycleBasemap = () => setBasemapRaw((cur) => {
     const next = BASEMAP_CYCLE[(BASEMAP_CYCLE.indexOf(cur) + 1) % BASEMAP_CYCLE.length];
     if (next !== "none") lastBasemapRef.current = next;
@@ -360,6 +416,12 @@ export default function App() {
   const [flyTo, setFlyTo] = useState(null);
   const goToLocation = (lat, lon) => {
     setFlyTo({ lat, lon, key: Date.now() });
+    if (basemap === "none") setBasemap("osm");
+  };
+  // Same jump for what3words search hits, which resolve straight to demo
+  // world co-ordinates (no lat/lon round-trip needed).
+  const goToWorld = (x, y) => {
+    setFlyTo({ x, y, key: Date.now() });
     if (basemap === "none") setBasemap("osm");
   };
   // One-shot "fit these world-space bounds" request — the Project panel's
@@ -382,6 +444,20 @@ export default function App() {
   const [ribbonDrag, setRibbonDrag] = useState(null);
   const dragActive = !!ribbonDrag;
   const beginDrag = (e, items, index) => setRibbonDrag({ items, index, x: e.clientX, y: e.clientY });
+  // Opening the 1D Weir unit form: for a fresh drop, prefill
+  // Upstream/Downstream from the two nodes nearest the drop point (upstream
+  // = the one further north, i.e. smaller world-Y, matching the network's
+  // north→south flow direction). Double-click edits reuse the node's stored
+  // values instead.
+  const openWeirForm = (draft) => {
+    setWeirModal(draft);
+  };
+  // Confirm: hand the form data to GisCanvas, which saves it onto the
+  // edited node (see its weirCommit effect).
+  const confirmWeir = (data) => {
+    setWeirCommit({ draft: weirModal, data });
+    setWeirModal(null);
+  };
 
   // "River Network > Save 1D Network" — serialises the canvas network as a
   // JSON file, mirroring the INIT_NODES/INIT_EDGES seed format above, so it
@@ -546,7 +622,7 @@ export default function App() {
   const highlightTimeoutRef = useRef(null);
   const highlightRibbonGroup = (it) => {
     if (!it?.top) return;
-    if (it.mode) setMode(it.mode);
+    if (it.mode) changeMode(it.mode);
     setHighlightedRibbonGroup(it.top);
     clearTimeout(highlightTimeoutRef.current);
     highlightTimeoutRef.current = setTimeout(() => setHighlightedRibbonGroup(null), 2500);
@@ -636,7 +712,7 @@ export default function App() {
       }
       if (e.ctrlKey && !e.shiftKey && !isTyping(e) && /^[1-9]$/.test(e.key)) {
         const target = modes[Number(e.key) - 1];
-        if (target) { e.preventDefault(); setMode(target); }
+        if (target) { e.preventDefault(); changeMode(target); }
       }
       // Toggle the map backdrop between the grid and the last-selected
       // basemap — same bare-letter convention as the canvas's V/G/M/Q/X/Z
@@ -688,6 +764,7 @@ export default function App() {
   const panelBodyProps = {
     nodes, edges, selected, setSelected,
     edgeColors, reachRegistry: registry, reachKeyOfEdge: resolvedKeyByEdge, onRenameReach: renameReach,
+    onOpenLongSection: setLongSectionIds,
     flowByEdge, velocityRange, setVelocityRange, clipOutOfRange, setClipOutOfRange,
     flowLabelsOn, setFlowLabelsOn, flowLabelMetric, setFlowLabelMetric, flowTracerOn, setFlowTracerOn,
     polygons, layers, activeLayerId, tab: projectTab, setTab: setProjectTab,
@@ -695,16 +772,22 @@ export default function App() {
     onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
     onZoomToLayer: zoomToLayer,
   };
+  // Mode-driven right dock: `rightLayout` is undefined for modes with no
+  // right panel (Home, Simulation, GIS views, Favourites) — hide the handle
+  // and slot instead of rendering them. TUFLOW's 552px dock exceeds the
+  // normal PANEL_MAX, so the resize clamp stretches per-layout.
+  const rightLayout = MODE_LAYOUTS[mode]?.right;
+  const rightMax = rightLayout ? Math.max(PANEL_MAX, rightLayout.width) : PANEL_MAX;
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--surface-3)", overflow: "hidden" }}>
-      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onOpenChangelog={() => setShowChangelog(true)} onGoToLocation={goToLocation}
+      <OSWindow onBeginDrag={beginDrag} onOpenShortcuts={() => setShowShortcuts(true)} onOpenChangelog={() => setShowChangelog(true)} onGoToLocation={goToLocation} onGoToWorld={goToWorld}
         flowLinesOn={flowLinesOn} setFlowLinesOn={setFlowLinesOn} onOpenToolbox={() => setToolboxFloat(true)}
         basemap={basemap} setBasemap={setBasemap}
         isFavourite={isFavourite} onToggleFavourite={toggleFavourite}
         recentSearches={recentSearches} onSelectResult={handleSelectSearchResult}
         onCreateLayer={() => setAddLayerModalOpen(true)} />
-      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={setMode} basemap={basemap} setBasemap={setBasemap} onExportNetwork={exportNetwork}
+      <ModeRibbon onBeginDrag={beginDrag} mode={mode} setMode={changeMode} basemap={basemap} setBasemap={setBasemap} onExportNetwork={exportNetwork}
         annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
         onOpenAnnotationSettings={() => setShowAnnotationSettings(true)}
         favourites={favourites} onDropFavourite={handleFavouriteDrop} onRemoveFavourite={removeFavourite}
@@ -730,7 +813,9 @@ export default function App() {
             basemap={basemap}
             flyTo={flyTo} onConsumeFlyTo={() => setFlyTo(null)}
             zoomExtent={zoomExtent} onConsumeZoomExtent={() => setZoomExtent(null)}
-            ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
+            onOpenWeirForm={openWeirForm} weirCommit={weirCommit} onWeirCommitted={() => setWeirCommit(null)}
+            onOpenLongSection={setLongSectionIds}
             edgeColors={edgeColors} degree={degree} reachRegistry={registry} edgesByReach={edgesByKey}
             reachKeyOfEdge={resolvedKeyByEdge} onReassignReach={reassignReach}
             annotateTool={annotateTool} setAnnotateTool={setAnnotateTool}
@@ -759,9 +844,13 @@ export default function App() {
           </>
         )}
 
-        <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(PANEL_MAX, w - dx)))} />
-        <PanelSlot width={networkW} viewId={rightView} onChangeView={setRightView} bodyProps={panelBodyProps}
-          onUndockToolbox={() => { setToolboxFloat(true); setRightView("network"); }} />
+        {rightLayout && (
+          <>
+            <ResizeHandle onDrag={(dx) => setNetworkW(w => Math.max(PANEL_MIN, Math.min(rightMax, w - dx)))} />
+            <PanelSlot width={networkW} viewId={rightView} onChangeView={setRightView} bodyProps={panelBodyProps}
+              onUndockToolbox={() => { setToolboxFloat(true); setRightView("network"); }} />
+          </>
+        )}
       </div>
 
       {ribbonDrag && (
@@ -797,6 +886,10 @@ export default function App() {
           onChange={(patch) => setAnnotationStyle((s) => ({ ...s, ...patch }))}
           onClose={() => setShowAnnotationSettings(false)}
         />
+      )}
+      {weirModal && <WeirModal draft={weirModal} onConfirm={confirmWeir} onClose={() => setWeirModal(null)} />}
+      {longSectionIds && (
+        <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)} />
       )}
     </div>
   );

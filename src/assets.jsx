@@ -376,6 +376,15 @@ import favListSave from "./assets/fav-list-save.svg";
 import fm2dZPolygonImport from "./assets/fm2d-z-polygon-import.svg";
 import fm2dZPolylineImport from "./assets/fm2d-z-polyline-import.svg";
 import fm2dZPointsImport from "./assets/fm2d-z-points-import.svg";
+import queryLay from "./assets/query-layer.svg";
+import history from "./assets/history.svg";
+import filter from "./assets/filter.svg";
+import download from "./assets/download.svg";
+import dashboard from "./assets/dashboard.svg";
+import colOrder from "./assets/col-order.svg";
+import messageReply from "./assets/message-reply.svg";
+import messageForward from "./assets/message-forward.svg";
+import expand from "./assets/expand.svg";
 
 export const A = {
   logo, search, add, check, minimise, dock, cancel, runFailed, layers,
@@ -461,6 +470,9 @@ export const A = {
   simNewSwmm,
   fm2dZPolygonImport, fm2dZPolylineImport, fm2dZPointsImport,
   favListSave,
+  queryLay, history,
+  filter: filter, download: download, dashboard: dashboard, colOrder: colOrder,
+  messageReply: messageReply, messageForward: messageForward, expand: expand,
 };
 
 // Small helper for a fixed-size icon <img>

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { A, Icon } from "../assets.jsx";
+import ContextMenu from "./ContextMenu.jsx";
 
 // Network initial conditions rows
 const nicRows = ["M014","M016","M017","M018","M019","M020","M021","M022","M023","M024","M025","M026","M027","M028","M029"]
@@ -41,9 +42,9 @@ function ColHeader({ cols }) {
   );
 }
 
-function Row({ children, zebra, selected, onClick, indent }) {
+function Row({ children, zebra, selected, onClick, onContextMenu, indent }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} onContextMenu={onContextMenu} style={{
       display: "flex", alignItems: "center", gap: 4, padding: 8, paddingLeft: 8 + (indent || 0), width: "100%",
       background: selected ? "rgba(70,138,243,0.14)" : zebra ? "var(--surface-3)" : "var(--surface-1)",
       borderBottom: "1px solid var(--border-primary)",
@@ -110,12 +111,32 @@ const cellStyle = { fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: 
 // Everything below the panel header — the header itself (icon+dropdown
 // switcher, title, filter/layers icons) is owned by the generic PanelSlot
 // shell so any slot can swap between this and the other panel views.
-export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSelected, reachRegistry = [], reachKeyOfEdge = {}, onRenameReach }) {
+export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSelected, reachRegistry = [], reachKeyOfEdge = {}, onRenameReach, onOpenLongSection }) {
   // The divider above "Network initial conditions" drags to resize the
   // top table's viewport height.
   const [topH, setTopH] = useState(320);
   const [collapsed, setCollapsed] = useState({});
+  const [ctx, setCtx] = useState(null);
   const registryByKey = Object.fromEntries((reachRegistry || []).map((r) => [r.key, r]));
+
+  // Right-click a row: plot a long section through the row + any Ctrl/Cmd
+  // multi-selection it's part of (same behaviour as the canvas menu).
+  const onRowContext = (e, n) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const multi = selected.includes(n.id) && selected.length > 1;
+    const ids = multi ? selected : [n.id];
+    if (!multi) setSelected([n.id]);
+    setCtx({
+      x: e.clientX, y: e.clientY,
+      items: [{
+        label: "Plot long section",
+        disabled: ids.length < 2,
+        disabledReason: ids.length < 2 ? "Ctrl/Cmd-click to select more units before plotting" : undefined,
+        onClick: () => onOpenLongSection?.(ids),
+      }],
+    });
+  };
 
   const reachesForNode = (nodeId) => {
     const keys = [];
@@ -197,7 +218,7 @@ export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSel
               {!isCollapsed && g.rows.map(({ n, reaches }, i) => {
                 const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
                 return (
-                  <Row key={n.id} zebra={i % 2 === 1} selected={selected.includes(n.id)} onClick={(e) => setSelected(sel => e.ctrlKey || e.metaKey ? (sel.includes(n.id) ? sel.filter(id => id !== n.id) : [...sel, n.id]) : [n.id])} indent={12}>
+                  <Row key={n.id} zebra={i % 2 === 1} selected={selected.includes(n.id)} onClick={(e) => setSelected(sel => e.ctrlKey || e.metaKey ? (sel.includes(n.id) ? sel.filter(id => id !== n.id) : [...sel, n.id]) : [n.id])} onContextMenu={(e) => onRowContext(e, n)} indent={12}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, width: 60, flexShrink: 0 }}>
                       <Icon src={A[n.icon]} size={12} />
                       <span style={{ ...cellStyle }}>{n.label}</span>
@@ -239,6 +260,7 @@ export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSel
           </Row>
         ))}
       </div>
+      {ctx && <ContextMenu {...ctx} onClose={() => setCtx(null)} />}
     </div>
   );
 }

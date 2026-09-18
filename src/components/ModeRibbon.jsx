@@ -892,15 +892,21 @@ function RibbonOverflowButton({ groups, open, setOpen, overflowOpen, setOverflow
   );
 }
 
-// Radio-select basemap options (Home tab). "none"/"osm"/"os-satellite" are
-// wired to a real backdrop (see GisCanvas/BASEMAP_SOURCES) — the remaining
-// ordnance/azure layers are shown for visual completeness, matching the Figma
-// spec, but greyed out since they'd need a real API key this demo doesn't have.
+// Radio-select basemap options (Home tab). Everything except the final
+// ordnance/azure block is wired to a real keyless backdrop (see
+// GisCanvas/BASEMAP_SOURCES) — the disabled OS/azure layers are shown for
+// visual completeness, matching the Figma spec, but greyed out since they'd
+// need a real API key this demo doesn't have.
 const BASEMAP_OPTIONS = [
   { id: "none", label: "None" },
   { sep: true },
   { id: "osm", label: "Open Street Map" },
+  { id: "osm-hot", label: "Humanitarian OSM" },
+  { id: "osm-topo", label: "OpenTopoMap" },
   { id: "os-satellite", label: "OS Satellite" },
+  { id: "esri-streets", label: "Esri Street Map" },
+  { id: "esri-topo", label: "Esri Topo" },
+  { sep: true },
   { id: "os-roads", label: "OS Roads", disabled: true },
   { id: "os-light", label: "OS Light", disabled: true },
   { id: "os-outdoor", label: "OS Outdoor", disabled: true },

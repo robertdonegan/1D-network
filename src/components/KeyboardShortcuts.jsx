@@ -114,7 +114,7 @@ const SECTIONS = [
       { fn: "Tracing on/off", keys: "T", desc: "Toggle on/off Tracing" },
       { fn: "North star tool", keys: "N", desc: "Persistently rotate view around the north axis" },
       { fn: "Toggle basemap", keys: "B", desc: "Switch the Map view backdrop between the grid and the last-selected Basemap", live: true },
-      { fn: "Cycle basemaps", keys: "Shift+B", desc: "Cycle the Map view backdrop through every available basemap (None, Open Street Map, OS Satellite)", live: true },
+      { fn: "Cycle basemaps", keys: "Shift+B", desc: "Cycle the Map view backdrop through every available keyless basemap (None, Open Street Map, Humanitarian OSM, OpenTopoMap, Esri)", live: true },
       { fn: "Zoom tool", keys: "Z", desc: "Persistently zoom in/out of screen using left-click and drag", live: true },
       { fn: "Zoom in (25%)", keys: "=", desc: "Zoom in to screen using increments", live: true },
       { fn: "Zoom in (50%)", keys: "Ctrl+=", desc: "Zoom in to screen using increments" },

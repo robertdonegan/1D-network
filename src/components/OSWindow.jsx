@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { A, Icon } from "../assets.jsx";
 import { flattenRibbonItems } from "./ModeRibbon.jsx";
+import { matchW3WQuery } from "../w3w.js";
 
 const ALL_ITEMS = flattenRibbonItems();
 
 // How long a sub-menu stays open after the pointer leaves its parent row —
-// long enough to cross the small gap to the flyout (Base map > options)
+// long enough to cross the small gap to the flyout (Basemap > options)
 // without the menu snapping shut mid-trail.
 const SUBMENU_CLOSE_DELAY_MS = 250;
 
@@ -96,7 +97,7 @@ function ResultRow({ it, isFavourite, onToggleFavourite, onPick }) {
 // Layer/Window/Toolbox/Help are visual-only chrome (matching the Home
 // ribbon's not-yet-built dropdowns convention), except "Open Toolbox..."
 // (id:"open-toolbox"), "Keyboard shortcuts..." (id:"shortcuts") and Help's
-// "Dev – changelog" (id:"changelog"), which are genuinely wired. Disabled
+// "Developer changelog" (id:"changelog"), which are genuinely wired. Disabled
 // rows mirror the Figma mockup exactly (e.g. no project is "dirty" yet, so
 // Save/Close project are greyed).
 const GENERAL_MENU = [
@@ -179,18 +180,29 @@ const HELP_MENU = [
   { label: "Legal summary", external: true },
   { label: "Open data notices", external: true },
   { label: "Third party software", external: true, sep: true },
-  { label: "Dev – changelog", id: "changelog" },
+  { label: "Developer changelog", id: "changelog" },
 ];
 
-// View > Base map submenu (fm-v8.0-menu-view-base-map spec, node 13:13958)
-// — Open Street Map / OS Satellite / None are wired to real basemap state
+// View > Basemap submenu (fm-v8.0-menu-view-base-map spec, node 13:13958)
+// — every keyless source in BASEMAP_SOURCES is wired to real basemap state
 // (same options the Home ribbon's Basemap dropdown supports; the satellite
 // entry renders Esri imagery as a keyless stand-in, see BASEMAP_SOURCES);
 // the remaining Ordnance Survey layers all need an API key this demo doesn't
 // have.
 const BASEMAP_DISABLED_REASON = "Requires an API key — not available in this demo";
-const BASEMAP_ENABLED = ["osm", "os-satellite", "none"];
-function buildBaseMapSubmenu(basemap, setBasemap) {
+const BASEMAP_ENABLED = [
+  "osm", "os-satellite", "osm-hot", "osm-topo",
+  "esri-streets", "esri-topo", "none",
+];
+const BASEMAP_LABELS = {
+  osm: "Open Street Map",
+  "osm-hot": "Humanitarian OSM",
+  "osm-topo": "OpenTopoMap",
+  "os-satellite": "OS Satellite",
+  "esri-streets": "Esri Street Map",
+  "esri-topo": "Esri Topo",
+};
+function buildBasemapSubmenu(basemap, setBasemap) {
   const opt = (id, label) => {
     const enabled = BASEMAP_ENABLED.includes(id);
     return {
@@ -201,22 +213,21 @@ function buildBaseMapSubmenu(basemap, setBasemap) {
     };
   };
   return [
-    opt("osm", "Open Street Map"),
-    opt("os-satellite", "OS Satellite"),
+    ...Object.entries(BASEMAP_LABELS).map(([id, label]) => opt(id, label)),
     opt("os-hybrid", "OS Hybrid"),
     opt("os-roads", "OS Roads"),
     opt("os-light", "OS Light"),
     opt("os-outdoor", "OS Outdoor"),
     { ...opt("none", "None"), sep: true },
-    { label: "Base map settings...", disabled: true, disabledReason: "Not available in this demo" },
+    { label: "Basemap settings...", disabled: true, disabledReason: "Not available in this demo" },
   ];
 }
 
-// View menu (fm-v8.0-menu-view spec) — only "Flow Lines" and "Base map" are
+// View menu (fm-v8.0-menu-view spec) — only "Flow Lines" and "Basemap" are
 // wired to real behaviour; the rest are visual-only chrome matching the
 // Figma menu, same convention as the Home ribbon's not-yet-built dropdowns.
 const VIEW_MENU = [
-  { label: "Base map", chevron: true },
+  { label: "Basemap", chevron: true },
   { label: "Web Map Services...", sep: true },
   { label: "Map decoration", chevron: true },
   { label: "Nodes", chevron: true },
@@ -238,7 +249,7 @@ function Sep() {
   return <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 4px" }} />;
 }
 
-// Flyout submenu (e.g. View > Base map) — same row look as the parent
+// Flyout submenu (e.g. View > Basemap) — same row look as the parent
 // dropdown, positioned to the parent row's right, matching the nested
 // MenuItem pattern ModeRibbon's ribbon dropdowns already use for their
 // own sub-lists (e.g. River > Muskingum).
@@ -283,7 +294,7 @@ function SubmenuFlyout({ items, onPick }) {
 // One top-level OS menu (General/Project/Layer/View/Window/Toolbox/Help) —
 // a plain label that toggles a dropdown of `fm-v8.0-menu-row`s. Only rows
 // with an `id` do anything (`onItemClick`); rows with a `submenu` open a
-// flyout on hover (e.g. View > Base map); the rest are visual-only,
+// flyout on hover (e.g. View > Basemap); the rest are visual-only,
 // matching the Figma mockup exactly (including which rows are greyed out).
 function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checkedIds, onHover }) {
   const ref = useRef(null);
@@ -374,7 +385,7 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
 // owned by App since it also drives GisCanvas's pulse animation and the
 // Flow Lines side panel. `onOpenToolbox` — Toolbox > "Open Toolbox..."
 // pops the floating Toolbox window (see App.jsx). `basemap`/`setBasemap` —
-// View > Base map submenu, same state the Home ribbon's Basemap dropdown
+// View > Basemap submenu, same state the Home ribbon's Basemap dropdown
 // drives (see ModeRibbon.jsx). `isFavourite(item)`/`onToggleFavourite(item)`
 // — back each result's star button, so a unit can be favourited straight
 // from search without needing to drag it onto the Favourites ribbon.
@@ -383,7 +394,7 @@ function MenuTab({ label, items, isOpen, onToggle, onClose, onItemClick, checked
 // `onSelectResult(item)` — called whenever a result (or Recents entry) is
 // picked up, so App can record it as a recent and highlight its ribbon
 // group (see App.jsx's `handleSelectSearchResult`).
-export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog, onGoToLocation, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, recentSearches, onSelectResult, onCreateLayer }) {
+export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog, onGoToLocation, onGoToWorld, flowLinesOn, setFlowLinesOn, onOpenToolbox, basemap, setBasemap, isFavourite, onToggleFavourite, recentSearches, onSelectResult, onCreateLayer }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [places, setPlaces] = useState([]);
@@ -405,6 +416,9 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
   useEffect(() => {
     const query = q.trim();
     if (query.length < 3) { setPlaces([]); return; }
+    // what3words-shaped queries are resolved in-app (simulated grid, no API
+    // key) — don't waste a geocoder call on ///filled.count.soap & co.
+    if (matchW3WQuery(query)) { setPlaces([]); setPlacesLoading(false); return; }
     let cancelled = false;
     setPlacesLoading(true);
     const t = setTimeout(async () => {
@@ -424,6 +438,9 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
   }, [q]);
 
   const query = q.trim().toLowerCase();
+  // Simulated what3words addresses are matched in-app: ///word.word.word
+  // (or /word.word.word) resolves to a real position in the demo world.
+  const w3w = useMemo(() => (query.length >= 3 ? matchW3WQuery(query) : null), [query]);
   const results = query
     ? ALL_ITEMS.filter((it) => it.label.toLowerCase().includes(query) || it.group.toLowerCase().includes(query)).slice(0, 8)
     : [];
@@ -463,7 +480,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
             const items = m.label === "View"
               ? m.items.map((it) => {
                   if (it.id === "flowlines") return { ...it, checked: flowLinesOn };
-                  if (it.label === "Base map") return { ...it, submenu: buildBaseMapSubmenu(basemap, setBasemap) };
+                  if (it.label === "Basemap") return { ...it, submenu: buildBasemapSubmenu(basemap, setBasemap) };
                   return it;
                 })
               : m.items;
@@ -505,7 +522,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
             }}
           />
         </div>
-        {open && (results.length > 0 || places.length > 0 || placesLoading || (!query && recentSearches?.length > 0)) && (
+        {open && (results.length > 0 || places.length > 0 || placesLoading || w3w || (!query && recentSearches?.length > 0)) && (
           <div style={{
             position: "absolute", top: "100%", left: 0, marginTop: 2, width: 280, color: "var(--text-primary)",
             background: "var(--surface-1)", border: "1px solid var(--border-primary)",
@@ -547,6 +564,32 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
             ))}
             {results.length > 0 && (places.length > 0 || placesLoading) && (
               <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
+            )}
+            {w3w && (
+              <>
+                {results.length > 0 && (
+                  <div style={{ height: 1, background: "var(--border-primary)", margin: "4px 2px" }} />
+                )}
+                {w3w.x != null ? (
+                  <div key="w3w-hit"
+                    onClick={() => { setOpen(false); onGoToWorld?.(w3w.x, w3w.y); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2, cursor: "pointer" }}
+                    onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                    onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                    title="Jump to this what3words address">
+                    <Icon src={A.worldMapView2} size={16} style={{ filter: "invert(33%) sepia(88%) saturate(3800%) hue-rotate(195deg) brightness(101%) contrast(113%)" }} />
+                    <span style={{ fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>///{w3w.words.join(".")}</span>
+                    <span style={{ fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)", marginLeft: "auto", flexShrink: 0 }}>what3words</span>
+                  </div>
+                ) : (
+                  <div key="w3w-miss"
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 2 }}
+                    title="Simulated demo grid — this address isn't inside it">
+                    <Icon src={A.worldMapView2} size={16} style={{ opacity: 0.4 }} />
+                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>No ///{w3w.words.join(".")} match in the demo area</span>
+                  </div>
+                )}
+              </>
             )}
             {placesLoading && places.length === 0 && (
               <div style={{ padding: "6px 8px", fontSize: "var(--fs-xxs)", color: "var(--text-tertiary)" }}>Searching locations…</div>

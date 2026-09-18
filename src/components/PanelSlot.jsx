@@ -5,6 +5,8 @@ import { NetworkPanelBody } from "./NetworkPanel.jsx";
 import { FlowLinesPanelBody } from "./FlowLinesPanel.jsx";
 import { GlobalAnimatorBody } from "./GlobalAnimatorPanel.jsx";
 import { ToolboxPanelBody } from "./ToolboxPanel.jsx";
+import { TuflowPanelBody } from "./TuflowPanel.jsx";
+import { ResultsViewerBody } from "./ResultsViewer.jsx";
 
 // Every view a left/right panel slot can be switched to. Project, 1D
 // Network, and Flow Lines have real content — the rest render a blank "not
@@ -15,7 +17,8 @@ export const PANEL_VIEWS = {
   network: { icon: "network", title: "1D Network", Body: NetworkPanelBody },
   glossary: { icon: "panelGlossary", title: "1D Glossary" },
   swmmnetwork: { icon: "panelSwmmNetwork", title: "1D SWMM Network" },
-  results2d: { icon: "panel2dResults", title: "2D results" },
+  results2d: { icon: "panel2dResults", title: "2D results", Body: ResultsViewerBody },
+  tuflow: { icon: "tuflowTools", title: "TUFLOW editor", Body: TuflowPanelBody },
   globalanimator: { icon: "globalAnimatorIcon", title: "Global Animator", Body: GlobalAnimatorBody },
   timesteps: { icon: "panelTimesteps", title: "Timesteps" },
   texteditor: { icon: "panelTextEditor", title: "Text editor" },
@@ -24,7 +27,7 @@ export const PANEL_VIEWS = {
   flowlines: { icon: "flowLinesIcon", title: "1D Flow Lines", Body: FlowLinesPanelBody },
 };
 const VIEW_ORDER = [
-  "project", "network", "flowlines", "glossary", "swmmnetwork", "results2d",
+  "project", "network", "tuflow", "flowlines", "glossary", "swmmnetwork", "results2d",
   "globalanimator", "timesteps", "texteditor", "diagnostics1d", "toolbox",
 ];
 

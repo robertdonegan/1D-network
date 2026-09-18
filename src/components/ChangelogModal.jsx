@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { A, Icon } from "../assets.jsx";
 
-// Developer changelog, surfaced from Help ▸ "Dev – changelog" so anyone
+// Developer changelog, surfaced from Help ▸ "Developer changelog" so anyone
 // picking up the prototype can read what has changed. Keep this list hand-
 // written and newest-first; it's deliberately prose rather than generated
 // from git so the wording stays testable by non-devs.
@@ -13,8 +13,20 @@ const TAG_COLOR = {
 
 const CHANGELOG = [
   {
+    area: "Icons & panel switcher",
+    items: [
+      { tag: "New", text: "Panel-switcher dropdown icons are Flood Icons: 1D Flow Lines recoloured brand blue, and Toolbox swapped to the mono toolbox glyph in brand blue." },
+      { tag: "Improved", text: "Results ▸ 1D Results & 2D Results all show official Flood colour icons for every option." },
+      { tag: "Improved", text: "TUFLOW ▸ Topography menu icon updated to the Flood define-topo colour icon." },
+      { tag: "Fixed", text: "Hydrology+ ▸ View River Station restores the \"Off (none)\" option." },
+    ],
+  },
+  {
     area: "GIS & basemaps",
     items: [
+      { tag: "Improved", text: "The North Star button now reorientates the map to north only — it no longer zooms back out to the full project extent; the \"0\" key still resets the whole view." },
+      { tag: "New", text: "Four more keyless basemaps: Humanitarian OSM, OpenTopoMap, Esri Street Map and Esri Topo (the OS/Azure rows still need an API key)." },
+      { tag: "Improved", text: "\"Base map\" menu labels renamed to \"Basemap\"." },
       { tag: "New", text: "OS Satellite added alongside Open Street Map (rendered with Esri World Imagery as a keyless stand-in)." },
       { tag: "New", text: "Shift+B cycles through every available basemap (None → Open Street Map → OS Satellite); B still toggles the grid against the last used backdrop." },
       { tag: "New", text: "Zoom to layer (layer right-click) fits the map to that layer's features." },
@@ -25,6 +37,7 @@ const CHANGELOG = [
   {
     area: "Panels & trees",
     items: [
+      { tag: "New", text: "The panels re-arrange to match the mode you pick on the ribbon, just like Flood Modeller 8: FM 1D/FM 2D, SWMM and Hydrology+ show the 1D Network on the right, TUFLOW shows a wider TUFLOW editor (a syntax-coloured demo .tcf file), and Results shows a 2D-results viewer with the Global Animator open beneath the map. Home, Simulation and Favourites hide the right panel for a full-width map." },
       { tag: "New", text: "Drag the Project panel's right edge to swipe between the Components and Layers tabs (left → Layers, right → Components)." },
       { tag: "New", text: "Components tree and Simulations expand/collapse; the Simulation list is one scrollable window with a drag-to-resize grabber." },
       { tag: "Improved", text: "Layer rows restyled to the Figma row spec; the selected layer uses the Select variant (brand border, medium label)." },
@@ -35,14 +48,24 @@ const CHANGELOG = [
   {
     area: "Network & editing",
     items: [
+      { tag: "Improved", text: "The status bar now says \"Dbl-click: open unit\" while hovering or selecting a Weir, so double-click-to-edit is discoverable." },
+      { tag: "Improved", text: "Double-clicking any Weir unit already on the map reopens the 1D Weir unit form, prefilled with its saved values, so you can edit it in place." },
+      { tag: "New", text: "The top-level Weir drops straight onto the map as a unit (slotted into a reach when dropped on a line); double-click it to open the 1D Weir unit form (name, description, upstream/downstream, coefficients and 2D dimensions) and set its details." },
       { tag: "New", text: "Undo/redo for network edits (Ctrl+Z / Ctrl+Shift+Z), covering drags, vertex changes and topology edits." },
       { tag: "Improved", text: "Default network seeded for reaches M014–M036 with a bridge gap on the map." },
       { tag: "Improved", text: "Live edit and the Pen tool draw into the selected layer." },
     ],
   },
   {
+    area: "Plots & visualisations",
+    items: [
+      { tag: "New", text: "Right-click two or more selected 1D network units (on the map or in the 1D Network table) and pick \"Plot long section\": a Flood Modeller-style Long Section window opens along the stretch of network, showing the bed, stage and left/right bank levels, per-station markers and a live timestep readout." },
+    ],
+  },
+  {
     area: "Dialogs & menus",
     items: [
+      { tag: "Improved", text: "Help ▸ \"Dev – changelog\" is now \"Developer changelog\"." },
       { tag: "Improved", text: "Save dialog redesigned with clear danger / secondary / primary actions and a cancel icon." },
       { tag: "New", text: "Escape prompts to save when there are unsaved edits." },
       { tag: "Fixed", text: "Submenus stay open while moving diagonally to them (250 ms close grace)." },
@@ -52,6 +75,7 @@ const CHANGELOG = [
   {
     area: "Search & favourites",
     items: [
+      { tag: "New", text: "Global search resolves what3words-style addresses: type the ///word.word.word shown in the status bar and it jumps straight to that spot (simulated in-app, matching the footer's addresses)." },
       { tag: "Improved", text: "Global search (Ctrl+K) matches tools, units and places; favourites support named lists and drag-to-ribbon." },
     ],
   },

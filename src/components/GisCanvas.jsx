@@ -98,6 +98,15 @@ let mCounter = 30;
 
 const sizeOf = (n) => (n.shape === "diamond" ? DIAMOND : OUTER);
 
+// The 1D Weir unit family — every ribbon Weirs entry that drops as a weir
+// node. Any of these (or a node already carrying form data) double-clicks
+// back into the 1D Weir unit editor.
+const WEIR_UNIT_ICONS = new Set([
+  "broadWeir", "crumpWeir", "flowHeadControl", "flatVWeir", "gatedWeir",
+  "labyrinthWeir", "notionalWeir", "sharpCrestedWeir", "syphonWeir", "generalWeir",
+]);
+const isWeirUnit = (n) => Boolean(n?.weirData) || WEIR_UNIT_ICONS.has(n.icon);
+
 // World <-> screen space. World coords are the node's stored x/y (pan+zoom
 // +rotation independent); screen coords are pixels inside the canvas wrap.
 // Node boxes are always drawn at their fixed screen size and unrotated, so
@@ -345,6 +354,10 @@ export default function GisCanvas({
   onConsumeZoomExtent,
   ribbonDrag,
   onConsumeRibbonDrag,
+  onOpenWeirForm,
+  onOpenLongSection,
+  weirCommit,
+  onWeirCommitted,
   edgeColors,
   degree,
   reachRegistry,
@@ -902,6 +915,22 @@ export default function GisCanvas({
     setAnnotateDraft(null);
   }, [annotateTool]);
 
+// Committing a confirmed 1D Weir form. The form only opens for editing
+// (double-click an existing weir) — dropping a Weir from the ribbon places
+// the node directly through the ordinary drop path above, and confirming the
+// form just saves the data onto that node. The App clears `weirCommit` via
+// `onWeirCommitted` once the node is updated.
+useEffect(() => {
+  if (!weirCommit) return;
+  const { draft, data } = weirCommit;
+  pushNet(snapNet(nodes, edges));
+  setNodes((ns) =>
+    ns.map((node) => (node.id === draft.id ? { ...node, weirData: data } : node)),
+  );
+  setSelected([draft.id]);
+  onWeirCommitted?.();
+}, [weirCommit, nodes, edges]);
+
   // Group-select tool: shape (rect/ellipse/freeform, picked via right-click
   // submenu) + the in-progress marquee itself. `mode` on the marquee is
   // replace (plain drag) / add (Shift+drag) / subtract (Alt+drag).
@@ -1053,6 +1082,18 @@ export default function GisCanvas({
     } else if (ids.length > 1) {
       items.push({ label: "Create Group", onClick: () => createGroup(ids) });
     }
+    if (ids.length >= 2) {
+      items.push({
+        label: "Plot long section",
+        onClick: () => onOpenLongSection?.(ids),
+      });
+    } else {
+      items.push({
+        label: "Plot long section",
+        disabled: true,
+        disabledReason: "Select at least two units to plot a long section",
+      });
+    }
     if (ids.length > 0 && !(ids.length === 1 && groupOfNode[ids[0]])) {
       items.push({
         label: ids.length > 1 ? `Delete ${ids.length} units` : "Delete",
@@ -1178,6 +1219,9 @@ export default function GisCanvas({
   // Reset view helpers, pivoting around the current viewport centre so the
   // content you're looking at doesn't jump.
   const resetView = () => setView({ scale: 1, tx: 660, ty: 430, rotation: 0 });
+  // North Star's plain click reorientates only — zero the rotation but keep
+  // the current pan/zoom so the map doesn't snap back to project extent.
+  const resetRotation = () => setView((v) => ({ ...v, rotation: 0 }));
   // Pan and Zoom are mutually exclusive persistent tools — turning one on
   // turns the other off, like a normal tool selector.
   const togglePanMode = () =>
@@ -1225,7 +1269,7 @@ export default function GisCanvas({
     const el = wrapRef.current;
     const cx = el ? el.clientWidth / 2 : 400,
       cy = el ? el.clientHeight / 2 : 300;
-    const w = lonLatToWorld(flyTo.lon, flyTo.lat);
+    const w = flyTo.x != null && flyTo.y != null ? { x: flyTo.x, y: flyTo.y } : lonLatToWorld(flyTo.lon, flyTo.lat);
     setView({
       scale: FLY_TO_SCALE,
       rotation: 0,
@@ -1340,7 +1384,7 @@ export default function GisCanvas({
           zoomBy(toolDrag.altKey ? 1 / KEY_ZOOM_FACTOR : KEY_ZOOM_FACTOR, pt({ clientX: toolDrag.sx, clientY: toolDrag.sy }));
         } else if (toolDrag.tool === "zoom") toggleZoomMode();
         else if (toolDrag.tool === "pan") togglePanMode();
-        else if (toolDrag.tool === "rotate") resetView();
+        else if (toolDrag.tool === "rotate") resetRotation();
       } else if (toolDrag.tool === "zoom" && toolDrag.viaCanvas) {
         // Box zoom out either via Alt, or by dragging from the box's
         // bottom-right corner up to its top-left corner (the classic
@@ -1358,7 +1402,7 @@ export default function GisCanvas({
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [toolDrag, zoomBy, boxZoom, resetView, togglePanMode, toggleZoomMode, pt]);
+  }, [toolDrag, zoomBy, boxZoom, resetRotation, togglePanMode, toggleZoomMode, pt]);
 
   // Clear the "drop here" affordance once a ribbon drag ends.
   useEffect(() => {
@@ -2667,6 +2711,7 @@ export default function GisCanvas({
 
   const confirmNode = confirmIds ? nodes.find((n) => n.id === confirmIds[0]) : null;
   const isPanning = panMode || spaceHeld;
+  const hoverNode = hovered ? nodes.find((n) => n.id === hovered) : null;
 
   // Footer guide: reflects whatever the user is actually doing right now,
   // most-specific state first. Falls through to MapFooter's own baseline
@@ -2758,22 +2803,29 @@ export default function GisCanvas({
         { label: "Shift/Ctrl+Click: add/remove" },
         { label: "Alt+Click: deselect one" },
       ];
-    if (selected.length === 1)
-      return [
+    if (selected.length === 1) {
+      const selNode = nodes.find((n) => n.id === selected[0]);
+      const items = [
         { icon: "mouseRight", label: "Right-click: options" },
         { label: "Shift/Ctrl+Click: add" },
         { label: "Alt+Click: deselect · Del: remove" },
       ];
+      if (isWeirUnit(selNode)) items.push({ label: "Dbl-click: open unit" });
+      return items;
+    }
     if (selectedVertex)
       return [
         { label: "Dbl-click: convert to unit" },
         { label: "Del to remove" },
       ];
-    if (hovered)
-      return [
+    if (hovered) {
+      const items = [
         { icon: "mouseLeft", label: "Click to select" },
         { label: "Shift/Ctrl+Click: multi-select" },
       ];
+      if (isWeirUnit(hoverNode)) items.push({ label: "Dbl-click: open unit" });
+      return items;
+    }
     if (hoverLine)
       return [
         { label: "Click midpoint: add point" },
@@ -3110,10 +3162,11 @@ export default function GisCanvas({
         </div>
 
         {/* Right nav controls — click-and-hold + drag: North Star rotates
-            (double-click = true north, click = reset view), Zoom scrubs
-            in/out with vertical drag (click = one step in), Pan drags the
-            view directly (click = toggle the sticky Pan tool). Alt inverts
-            direction, Shift slows any of the three down. */}
+            (double-click = true north, click = reorientate to north keeping
+            the current pan/zoom), Zoom scrubs in/out with vertical drag
+            (click = one step in), Pan drags the view directly (click =
+            toggle the sticky Pan tool). Alt inverts direction, Shift slows
+            any of the three down. */}
         <div
           style={{
             position: "absolute",
@@ -3129,7 +3182,7 @@ export default function GisCanvas({
             {
               icon: A.northStar,
               tool: "rotate",
-              name: "Rotate (drag) · double-click = true north · click = reset view (0)",
+              name: "Rotate (drag) · double-click = true north · click = reorientate to north (keeps current pan/zoom)",
               active: Math.abs(((view.rotation % 360) + 360) % 360) > 0.5,
               iconStyle: { transform: `rotate(${view.rotation}deg)` },
             },
@@ -4109,7 +4162,31 @@ export default function GisCanvas({
               <div
                 onMouseDown={(e) => nodeDown(e, n.id)}
                 onContextMenu={(e) => onNodeContext(e, n.id)}
-                title="Shift/Ctrl-click to multi-select · Alt-click to deselect"
+                onDoubleClick={
+                  isWeirUnit(n)
+                    ? (e) => {
+                        e.stopPropagation();
+                        onOpenWeirForm?.({
+                          mode: "edit",
+                          id: n.id,
+                          label: n.label,
+                          icon: n.icon,
+                          shape: n.shape,
+                          unitLabel: n.unitLabel,
+                          weirData: n.weirData,
+                          worldX: n.x + sizeOf(n) / 2,
+                          worldY: n.y + sizeOf(n) / 2,
+                          x: n.x,
+                          y: n.y,
+                        });
+                      }
+                    : undefined
+                }
+                title={
+                  isWeirUnit(n)
+                    ? "Shift/Ctrl-click to multi-select · Alt-click to deselect · double-click to edit"
+                    : "Shift/Ctrl-click to multi-select · Alt-click to deselect"
+                }
                 style={{
                   position: "absolute",
                   left: s.x,

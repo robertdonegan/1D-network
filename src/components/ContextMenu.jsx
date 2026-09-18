@@ -43,14 +43,15 @@ export default function ContextMenu({ x, y, items, onClose }) {
     }}>
       {items.map((it, i) => (
         <div key={i}
-          onClick={() => { it.onClick(); onClose(); }}
+          onClick={() => { if (!it.disabled) it.onClick(); onClose(); }}
+          title={it.disabled ? it.disabledReason : undefined}
           style={{
             display: "flex", alignItems: "center", gap: 4, height: 24, padding: 4, borderRadius: 2,
-            cursor: "pointer", fontSize: "var(--fs-xs)",
-            color: it.danger ? "var(--red-700)" : "var(--text-primary)",
+            cursor: it.disabled ? "default" : "pointer", fontSize: "var(--fs-xs)",
+            color: it.disabled ? "var(--text-tertiary)" : it.danger ? "var(--red-700)" : "var(--text-primary)",
           }}
-          onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-          onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+          onMouseOver={(e) => { if (!it.disabled) e.currentTarget.style.background = "var(--surface-3)"; }}
+          onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
           {it.label}
         </div>

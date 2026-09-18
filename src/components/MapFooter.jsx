@@ -1,5 +1,6 @@
 import { A, Icon } from "../assets.jsx";
 import { METERS_PER_WORLD_UNIT } from "./OsmBasemap.jsx";
+import { simulatedW3W } from "../w3w.js";
 
 // "Nice" round scale-bar values, in metres.
 const NICE_METERS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 2000000];
@@ -17,32 +18,6 @@ function pickScale(metersPerPx) {
 
 function fmt(value, unit) {
   return `${value.toFixed(value < 10 ? 1 : 0)}${unit}`;
-}
-
-// Simulated what3words — we have no API access, so this derives a stable
-// (not random-per-render) ///word.word.word from the world position using
-// ~3m grid cells, the same granularity the real service uses.
-const W3W_WORDS = [
-  "apple", "river", "stone", "cloud", "tiger", "willow", "bridge", "meadow",
-  "copper", "forest", "harbor", "island", "jungle", "kettle", "lantern", "marble",
-  "nectar", "orchid", "pencil", "quartz", "ribbon", "silver", "temple", "umbrella",
-  "velvet", "walnut", "canyon", "desert", "ember", "fossil", "granite", "hollow",
-  "ivory", "jasper", "kernel", "lagoon", "mantle", "needle", "opal", "pebble",
-  "quiver", "raven", "summit", "thicket", "unity", "valley", "willow2", "yonder",
-  "zephyr", "amber", "birch", "cedar", "delta", "ember2", "flint", "glacier",
-  "heron", "indigo", "juniper", "knoll", "lupine", "moss", "nutmeg", "olive",
-];
-function hash2(a, b) {
-  let h = Math.imul(a, 374761393) + Math.imul(b, 668265263);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return Math.abs(h ^ (h >>> 16));
-}
-function simulatedW3W(wx, wy) {
-  const cx = Math.floor(wx / 3), cy = Math.floor(wy / 3);
-  const w1 = W3W_WORDS[hash2(cx, cy) % W3W_WORDS.length];
-  const w2 = W3W_WORDS[hash2(cy, cx + 1) % W3W_WORDS.length];
-  const w3 = W3W_WORDS[hash2(cx + 1, cy + 1) % W3W_WORDS.length];
-  return `///${w1}.${w2}.${w3}`;
 }
 
 function GuideItem({ icon, label }) {

@@ -16,12 +16,13 @@ const ANCHOR_LON = -2.2, ANCHOR_LAT = 52.058;
 // when the backdrop itself is toggled off.
 export const METERS_PER_WORLD_UNIT = (156543.03392 * Math.cos((ANCHOR_LAT * Math.PI) / 180)) / 2 ** BASE_ZOOM;
 
-// Real, keyless raster backdrops this demo can actually render (the OS/ordnance
-// layers the Figma menus also list need an API key, so they stay disabled
-// there). `url(z, x, y)` returns the standard slippy-map tile for a source;
-// MapFooter attribution is read from here too so it always names the right
-// provider. "os-satellite" uses Esri World Imagery as a stand-in for the OS
-// satellite layer the design calls for, matching this demo's keyless spirit.
+// Real, keyless raster backdrops this demo can actually render — no API key
+// or login required for any of these (a couple just ask for attribution,
+// which MapFooter reads from here too so it always names the right
+// provider). The OS/ordnance + Azure layers the Figma menus also list need
+// an API key, so they stay disabled there. "os-satellite" uses Esri World
+// Imagery as a stand-in for the OS satellite layer the design calls for,
+// matching this demo's keyless spirit.
 export const BASEMAP_SOURCES = {
   osm: {
     url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
@@ -32,6 +33,26 @@ export const BASEMAP_SOURCES = {
     url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
     attribution: "Esri, Maxar, Earthstar Geographics",
     opacity: 1,
+  },
+  "osm-hot": {
+    url: (z, x, y) => `https://a.tile.openstreetmap.fr/hot/${z}/${x}/${y}.png`,
+    attribution: "© OpenStreetMap contributors (Humanitarian)",
+    opacity: 0.85,
+  },
+  "osm-topo": {
+    url: (z, x, y) => `https://tile.opentopomap.org/${z}/${x}/${y}.png`,
+    attribution: "© OpenStreetMap contributors, © SRTM · OpenTopoMap (CC-BY-SA)",
+    opacity: 0.9,
+  },
+  "esri-streets": {
+    url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${y}/${x}`,
+    attribution: "Esri, HERE, Garmin, © OpenStreetMap contributors",
+    opacity: 0.9,
+  },
+  "esri-topo": {
+    url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${z}/${y}/${x}`,
+    attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS, © OpenStreetMap contributors",
+    opacity: 0.9,
   },
 };
 
