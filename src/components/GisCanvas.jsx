@@ -3175,7 +3175,7 @@ useEffect(() => {
             zIndex: 12,
             display: "flex",
             flexDirection: "column",
-            gap: 8,
+            gap: 4,
           }}
         >
           {[

@@ -7,17 +7,25 @@ import { FmMaxIcon } from "./FmMaxIcon.jsx";
 // FM-results-max-cell, FMv8.2-TUFLOW-Solver 4002:12408). Implements every
 // component variant — Default, Hover, Selected, Selected Max, Focus, Disabled —
 // and is interactive out of the box:
-//   hover  → Hover variant (light fill, darker text, ellipsis appears)
+//   hover  → Hover variant (light fill, darker text) + the options ellipsis
+//            reveals at the far right, whether the row is Default or Selected
 //   click  → toggles Selected / back to Default
 //   max ▸  → marks the row "Selected Max" (brand-tinted max glyph)
 //   tab    → Focus variant (black focus ring)
-// Pass `property1` explicitly to freeze a single static variant (used by
-// callers that want to control state, e.g. a preselected row), otherwise the
+// `defaultSelected` starts the row in its Selected state (the design begins
+// with the first View-status and first Raster row selected). Pass
+// `property1` explicitly to freeze a single static variant, otherwise the
 // cell drives its own state. `icon` overrides the default slot icon so each
-// results group supplies its own official Flood glyph.
+// results group supplies its own official mono Flood glyph. Icon colour is
+// driven per-state from the Figma asset fills (#999999 grey at rest, #666666
+// on hover, #0A7DFF brand blue when selected/focused, #B1B1B1 when disabled).
 const LONG_TEXT = "Results cell";
 
-const BRAND_FILTER = "brightness(0) saturate(100%) sepia(1) saturate(6) hue-rotate(195deg)";
+// filters map our black mono SVGs onto the design's exact per-state colours
+const GREY = "invert(0.6)"; //                   #999999 — default
+const GREY_DARK = "invert(0.4)"; //              #666666 — hover
+const GREY_DISABLED = "invert(0.694)"; //        #B1B1B1 — disabled
+const BRAND_BLUE = "invert(0.4) sepia(0.8) saturate(100) hue-rotate(190deg) brightness(1.5)"; // ≈#0A7DFF
 
 export function ResultsCell({
   property1,
@@ -27,8 +35,9 @@ export function ResultsCell({
   showMore = true,
   icon = null,
   label = LONG_TEXT,
+  defaultSelected = false,
 }) {
-  const [sel, setSel] = useState(null); // null | "Selected" | "Selected Max"
+  const [sel, setSel] = useState(defaultSelected ? "Selected" : null); // null | "Selected" | "Selected Max"
   const [hover, setHover] = useState(false);
   const [maxHover, setMaxHover] = useState(false);
   const [focus, setFocus] = useState(false);
@@ -39,13 +48,17 @@ export function ResultsCell({
   const selected = state === "Selected" || state === "Selected Max";
   const selectedMax = state === "Selected Max";
   const disabled = state === "Disabled";
-  const hovered = !controlled && !selected && !focus && hover;
+
+  // Light  fill only for the non-selected hover look; the ellipsis reveals on
+  // hover no matter which variant the row is currently in.
+  const flatHover = !controlled && !selected && !focus && hover;
+  const revealMore = !controlled && showMore && hover;
 
   const textColor = selected || state === "Focus"
     ? "var(--text-primary-selected)"
     : disabled
       ? "var(--text-tertiary)"
-      : hover || state === "Hover"
+      : state === "Hover"
         ? "var(--text-primary)"
         : "var(--text-secondary)";
 
@@ -54,7 +67,7 @@ export function ResultsCell({
     display: "flex", alignItems: "center", gap: 4,
     padding: "0 2px 0 4px",
     borderRadius: selected || state === "Focus" ? 4 : 2,
-    background: !disabled && (selected || state === "Focus" || hovered) ? "var(--surface-3)" : "transparent",
+    background: !disabled && (selected || state === "Focus" || flatHover) ? "var(--surface-3)" : "transparent",
     border: `2px solid ${
       state === "Focus"
         ? "var(--text-primary-selected)"
@@ -84,8 +97,13 @@ export function ResultsCell({
           src={icon}
           size={16}
           style={{
-            opacity: disabled ? 0.6 : 0.9,
-            filter: selected || state === "Focus" ? BRAND_FILTER : undefined,
+            filter: disabled
+              ? GREY_DISABLED
+              : selected || state === "Focus"
+                ? BRAND_BLUE
+                : hover && !controlled
+                  ? GREY_DARK
+                  : GREY,
           }}
         />
       )}
@@ -101,15 +119,16 @@ export function ResultsCell({
         <FmMaxIcon
           property1={selectedMax ? "Select" : maxHover ? "Hover" : "Default"}
           onClick={(e) => {
-            if (controlled || disabled) return;
-            e.stopPropagation();
-            setSel("Selected Max");
+            if (!controlled && !disabled) {
+              e.stopPropagation();
+              setSel(sel === "Selected Max" ? "Selected" : "Selected Max");
+            }
           }}
           onMouseEnter={() => setMaxHover(true)}
           onMouseLeave={() => setMaxHover(false)}
         />
       )}
-      {showMore && <FmMoreIcon property1={hovered ? "Hover" : "Default"} />}
+      <FmMoreIcon property1={revealMore ? "Hover" : "Default"} />
     </div>
   );
 

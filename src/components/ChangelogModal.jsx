@@ -24,6 +24,7 @@ const CHANGELOG = [
   {
     area: "GIS & basemaps",
     items: [
+      { tag: "Improved", text: "The North Star, Zoom and Pan buttons now sit 4px apart instead of 8px, matching the design." },
       { tag: "Improved", text: "The North Star button now reorientates the map to north only — it no longer zooms back out to the full project extent; the \"0\" key still resets the whole view." },
       { tag: "New", text: "Four more keyless basemaps: Humanitarian OSM, OpenTopoMap, Esri Street Map and Esri Topo (the OS/Azure rows still need an API key)." },
       { tag: "Improved", text: "\"Base map\" menu labels renamed to \"Basemap\"." },
@@ -35,14 +36,16 @@ const CHANGELOG = [
     ],
   },
   {
-    area: "Panels & trees",
+area: "Panels & trees",
     items: [
-      { tag: "Improved", text: "2D Results is now represented by the official Flood mono 2D-results glyph in brand blue, matching the other panel-switcher icons." },
+      { tag: "Fixed", text: "The 2D-results row icons snap to the exact FMv8.2 colours now: row glyphs rest grey, darken as you hover, turn the brand p2 blue when a row is selected or focused, drop to a lighter grey while disabled, and the max \u25b8 glyph goes solid black when pinned as the max result." },
+      { tag: "Improved", text: "The 2D-results rows now all speak one colour language: every icon is the same mono black, the Check rows drop the colourful upload glyph for the official mono upload icon, and the options ellipsis reveals on hover whether a row is idle or selected." },
+      { tag: "New", text: "Opening Results now matches the FMv8.2 drawing's resting state: the active View-status row and the active Raster result start selected with a p2-blue border and blue glyph (click to select/deselect, click its max \u25b8 to pin it as the max result)." },
       { tag: "New", text: "Results rows are now interactive like in FMv8.2: hovering a row highlights it and reveals its options ellipsis, clicking selects it with the blue focus border, clicking its max \u25b8 glyph pins it as the max result (max turns blue), and tabbing to a row shows the black keyboard focus ring." },
       { tag: "Improved", text: "Every icon in the 2D-results panel now comes clean from the official Flood-Icons set: the raster tiles show the raster glyph, Vector shows the FM 2D line, Logs shows the diagnostics-mono glyph, the row max toggle is the display-max glyph, and the section headers use the standard add icon." },
       { tag: "Improved", text: "The 2D-results panel's layout now mirrors the FMv8.2 drawing exactly: the View status list sits in a fixed-height scrollable band, the divider line floats with padding around it, the results-type groups use the compact 24px section bars, and the Vector group shows the official FM 2D Line icon." },
       { tag: "Improved", text: "Every panel's header now follows the FMv8.2 panel-title spec: even 4px padding, the 14px title, and Filter + New-window (undock) icons on the right." },
-      { tag: "New", text: "Results cells' max/expand toggle matches the FMv8.2 Max-icon component (Default / Hover / Select states); the Select state tints it brand blue for the \u201cmax\u201d cell." },
+      { tag: "New", text: "Results cells' max/expand toggle matches the FMv8.2 Max-icon component (Default / Hover / Select states); the Select state uses the solid black glyph for the \u201cmax\u201d cell." },
       { tag: "New", text: "Results cells now carry the official \"options\" affordance (a vertical ellipsis) that appears on hover, matching the FMv8.2 more-icon component; the ellipsis glyph was pulled from the Flood-Icons set." },
       { tag: "Improved", text: "The Raster / Vector / Check / Logs group headers in Results now match the FMv8.2 section component (\u201cSection\u201d bar) with its Default and Collapse states ready to use." },
       { tag: "New", text: "Results-mode list rows are now proper \"Results cells\" matching the FMv8.2 component — every state (Default, hover, selected, focus, disabled and selected-max) is implemented ready for wiring up; the Results panel shows them all in the Default state for now." },

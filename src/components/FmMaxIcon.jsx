@@ -1,16 +1,16 @@
 import { A, Icon } from "../assets.jsx";
 
 // Max/expand toggle on Results cells (Figma FM-max-icon, FMv8.2-TUFLOW-Solver
-// 4002:12455), using the official arrows/display-max Flood glyph.
-// Default = plain glyph (clickable); Hover = darkened glyph; Select = brand-
-// tinted, used by the cell's "Selected Max" state.
+// 4002:12455), using the official arrows/display-max Flood glyph and the
+// component's exact per-state fills: Default #C8C8C8, Hover #666666, Select
+// plain black (used by the cell's "Selected Max" state).
 export function FmMaxIcon({ property1 = "Default", onClick, onMouseEnter, onMouseLeave }) {
   const filter =
-    property1 === "Select"
-      ? "brightness(0) saturate(100%) sepia(1) saturate(6) hue-rotate(195deg)"
-      : property1 === "Hover"
-        ? "brightness(0.45)"
-        : undefined;
+    property1 === "Hover"
+      ? "invert(0.4)"
+      : property1 === "Select"
+        ? undefined
+        : "invert(0.784)";
   return (
     <button
       type="button"
