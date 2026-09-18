@@ -166,6 +166,7 @@ import results1d from "./assets/results-1d.svg";
 import results1dFloodMap from "./assets/results-1d-flood-map.svg";
 import resultsTabularCsv from "./assets/results-tabular-csv.svg";
 import results2d from "./assets/results-2d.svg";
+import results2dMono from "./assets/results-2d-mono.svg";
 import results2dFloodMap from "./assets/results-2d-flood-map.svg";
 import resultsDamageCalculator from "./assets/results-damage-calculator.svg";
 import resultsComments from "./assets/results-comments.svg";
@@ -385,6 +386,9 @@ import colOrder from "./assets/col-order.svg";
 import messageReply from "./assets/message-reply.svg";
 import messageForward from "./assets/message-forward.svg";
 import expand from "./assets/expand.svg";
+import displayMax from "./assets/display-max.svg";
+import raster from "./assets/raster.svg";
+import diagnosticsMono from "./assets/diagnostics-mono.svg";
 import ellipsisVert from "./assets/ellipsis-vert.svg";
 import newWindow from "./assets/new-window.svg";
 
@@ -424,7 +428,7 @@ export const A = {
   resultEmbeddedStructures,
   hydroLoadHplus, hydroRefh, hydroFsuPortal, hydroRiverStations, hydroCatchDesc,
   simQuality, simNew2d, simBuilder, simRun, simRunBatch,
-  results1d, results1dFloodMap, resultsTabularCsv, results2d, results2dFloodMap,
+  results1d, results1dFloodMap, resultsTabularCsv, results2d, results2dMono, results2dFloodMap,
   results1dTimeSeries, results1dLongSection, results1dCrossSection, results1dXyChart,
   results2dTimeSeries, results2dPlotSections, results2dFlowLines, results2dEmbedStructure,
   resultsDamageCalculator, resultsComments, favStar, chartAnalytics,
@@ -475,6 +479,9 @@ export const A = {
   queryLay, history,
   filter: filter, download: download, dashboard: dashboard, colOrder: colOrder,
   messageReply: messageReply, messageForward: messageForward, expand: expand,
+  displayMax: displayMax,
+  raster: raster,
+  diagnosticsMono: diagnosticsMono,
   ellipsisVert: ellipsisVert,
   newWindow: newWindow,
 };

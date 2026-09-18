@@ -17,7 +17,7 @@ export const PANEL_VIEWS = {
   network: { icon: "network", title: "1D Network", Body: NetworkPanelBody },
   glossary: { icon: "panelGlossary", title: "1D Glossary" },
   swmmnetwork: { icon: "panelSwmmNetwork", title: "1D SWMM Network" },
-  results2d: { icon: "panel2dResults", title: "2D results", Body: ResultsViewerBody },
+  results2d: { icon: "results2dMono", title: "2D results", Body: ResultsViewerBody },
   tuflow: { icon: "tuflowTools", title: "TUFLOW editor", Body: TuflowPanelBody },
   globalanimator: { icon: "globalAnimatorIcon", title: "Global Animator", Body: GlobalAnimatorBody },
   timesteps: { icon: "panelTimesteps", title: "Timesteps" },

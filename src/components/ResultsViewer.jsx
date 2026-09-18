@@ -6,10 +6,12 @@ import { ContextSection } from "./ContextSection.jsx";
 //  fm-v8.0-TUFLOW-viewer, FMv8.2-TUFLOW-Solver 4002:12463). A "View status"
 //  section (1 active + 3 idle result cells), a separator, then a "Results
 //  type" section grouped into Raster / Vector / Check / Logs bars
-//  (FM-context-section) with Flood-Icons per group and a max/expand glyph on
-//  Raster, Vector and Logs rows. Demo-only; nothing is wired to real results
-//  data. The panel chrome (title switcher + filter/undock icons) lives in
-//  PanelSlot's header to match fm-v8.0-panel-title.
+//  (FM-context-section) with official Flood-Icons per group (raster,
+//  fm2d line, diagnostics-mono) and a display-max glyph on Raster, Vector and
+//  Logs rows. Rows are live ResultsCells: hover, click-to-select, click the
+//  max glyph to pin the row as the max result. The panel chrome (title
+//  switcher + filter/undock icons) lives in PanelSlot's header to match
+//  fm-v8.0-panel-title.
 
 const MEDIUM = 500;
 
@@ -27,14 +29,14 @@ function SectionHead({ label }) {
   );
 }
 
-// fm-v8.0-project-section content rows — a block of result cells, all in the
-// Default component state for now (Selected/Hover etc. are implemented in
-// ResultsCell but not yet driven by interactions).
+// fm-v8.0-project-section content rows — interactive ResultsCells in their
+// default state (Hover/Selected/etc. are driven by live pointer/keyboard
+// interaction in ResultsCell itself).
 function ResultCells({ count, source, withMax, showIcon = true }) {
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
-        <ResultsCell key={i} property1="Default" icon={source} showIcon={showIcon} showMax={Boolean(withMax)} />
+        <ResultsCell key={i} icon={source} showIcon={showIcon} showMax={Boolean(withMax)} />
       ))}
     </>
   );
@@ -61,13 +63,13 @@ export function ResultsViewerBody() {
       <div style={{ flex: "1 0 0", minHeight: 0, display: "flex", flexDirection: "column", paddingBottom: 8 }}>
         <div style={{ flex: "1 0 0", minHeight: 0, overflowY: "auto", padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
           <ContextSection label="Raster" height={24} />
-          <ResultCells count={6} source={A.filesRaster} withMax />
+          <ResultCells count={6} source={A.raster} withMax />
           <ContextSection label="Vector" height={24} />
           <ResultCells count={2} source={A.fm2dLine} withMax />
           <ContextSection label="Check" height={24} />
           <ResultCells count={2} source={A.results2dUpload} />
           <ContextSection label="Logs" height={24} />
-          <ResultCells count={1} source={A.panelDiagnostics} withMax />
+          <ResultCells count={1} source={A.diagnosticsMono} withMax />
         </div>
       </div>
     </div>
