@@ -385,6 +385,8 @@ import colOrder from "./assets/col-order.svg";
 import messageReply from "./assets/message-reply.svg";
 import messageForward from "./assets/message-forward.svg";
 import expand from "./assets/expand.svg";
+import ellipsisVert from "./assets/ellipsis-vert.svg";
+import newWindow from "./assets/new-window.svg";
 
 export const A = {
   logo, search, add, check, minimise, dock, cancel, runFailed, layers,
@@ -473,6 +475,8 @@ export const A = {
   queryLay, history,
   filter: filter, download: download, dashboard: dashboard, colOrder: colOrder,
   messageReply: messageReply, messageForward: messageForward, expand: expand,
+  ellipsisVert: ellipsisVert,
+  newWindow: newWindow,
 };
 
 // Small helper for a fixed-size icon <img>

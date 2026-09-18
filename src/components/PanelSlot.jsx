@@ -98,17 +98,17 @@ function PanelSwitcher({ viewId, onChangeView }) {
 function PanelHeader({ viewId, onChangeView, onClose, onUndockToolbox }) {
   const isToolbox = viewId === "toolbox";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "4px 8px 4px 4px", flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: 4, flexShrink: 0 }}>
       <PanelSwitcher viewId={viewId} onChangeView={onChangeView} />
       <span style={{ fontSize: "var(--fs-s)", fontWeight: 500 }}>{PANEL_VIEWS[viewId].title}</span>
       <div style={{ flex: "1 0 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
-        <Icon src={A.labelFilter} size={12} />
+        <Icon src={A.filter} size={12} />
         {isToolbox && onUndockToolbox ? (
           <button onClick={onUndockToolbox} title="Undock into a floating window" style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, display: "flex" }}>
             <Icon src={A.toolboxUndock} size={12} />
           </button>
         ) : (
-          <Icon src={A.layers} size={12} />
+          <Icon src={A.newWindow} size={12} />
         )}
         {onClose && (
           <button onClick={onClose} title="Close panel" style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1, color: "var(--text-tertiary)" }}>×</button>
