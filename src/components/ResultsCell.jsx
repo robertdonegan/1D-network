@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { A, Icon } from "../assets.jsx";
 import { FmMoreIcon } from "./FmMoreIcon.jsx";
 import { FmMaxIcon } from "./FmMaxIcon.jsx";
@@ -9,9 +9,11 @@ import { FmMaxIcon } from "./FmMaxIcon.jsx";
 // and is interactive out of the box:
 //   hover  → Hover variant (light fill, darker text) + the options ellipsis
 //            reveals at the far right, whether the row is Default or Selected
-//   click  → toggles Selected / back to Default
+//   click  → toggles Selected / back to Default (blue border, matching the
+//            Figma "Selected" variant — a mouse click must never show the
+//            black Focus ring; see the focus-visible note below)
 //   max ▸  → marks the row "Selected Max" (brand-tinted max glyph)
-//   tab    → Focus variant (black focus ring)
+//   tab    → Focus variant (black focus ring) — keyboard navigation only
 // `defaultSelected` starts the row in its Selected state (the design begins
 // with the first View-status and first Raster row selected). Pass
 // `property1` explicitly to freeze a single static variant, otherwise the
@@ -41,6 +43,12 @@ export function ResultsCell({
   const [hover, setHover] = useState(false);
   const [maxHover, setMaxHover] = useState(false);
   const [focus, setFocus] = useState(false);
+  // Standard focus-visible technique: a plain mouse click focuses the row
+  // natively (it's a tabIndex button) but must render as Selected (blue), not
+  // Focus (black ring) — the ring is reserved for keyboard navigation. A
+  // mousedown fires just before the browser's focus event, so flagging it
+  // here lets onFocus tell the two apart.
+  const pointerFocusRef = useRef(false);
 
   const controlled = property1 !== undefined;
   const state = controlled ? property1 : focus ? "Focus" : hover ? sel ?? "Hover" : sel ?? "Default";
@@ -139,7 +147,11 @@ export function ResultsCell({
       onClick={toggleSelect}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onFocus={() => setFocus(true)}
+      onMouseDown={() => { pointerFocusRef.current = true; }}
+      onFocus={() => {
+        if (!pointerFocusRef.current) setFocus(true);
+        pointerFocusRef.current = false;
+      }}
       onBlur={() => setFocus(false)}
       style={rowStyle}
     >

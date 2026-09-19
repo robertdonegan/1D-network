@@ -382,6 +382,7 @@ import history from "./assets/history.svg";
 import filter from "./assets/filter.svg";
 import download from "./assets/download.svg";
 import upload from "./assets/upload.svg";
+import fileUploadComplete from "./assets/file-upload-complete.svg";
 import dashboard from "./assets/dashboard.svg";
 import colOrder from "./assets/col-order.svg";
 import messageReply from "./assets/message-reply.svg";
@@ -478,7 +479,7 @@ export const A = {
   fm2dZPolygonImport, fm2dZPolylineImport, fm2dZPointsImport,
   favListSave,
   queryLay, history,
-  filter: filter, download: download, upload: upload, dashboard: dashboard, colOrder: colOrder,
+  filter: filter, download: download, upload: upload, fileUploadComplete: fileUploadComplete, dashboard: dashboard, colOrder: colOrder,
   messageReply: messageReply, messageForward: messageForward, expand: expand,
   displayMax: displayMax,
   raster: raster,
