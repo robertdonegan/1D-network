@@ -10,6 +10,15 @@ import { METERS_PER_WORLD_UNIT } from "./OsmBasemap.jsx";
 // same "demo data, stable per node" spirit as the rest of the prototype.
 // Stations are ordered spatially (projected onto the reach's principal axis)
 // and spaced by real on-map metres so the x axis reads as a true chainage.
+//
+// The water body's diagonal hatch doubles as a flow-direction indicator,
+// driven by the Global Animator's playhead (App.jsx lifts that state via
+// `useAnimator()` so it's shared, not local to the panel): resting/slack
+// flow reads as vertical "|" chevrons, a rising storm tilts them forward
+// into a steeper "/" as flow quickens, and a reach seeded as tidal/coastal
+// can reverse past vertical into "\". See `reachFlow` below. The same pulse
+// also raises the Stage line itself — bed and banks stay fixed, but stage
+// surges past whichever bank is higher at the peak, then eases back down.
 
 const Y_MIN = 5.0, Y_MAX = 13.5; // Elevation (m AD) axis
 const PLOT_H = 300;              // series area height
@@ -44,6 +53,38 @@ function stationStats(n, i) {
   const left = bed + 3.2 + v3 * 1.05;
   const right = bed + 3.0 + v2 * 1.0;
   return { bed, stage, left, right };
+}
+
+// Reach-wide flow, in -1..1, at one animator step — the storm hydrograph
+// driving the hatch tilt. Seeded from the plotted reach's end stations so
+// it's stable for a given selection but varies reach to reach: most reaches
+// get a simple rise-and-fall pulse centred on the timeline (peak position
+// jittered by the seed), while ~1 in 5 are treated as tidal/coastal and
+// oscillate instead, so they can swing past vertical into reverse flow.
+const MAX_TILT_DEG = 32;
+const STAGE_OVERTOP_MARGIN = 0.3; // m the flood clears the higher bank by, at peak flow
+function reachFlow(stations, step, totalSteps) {
+  if (!stations.length) return 0;
+  const seed = hashStr(stations[0].n.id + "|" + stations[stations.length - 1].n.id);
+  const t = (step - 1) / Math.max(1, totalSteps - 1);
+  if (seed > 0.8) return Math.sin((t + seed) * Math.PI * 2);
+  const peakShift = (seed - 0.5) * 0.4;
+  return Math.max(0, Math.cos((t - 0.5 - peakShift) * Math.PI * 1.15));
+}
+
+// Active-station markers — diamond/square/circle/triangle, each an 8px
+// shape centred on (cx, cy), matching the Figma marker set exactly (left
+// bank, right bank, stage, bed). Kept equal-sided so none reads as skewed.
+const MARKER = 8;
+function StationMarker({ shape, cx, cy, color }) {
+  const h = MARKER / 2;
+  const common = { fill: "#fafafa", stroke: color, strokeWidth: 1.5 };
+  if (shape === "circle") return <circle cx={cx} cy={cy} r={h} {...common} />;
+  if (shape === "triangle") {
+    return <path d={`M ${cx} ${cy - h} L ${cx + h} ${cy + h} L ${cx - h} ${cy + h} Z`} strokeLinejoin="round" {...common} />;
+  }
+  const rect = <rect x={cx - h} y={cy - h} width={MARKER} height={MARKER} {...common} />;
+  return shape === "diamond" ? <g transform={`rotate(45 ${cx} ${cy})`}>{rect}</g> : rect;
 }
 
 function Swatch({ dashed, color }) {
@@ -101,15 +142,32 @@ function buildStations(nodeIds, nodes) {
   return stations;
 }
 
-export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) {
+export default function LongSectionModal({ nodeIds = [], nodes = [], onClose, animStep = 1, animTotalSteps = 32 }) {
   const [expanded, setExpanded] = useState(false);
   const [lineWidth, setLineWidth] = useState(1.5);
   const [selIdx, setSelIdx] = useState(-1);
   const [hover, setHover] = useState(null); // { x, idx }
   const svgRef = useRef(null);
   const [chartW, setChartW] = useState(800);
+  // Legend click toggles a series off — matches the design's clickable
+  // legend. Stage/Bed also carry the water/ground fills, so hiding either
+  // takes its fill with it; Left/Right bank only ever draw their own line.
+  const [visible, setVisible] = useState({ stage: true, bed: true, left: true, right: true });
+  const toggleVisible = (key) => setVisible((v) => ({ ...v, [key]: !v[key] }));
 
-  const stations = useMemo(() => buildStations(nodeIds, nodes), [nodeIds, nodes]);
+  const rawStations = useMemo(() => buildStations(nodeIds, nodes), [nodeIds, nodes]);
+  const flow = useMemo(() => reachFlow(rawStations, animStep, animTotalSteps), [rawStations, animStep, animTotalSteps]);
+  const hatchTiltDeg = flow * MAX_TILT_DEG;
+  // Stage rises and falls with the same storm pulse driving the flow
+  // chevrons — surging past both banks at the peak (flood overtopping),
+  // easing back to its resting level as flow subsides. Bed/banks stay put;
+  // only the water surface itself is time-varying.
+  const flowMag = Math.min(1, Math.abs(flow));
+  const stations = useMemo(() => rawStations.map((s) => {
+    const headroom = Math.max(s.left, s.right) - s.stage;
+    const stage = Math.min(s.stage + flowMag * (headroom + STAGE_OVERTOP_MARGIN), Y_MAX - 0.2);
+    return { ...s, stage };
+  }), [rawStations, flowMag]);
   const count = stations.length;
   const total = Math.max(stations[count - 1]?.chain || 0, 1);
 
@@ -143,6 +201,7 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
   const actX = act ? xPos[displayIdx] : 0;
 
   const profile = (key, dash) => {
+    if (!visible[key]) return null;
     const stroke = COL[key];
     return (
       <path
@@ -153,9 +212,20 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
       />
     );
   };
-  const bedFill = stations.length
-    ? `${stations.map((s, i) => `${i ? "L" : "M"} ${xPos[i]} ${sy(s.bed)}`).join(" ")} L ${xPos[count - 1]} ${PLOT_H} L ${xPos[0]} ${PLOT_H} Z`
-    : "";
+  // Band fill between two elevation series (e.g. stage-over-bed for the
+  // water body, bed-over-floor for the solid ground) — top edge left to
+  // right, bottom edge back right to left, closed.
+  const bandPath = (topKey, bottomVal) => {
+    if (!stations.length) return "";
+    const top = stations.map((s, i) => `${i ? "L" : "M"} ${xPos[i]} ${sy(s[topKey])}`).join(" ");
+    const bottom = [...stations].reverse().map((s, i) => {
+      const j = count - 1 - i;
+      return `L ${xPos[j]} ${bottomVal === "floor" ? PLOT_H : sy(s[bottomVal])}`;
+    }).join(" ");
+    return `${top} ${bottom} Z`;
+  };
+  const groundFill = bandPath("bed", "floor");
+  const waterFill = bandPath("stage", "bed");
 
   const onMove = (e) => {
     const rect = svgRef.current.getBoundingClientRect();
@@ -169,27 +239,30 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
   const tooltipTop = act ? Math.min(Math.max(sy(act.stage) - 12, 8), PLOT_H - 100) : 8;
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.3)", zIndex: 300 }}
-      onClick={onClose}>
+    // No dimming scrim and no click-outside-to-close: this plot is driven by
+    // the Global Animator panel, so the rest of the UI — the animator's
+    // play/scrub controls above all — has to stay reachable while it's open.
+    // Escape and the title bar's Close button remain the ways to dismiss it.
+    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, pointerEvents: "none" }}>
       <div style={{
         background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
         boxShadow: "0 2px 10px 2px rgba(0,0,0,0.25)", padding: 8, width: expanded ? 1500 : 940,
         maxWidth: "calc(100vw - 48px)", maxHeight: "calc(100vh - 48px)",
-        display: "flex", flexDirection: "column",
-      }} onClick={(e) => e.stopPropagation()}>
+        display: "flex", flexDirection: "column", pointerEvents: "auto",
+      }}>
         {/* Title row */}
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 28, flexShrink: 0 }}>
-          <Icon src={A.results1dLongSection} size={16} />
+          <Icon src={A.tuflowLongSection} size={16} />
           <span style={{ flex: "1 0 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)" }}>
             Long Section{count ? ` — ${count} units` : ""}
           </span>
-          {[A.minimise, A.dock, A.queryLay, A.cancel].map((ic, i) => (
+          {[A.dockWindow, A.minimise, A.dock, A.cancel].map((ic, i) => (
             <button key={i} onClick={i === 3 ? onClose : undefined}
-              title={["Minimise", "Maximise", "Help", "Close"][i]}
+              title={["Pop out", "Minimise", "Dock", "Close"][i]}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", borderRadius: 2 }}
               onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
               onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
-              <Icon src={ic} size={12} />
+              <Icon src={ic} size={12} style={{ filter: "brightness(0)", opacity: 0.55 }} />
             </button>
           ))}
         </div>
@@ -231,53 +304,74 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
               {/* Series */}
               <div style={{ flex: 1, minWidth: 0, position: "relative" }} onMouseLeave={() => setHover(null)}>
                 <svg ref={svgRef} width="100%" height={PLOT_H} onMouseMove={onMove} style={{ display: "block", cursor: "crosshair" }}>
+                  <defs>
+                    <linearGradient id="ls-water-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#cfe4fb" />
+                      <stop offset="100%" stopColor="#eef5fd" />
+                    </linearGradient>
+                    <pattern id="ls-water-hatch" width="16" height="8" patternUnits="userSpaceOnUse" patternTransform={`rotate(${hatchTiltDeg})`}>
+                      <line x1="0" y1="0" x2="0" y2="8" stroke="#7fb2ee" strokeOpacity="0.4" strokeWidth="1.2" />
+                    </pattern>
+                  </defs>
                   {Y_TICKS.map((v) => (
                     <line key={v} x1={0} y1={sy(v)} x2={chartW} y2={sy(v)} stroke={COL.grid} vectorEffect="non-scaling-stroke" />
                   ))}
                   {stations.map((s, i) => (
                     <line key={s.n.id} x1={xPos[i]} y1={0} x2={xPos[i]} y2={PLOT_H}
-                      stroke={i === displayIdx ? "#b0b8c4" : "#dfe3e8"}
-                      strokeWidth={i === displayIdx ? 1.5 : 1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+                      stroke={i === displayIdx ? "var(--text-primary)" : "#dfe3e8"}
+                      strokeWidth={i === displayIdx ? 1.5 : 1}
+                      strokeDasharray={i === displayIdx ? undefined : "3 3"}
+                      vectorEffect="non-scaling-stroke" />
                   ))}
-                  <path d={bedFill} fill="#f1f4f8" />
+                  {visible.bed && <path d={groundFill} fill="#f1f4f8" />}
+                  {visible.stage && <path d={waterFill} fill="url(#ls-water-grad)" />}
+                  {visible.stage && <path d={waterFill} fill="url(#ls-water-hatch)" />}
                   {profile("left", "5 3")}
                   {profile("right", "5 3")}
                   {profile("stage")}
                   {profile("bed")}
                   {act && (
                     <g>
-                      <rect x={actX - 5} y={sy(act.left) - 5} width={10} height={10} fill="#fafafa" stroke={COL.left} strokeWidth={1.5} transform={`rotate(45 ${actX} ${sy(act.left)})`} />
-                      <rect x={actX - 5} y={sy(act.right) - 5} width={10} height={10} fill="#fafafa" stroke={COL.right} strokeWidth={1.5} />
-                      <circle cx={actX} cy={sy(act.stage)} r={5} fill="#fafafa" stroke={COL.stage} strokeWidth={1.5} />
+                      {visible.left && <StationMarker shape="diamond" cx={actX} cy={sy(act.left)} color={COL.left} />}
+                      {visible.right && <StationMarker shape="square" cx={actX} cy={sy(act.right)} color={COL.right} />}
+                      {visible.stage && <StationMarker shape="circle" cx={actX} cy={sy(act.stage)} color={COL.stage} />}
+                      {visible.bed && <StationMarker shape="triangle" cx={actX} cy={sy(act.bed)} color="#999" />}
                     </g>
                   )}
                 </svg>
-                {/* timestep pill */}
-                {act && (
-                  <div style={{ position: "absolute", left: actX + 8, top: sy(act.stage) - 15, background: "var(--surface-brand)", color: "#fafafa", borderRadius: 2, padding: "2px 4px", fontSize: 12, fontWeight: 500, lineHeight: "12px", textAlign: "center", minWidth: 20 }}>
-                    {displayIdx + 1}
+                {/* Timestep pill — pinned to the right edge (not the hovered
+                    station) and vertically tracking the Stage line's own
+                    endpoint, so it reads as a live "current timestep being
+                    played" readout rather than a per-station annotation. */}
+                {count > 0 && (
+                  <div title={`Animator timestep ${animStep} of ${animTotalSteps}`}
+                    style={{ position: "absolute", right: 4, top: sy(stations[count - 1].stage), transform: "translateY(-50%)", background: "var(--surface-brand)", color: "#fafafa", borderRadius: 2, padding: "2px 4px", fontSize: 12, fontWeight: 500, lineHeight: "12px", textAlign: "center", minWidth: 20, zIndex: 1 }}>
+                    {animStep}
                   </div>
                 )}
-                {/* hover / active tooltip */}
-                <div style={{ position: "absolute", left: tooltipLeft, top: tooltipTop, width: 160, zIndex: 2, background: "var(--surface-1)", borderRadius: 2, padding: 8, boxShadow: "0 2px 2px rgba(0,0,0,0.1), 0 3px 3px rgba(0,0,0,0.1)", pointerEvents: "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", padding: "4px 0", fontSize: 12, fontWeight: 500, color: "var(--text-primary)" }}>
-                    {act ? act.n.label : "—"}
-                  </div>
-                  {[
-                    ["Left bank", "left", true],
-                    ["Right bank", "right", true],
-                    ["Stage level", "stage", false],
-                    ["Bed level", "bed", false],
-                  ].map(([label, key, dashed]) => (
-                    <div key={label} style={{ display: "flex", gap: 2, height: 14, alignItems: "center" }}>
-                      <Swatch dashed={dashed} color={COL[key]} />
-                      <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{label}</span>
-                      <span style={{ flex: "1 0 0", fontSize: 12, fontWeight: 500, color: "var(--text-primary)", textAlign: "right" }}>
-                        {act ? act[key].toFixed(2) : "—"}
-                      </span>
+                {/* Tooltip — only while actively hovering the chart, not
+                    for the default/prev-next "selected" station. */}
+                {hover && act && (
+                  <div style={{ position: "absolute", left: tooltipLeft, top: tooltipTop, width: 160, zIndex: 2, background: "var(--surface-1)", borderRadius: 2, padding: 8, boxShadow: "0 2px 2px rgba(0,0,0,0.1), 0 3px 3px rgba(0,0,0,0.1)", pointerEvents: "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", padding: "4px 0", fontSize: 12, fontWeight: 500, color: "var(--text-primary)" }}>
+                      {act.n.label}
                     </div>
-                  ))}
-                </div>
+                    {[
+                      ["Left bank", "left", true],
+                      ["Right bank", "right", true],
+                      ["Stage level", "stage", false],
+                      ["Bed level", "bed", false],
+                    ].map(([label, key, dashed]) => (
+                      <div key={label} style={{ display: "flex", gap: 2, height: 14, alignItems: "center", opacity: visible[key] ? 1 : 0.4 }}>
+                        <Swatch dashed={dashed} color={visible[key] ? COL[key] : "var(--text-tertiary)"} />
+                        <span style={{ fontSize: 12, color: "var(--text-primary)" }}>{label}</span>
+                        <span style={{ flex: "1 0 0", fontSize: 12, fontWeight: 500, color: "var(--text-primary)", textAlign: "right" }}>
+                          {act[key].toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             {/* X axis: rotated station labels */}
@@ -285,7 +379,7 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
               <div style={{ width: 44, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0, position: "relative", height: 44 }}>
                 {stations.map((s, i) => (
-                  <span key={s.n.id} style={{ position: "absolute", left: xPos[i] - 4, top: 6, transform: "rotate(-90deg)", transformOrigin: "left top", fontSize: 10, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                  <span key={s.n.id} style={{ position: "absolute", left: xPos[i] + 4, top: 6, transform: "rotate(90deg)", transformOrigin: "left top", fontSize: 10, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
                     {s.n.label}
                   </span>
                 ))}
@@ -297,14 +391,21 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
             {/* legend */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "4px 0 8px", flexWrap: "wrap" }}>
               {[
-                ["Stage", "stage", false],
+                ["Stage (1)", "stage", false],
                 ["Bed elevation", "bed", false],
                 ["Left bank", "left", true],
                 ["Right bank", "right", true],
               ].map(([label, key, dashed]) => (
-                <span key={label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--text-primary)" }}>
-                  <Swatch dashed={dashed} color={COL[key]} /> {label}
-                </span>
+                <button key={label} onClick={() => toggleVisible(key)}
+                  title={visible[key] ? `Hide ${label}` : `Show ${label}`}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4, fontSize: 12,
+                    color: visible[key] ? "var(--text-primary)" : "var(--text-tertiary)",
+                    opacity: visible[key] ? 1 : 0.5, border: "none", background: "transparent",
+                    padding: 2, cursor: "pointer",
+                  }}>
+                  <Swatch dashed={dashed} color={visible[key] ? COL[key] : "var(--text-tertiary)"} /> {label}
+                </button>
               ))}
             </div>
           </div>

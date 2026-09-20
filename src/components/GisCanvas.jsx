@@ -2410,7 +2410,7 @@ useEffect(() => {
         e.preventDefault();
         deletePolygons(selectedPolyIds);
       }
-      if (e.code === "Space" && !spaceHeld && !isTyping(e)) {
+      if (e.code === "Space" && !spaceHeld && !isTyping(e) && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         setSpaceHeld(true);
       }

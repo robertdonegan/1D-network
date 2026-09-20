@@ -324,16 +324,16 @@ export default function WeirModal({ draft, onConfirm, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 28, flexShrink: 0 }}>
           <Icon src={A.broadWeir} size={16} />
           <span style={{ flex: "1 0 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)" }}>1D Weir unit</span>
-          {[A.minimise, A.dock, A.queryLay, A.cancel].map((ic, i) => (
+          {[A.dockWindow, A.minimise, A.dock, A.cancel].map((ic, i) => (
             <button
               key={i}
               onClick={i === 3 ? onClose : undefined}
-              title={["Minimise", "Maximise", "Help", "Close"][i]}
+              title={["Pop out", "Minimise", "Dock", "Close"][i]}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", borderRadius: 2 }}
               onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
               onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
             >
-              <Icon src={ic} size={12} />
+              <Icon src={ic} size={12} style={{ filter: "brightness(0)", opacity: 0.55 }} />
             </button>
           ))}
         </div>

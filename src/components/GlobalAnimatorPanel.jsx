@@ -37,15 +37,15 @@ function ControlButton({ children, onClick, title, active }) {
   );
 }
 
-// Demo-only playback widget (fm-v8.0-anim-player-v2) — no time-varying
-// simulation data exists behind this prototype, so play/pause just steps
-// `currentStep` through 1..32 on an interval; nothing else on the canvas
-// is wired to it yet.
-export function GlobalAnimatorBody() {
+// Lifted to App.jsx so any animated element (the Long Section plot's flow
+// chevrons, so far) can read the same playhead the panel controls — see
+// `panelBodyProps` in App.jsx. Demo-only: no time-varying simulation data
+// exists behind this prototype, so play/pause just steps `currentStep`
+// through 1..32 on an interval.
+export function useAnimator() {
   const [currentStep, setCurrentStep] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(0);
-  const trackRef = useRef(null);
 
   useEffect(() => {
     if (!playing) return;
@@ -54,6 +54,12 @@ export function GlobalAnimatorBody() {
     }, 500 / SPEEDS[speedIdx]);
     return () => clearInterval(id);
   }, [playing, speedIdx]);
+
+  return { currentStep, setCurrentStep, playing, setPlaying, speedIdx, setSpeedIdx, totalSteps: TOTAL_STEPS };
+}
+
+export function GlobalAnimatorBody({ currentStep, setCurrentStep, playing, setPlaying, speedIdx, setSpeedIdx }) {
+  const trackRef = useRef(null);
 
   const stepFromClientX = (clientX) => {
     const r = trackRef.current.getBoundingClientRect();

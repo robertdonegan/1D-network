@@ -9,6 +9,7 @@ import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import AddLayerModal from "./components/AddLayerModal.jsx";
 import WeirModal from "./components/WeirModal.jsx";
 import LongSectionModal from "./components/LongSectionModal.jsx";
+import { useAnimator } from "./components/GlobalAnimatorPanel.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
@@ -335,6 +336,10 @@ export default function App() {
   // Long Section plot: node ids to plot, opened from the map right-click menu
   // or the 1D Network table's context menu on a multi-selection.
   const [longSectionIds, setLongSectionIds] = useState(null);
+  // Global Animator playhead — lifted here (rather than kept local to
+  // GlobalAnimatorBody) so other animated elements, like the Long Section
+  // plot's flow chevrons, can read the same timestep. See panelBodyProps.
+  const animator = useAnimator();
   // Mode-driven panels (Figma "Modes and ribbons" FMv8.0 spec): switching
   // modes also rewires the right dock (which panel + how wide) and optionally
   // opens the bottom dock, matching what the Figma frame for each mode shows.
@@ -724,6 +729,13 @@ export default function App() {
         if (e.shiftKey) cycleBasemap();
         else toggleBasemap();
       }
+      // Play/Pause time-steps (Keyboard Shortcuts spec: Ctrl+Space) — drives
+      // the same Global Animator playhead the panel and Long Section plot
+      // share (see `animator` / `useAnimator()`).
+      if ((e.ctrlKey || e.metaKey) && e.code === "Space" && !isTyping(e)) {
+        e.preventDefault();
+        animator.setPlaying((p) => !p);
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -771,6 +783,9 @@ export default function App() {
     onSetActiveLayer: setActiveLayerId, onToggleLayerVisibility: toggleLayerVisibility,
     onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
     onZoomToLayer: zoomToLayer,
+    currentStep: animator.currentStep, setCurrentStep: animator.setCurrentStep,
+    playing: animator.playing, setPlaying: animator.setPlaying,
+    speedIdx: animator.speedIdx, setSpeedIdx: animator.setSpeedIdx,
   };
   // Mode-driven right dock: `rightLayout` is undefined for modes with no
   // right panel (Home, Simulation, GIS views, Favourites) — hide the handle
@@ -889,7 +904,8 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
       )}
       {weirModal && <WeirModal draft={weirModal} onConfirm={confirmWeir} onClose={() => setWeirModal(null)} />}
       {longSectionIds && (
-        <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)} />
+        <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)}
+          animStep={animator.currentStep} animTotalSteps={animator.totalSteps} />
       )}
     </div>
   );
