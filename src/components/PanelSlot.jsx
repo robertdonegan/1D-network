@@ -29,7 +29,13 @@ const VIEW_ORDER = [
   "timesteps", "texteditor", "diagnostics1d", "toolbox",
 ];
 
-function PanelSwitcher({ viewId, onChangeView }) {
+// Shared by every panel's own switcher (`viewId` = this slot's current
+// view, `onSelect` swaps it in place) and by GlobalAnimatorFooter's "open a
+// panel" button (`viewId` null — it isn't itself one of these views —
+// `icon` stands in for the button's glyph, and `onSelect` opens the chosen
+// view in the bottom dock instead of swapping in place). `openUp` flips the
+// menu to grow upward, for callers pinned near the bottom of the viewport.
+export function PanelSwitcher({ viewId, icon, iconStyle, onSelect, openUp, title = "Switch panel view" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -46,21 +52,22 @@ function PanelSwitcher({ viewId, onChangeView }) {
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Switch panel view"
+        title={title}
         style={{
           display: "flex", alignItems: "center", justifyContent: "center", gap: 2, height: 24,
           padding: 4, borderRadius: 2, background: "var(--surface-1)", border: "1px solid var(--border-primary)",
           cursor: "pointer",
         }}
       >
-        <Icon src={A[PANEL_VIEWS[viewId].icon]} size={16} />
-        <Icon src={A.keyDown} size={12} style={{ transform: open ? "rotate(180deg)" : "none" }} />
+        <Icon src={icon || A[PANEL_VIEWS[viewId].icon]} size={16} style={iconStyle} />
+        <Icon src={A.keyDown} size={12} style={{ transform: open !== !!openUp ? "rotate(180deg)" : "none" }} />
       </button>
       {open && (
         <div
           onMouseDown={(e) => e.stopPropagation()}
           style={{
-            position: "absolute", top: "100%", left: 0, marginTop: 2, minWidth: 190, zIndex: 50,
+            position: "absolute", [openUp ? "bottom" : "top"]: "100%", left: 0,
+            [openUp ? "marginBottom" : "marginTop"]: 2, minWidth: 190, zIndex: 50,
             background: "var(--surface-1)", border: "1px solid var(--border-primary)",
             borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 4,
             display: "flex", flexDirection: "column", gap: 2,
@@ -72,7 +79,7 @@ function PanelSwitcher({ viewId, onChangeView }) {
             return (
               <button
                 key={id}
-                onClick={() => { onChangeView(id); setOpen(false); }}
+                onClick={() => { onSelect(id); setOpen(false); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 8, height: 28, padding: "4px 8px",
                   border: "none", borderRadius: 2, cursor: "pointer", textAlign: "left",
@@ -97,7 +104,7 @@ function PanelHeader({ viewId, onChangeView, onClose, onUndockToolbox }) {
   const isToolbox = viewId === "toolbox";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: 4, flexShrink: 0 }}>
-      <PanelSwitcher viewId={viewId} onChangeView={onChangeView} />
+      <PanelSwitcher viewId={viewId} onSelect={onChangeView} />
       <span style={{ fontSize: "var(--fs-s)", fontWeight: 500 }}>{PANEL_VIEWS[viewId].title}</span>
       <div style={{ flex: "1 0 0", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
         <Icon src={A.filter} size={12} />

@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { A, Icon } from "../assets.jsx";
 import { fmtHours } from "./GlobalAnimatorPanel.jsx";
+import { PanelSwitcher } from "./PanelSlot.jsx";
 
 // Transport bar (Figma "fm-v8.0-anim-player-v2"): always visible, docked
 // underneath the map — a panel in the canvas column like the other
@@ -44,6 +45,19 @@ const COMMENTS = [
   { step: 29, name: "Anya Lindqvist", initials: "AL", color: "#7b5ee8", badge: false, text: "Re-check this timestep after the mesh refinement lands." },
 ];
 
+// Placeholder animated-layer inventory for the layers drop-up. These are
+// the "result layers" a real animator would expose; toggling one only
+// changes the local check state + the count on the button for now — there
+// is no rendering pipeline behind them in this prototype.
+const ANIMATED_LAYERS = [
+  { id: "depth", name: "Depth (m)", color: "#2f6fed", on: true },
+  { id: "flow", name: "Flow rate (m³/s)", color: "#00a33b", on: true },
+  { id: "velocity", name: "Velocity (m/s)", color: "#f2a63b", on: false },
+  { id: "level", name: "Water level (mAOD)", color: "#0a7dff", on: true },
+  { id: "flood", name: "Flood extent", color: "#e1455b", on: false },
+  { id: "shear", name: "Shear stress", color: "#7b5ee8", on: false },
+];
+
 function TransportBtn({ icon, iconSize = 16, label, onClick, onLabelClick, title, end, first }) {
   return (
     <div
@@ -68,14 +82,103 @@ function TransportBtn({ icon, iconSize = 16, label, onClick, onLabelClick, title
 
 const SPEEDS = [1, 2, 4];
 
-export default function GlobalAnimatorFooter({ animator }) {
-  const { currentStep, seekTo, playing, setPlaying, speedIdx, setSpeedIdx, totalSteps, trimStart, trimEnd, setTrimStart, setTrimEnd } = animator;
-  const [direction, setDirection] = useState(1);
+// Generic drop-up menu for the footer's right-hand controls (layers,
+// settings). Grows upward since the bar is pinned to the bottom of the
+// viewport, and closes on outside click / Escape — same behaviour as
+// PanelSwitcher, but anchored to the trigger's right edge so wide menus
+// stay on screen.
+function DropUp({ title, trigger, children, width = 200 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <div onClick={() => setOpen((v) => !v)} title={title} style={{ cursor: "pointer" }}>{trigger}</div>
+      {open && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute", bottom: "100%", right: 0, marginBottom: 6, width, zIndex: 60,
+            background: "var(--surface-1)", border: "1px solid var(--border-primary)",
+            borderRadius: 4, boxShadow: "0 4px 16px rgba(0,0,0,0.16)", padding: 4,
+            display: "flex", flexDirection: "column", gap: 2,
+          }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuHeading({ children }) {
+  return (
+    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase", color: "var(--text-tertiary)", padding: "4px 8px 2px" }}>
+      {children}
+    </div>
+  );
+}
+
+function MenuRow({ children, onClick, active }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 8, height: 28, padding: "4px 8px",
+        border: "none", borderRadius: 2, cursor: "pointer", textAlign: "left", width: "100%",
+        background: active ? "var(--surface-4)" : "transparent",
+        fontSize: "var(--fs-xs)", color: "var(--text-primary)",
+      }}
+      onMouseOver={(e) => { if (!active) e.currentTarget.style.background = "var(--surface-3)"; }}
+      onMouseOut={(e) => { e.currentTarget.style.background = active ? "var(--surface-4)" : "transparent"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Checkbox-style toggle row: a check glyph in a fixed slot keeps labels
+// aligned whether or not the option is on.
+function MenuToggle({ label, checked, onClick }) {
+  return (
+    <MenuRow onClick={onClick}>
+      <span style={{ width: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {checked && <Icon src={A.check} size={12} />}
+      </span>
+      <span style={{ flex: "1 0 0" }}>{label}</span>
+    </MenuRow>
+  );
+}
+
+export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
+  const {
+    currentStep, seekTo, playing, direction, play, speedIdx, setSpeedIdx, totalSteps,
+    trimStart, trimEnd, setTrimStart, setTrimEnd, loop, setLoop,
+  } = animator;
   const trackRef = useRef(null);
   const [hoveredPin, setHoveredPin] = useState(null);
 
   const waveform = useRef(null);
   if (!waveform.current) waveform.current = waveformValues(totalSteps);
+
+  // View options that live only in the footer (the animator itself only
+  // cares about the playhead). `loop` is the exception — it's owned by
+  // useAnimator so playback can actually honour it.
+  const [showWaveform, setShowWaveform] = useState(true);
+  const [showComments, setShowComments] = useState(true);
+  const [showRulerLabels, setShowRulerLabels] = useState(true);
+  const [layers, setLayers] = useState(ANIMATED_LAYERS);
+  const activeLayerCount = layers.filter((l) => l.on).length;
+
+  const toggleLayer = (id) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, on: !l.on } : l)));
 
   const fracFromClientX = (clientX) => {
     const r = trackRef.current.getBoundingClientRect();
@@ -102,11 +205,6 @@ export default function GlobalAnimatorFooter({ animator }) {
     window.addEventListener("mouseup", onUp);
   };
 
-  const play = (dir) => {
-    if (playing && direction === dir) { setPlaying(false); return; }
-    setDirection(dir);
-    setPlaying(true);
-  };
   const cycleSpeed = () => setSpeedIdx((i) => (i + 1) % SPEEDS.length);
 
   const pct = (n) => `${((n - 1) / (totalSteps - 1)) * 100}%`;
@@ -115,14 +213,16 @@ export default function GlobalAnimatorFooter({ animator }) {
     <div style={{
       flexShrink: 0, background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
       padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6,
+      // The bar is the last thing in the canvas column, so without this its
+      // upward comment-pin tooltips paint *under* the map panel above and
+      // get clipped by it. A stacking context on the bar keeps them on top.
+      position: "relative", zIndex: 100,
     }}>
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, height: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 0 0", minWidth: 0 }}>
-          <Icon src={A.globalAnimatorIcon} size={16} style={{ filter: "brightness(0)" }} />
-          <button title="Animator options" style={{ display: "flex", alignItems: "center", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
-            <Icon src={A.keyDown} size={12} />
-          </button>
+          <PanelSwitcher icon={A.globalAnimatorIcon} iconStyle={{ filter: "brightness(0)" }} openUp
+            onSelect={onOpenPanel} title="Open a panel below the map" />
           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)", whiteSpace: "nowrap" }}>Global Animator</span>
         </div>
 
@@ -136,13 +236,55 @@ export default function GlobalAnimatorFooter({ animator }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
-          <div title="Animated layers" style={{ display: "flex", alignItems: "center", gap: 2, height: 24, padding: "4px 8px", background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2 }}>
-            <Icon src={A.layers} size={16} />
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>3</span>
-          </div>
-          <div title="Animator settings" style={{ display: "flex", alignItems: "center", height: 24, padding: "4px 8px", background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2 }}>
-            <Icon src={A.settingsOutline} size={16} style={{ filter: "brightness(0)" }} />
-          </div>
+          <DropUp
+            width={216}
+            title="Animated layers"
+            trigger={
+              <div style={{ display: "flex", alignItems: "center", gap: 2, height: 24, padding: "4px 8px", background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2 }}>
+                <Icon src={A.layers} size={16} />
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>{activeLayerCount}</span>
+              </div>
+            }
+          >
+            <MenuHeading>Animated layers</MenuHeading>
+            {layers.map((l) => (
+              <MenuRow key={l.id} onClick={() => toggleLayer(l.id)}>
+                <span style={{ width: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {l.on
+                    ? <span style={{ width: 10, height: 10, borderRadius: 2, background: l.color }} />
+                    : <Icon src={A.generalInvisible} size={12} />}
+                </span>
+                <span style={{ flex: "1 0 0", color: l.on ? "var(--text-primary)" : "var(--text-tertiary)" }}>{l.name}</span>
+                {l.on && <Icon src={A.check} size={12} />}
+              </MenuRow>
+            ))}
+            <div style={{ borderTop: "1px solid var(--border-primary)", margin: "4px 0 2px" }} />
+            <MenuRow onClick={() => setLayers((ls) => ls.map((l) => ({ ...l, on: true })))}>
+              <span style={{ width: 14 }} />
+              <span style={{ flex: "1 0 0" }}>Show all</span>
+            </MenuRow>
+          </DropUp>
+
+          <DropUp
+            width={216}
+            title="Animator settings"
+            trigger={
+              <div style={{ display: "flex", alignItems: "center", height: 24, padding: "4px 8px", background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2 }}>
+                <Icon src={A.settingsOutline} size={16} style={{ filter: "brightness(0)" }} />
+              </div>
+            }
+          >
+            <MenuHeading>Playback</MenuHeading>
+            <MenuToggle label="Loop" checked={loop} onClick={() => setLoop((v) => !v)} />
+            <MenuToggle label="Show waveform" checked={showWaveform} onClick={() => setShowWaveform((v) => !v)} />
+            <MenuToggle label="Show comment pins" checked={showComments} onClick={() => setShowComments((v) => !v)} />
+            <MenuToggle label="Show frame labels" checked={showRulerLabels} onClick={() => setShowRulerLabels((v) => !v)} />
+            <div style={{ borderTop: "1px solid var(--border-primary)", margin: "4px 0 2px" }} />
+            <MenuHeading>Speed</MenuHeading>
+            {SPEEDS.map((s, i) => (
+              <MenuToggle key={s} label={`${s}×`} checked={i === speedIdx} onClick={() => setSpeedIdx(i)} />
+            ))}
+          </DropUp>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 0 0", justifyContent: "flex-end", minWidth: 0 }}>
@@ -159,17 +301,19 @@ export default function GlobalAnimatorFooter({ animator }) {
       <div ref={trackRef} style={{ position: "relative", padding: "0 6px" }}>
         {/* Ruler */}
         <div onMouseDown={onScrubDown} style={{ display: "flex", justifyContent: "space-between", cursor: "pointer", paddingBottom: 2 }}>
-          {Array.from({ length: totalSteps }, (_, i) => i + 1).map((n) => (
-            <span key={n} style={{ fontSize: 9, color: n === currentStep ? "var(--text-primary)" : "var(--text-tertiary)", fontWeight: n === currentStep ? 600 : 400 }}>{n}</span>
-          ))}
+          {showRulerLabels
+            ? Array.from({ length: totalSteps }, (_, i) => i + 1).map((n) => (
+              <span key={n} style={{ fontSize: 9, color: n === currentStep ? "var(--text-primary)" : "var(--text-tertiary)", fontWeight: n === currentStep ? 600 : 400 }}>{n}</span>
+            ))
+            : <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>&nbsp;</span>}
         </div>
 
         {/* Waveform + comment pins */}
-        <div onMouseDown={onScrubDown} style={{ position: "relative", height: 16, display: "flex", alignItems: "flex-end", gap: 1, cursor: "pointer" }}>
-          {waveform.current.map((v, i) => (
+        <div onMouseDown={onScrubDown} style={{ position: "relative", height: showWaveform || showComments ? 16 : 2, display: "flex", alignItems: "flex-end", gap: 1, cursor: "pointer" }}>
+          {showWaveform && waveform.current.map((v, i) => (
             <div key={i} style={{ flex: "1 0 0", height: `${v * 100}%`, background: i + 1 <= currentStep ? "#55c7ff" : "#cfe4fb", borderRadius: 1 }} />
           ))}
-          {COMMENTS.map((c, i) => (
+          {showComments && COMMENTS.map((c, i) => (
             <div key={i}
               onMouseEnter={() => setHoveredPin(i)}
               onMouseLeave={() => setHoveredPin((h) => (h === i ? null : h))}

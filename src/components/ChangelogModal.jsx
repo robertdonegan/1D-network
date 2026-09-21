@@ -97,10 +97,16 @@ area: "Panels & trees",
   {
     area: "Global Animator",
     items: [
+      { tag: "New", text: "The settings cog now opens a drop-up menu instead of doing nothing, with toggles for Loop, Show waveform, Show comment pins and Show frame labels, plus a 1×/2×/4× speed picker. Turning Loop off parks playback on the trim boundary instead of wrapping back to the start." },
+      { tag: "New", text: "The animated-layers button (the layers glyph with a count) now opens a drop-up listing placeholder result layers — Depth, Flow rate, Velocity, Water level, Flood extent and Shear stress — each toggled on/off, with the button's count tracking how many are on and a \"Show all\" shortcut. Dummy content for now; nothing is rendered from them yet." },
+      { tag: "Fixed", text: "Temporal comment tooltips on the waveform were being clipped by the map panel above the Global Animator — the bar now sits in its own stacking context so the hover notes float clear over the map." },
       { tag: "Improved", text: "Redesigned to match the latest spec: a 6-button connected transport strip (jump to start, step back, reverse play, forward play, step forward, jump to end — each reverse/forward play button doubles as a speed cycler, click the \"x1\" label) replaces the old 3-button-plus-speed-cycle row; a leading module icon, dropdown, layers and settings buttons, and a pop-out icon round out the header." },
       { tag: "New", text: "A thin waveform track now sits under the timestep ruler, with small avatar pins marking temporal comments left by other users (hover for the note) — SoundCloud-style. Dummy content for now; there's no comment backend yet." },
       { tag: "New", text: "An After Effects-style trim range on the scrub track: drag either handle to set an in/out range — playback now loops within it instead of the full run, and scrubbing outside it snaps back in." },
       { tag: "Improved", text: "Global Animator is now a persistent panel docked under the map (like the old bottom-dock views), rather than one of the panel-switcher's swappable options — it's always visible instead of needing to be revealed and selected." },
+      { tag: "Fixed", text: "The header's leading icon and settings button were rendering in a stray brand blue instead of the same neutral black/grey as every other icon on the bar — both assets had that colour hardcoded rather than inheriting from context, same underlying issue fixed earlier for the Long Section and Weir title bars." },
+      { tag: "Fixed", text: "The header's panel dropdown was a plain non-functional chevron, unlike every other panel's full switcher — it now opens the same complete panel list (Project, 1D Network, TUFLOW editor, etc.), opening upward since the bar sits at the bottom of the window, and picking one reveals it in the dock above. The dropdown is now one shared component reused by every panel, so they can't drift apart again." },
+      { tag: "Fixed", text: "Play reverse didn't actually reverse — the playhead direction was tracked locally in the header but never reached the animator's own step-advance logic, so it just kept ticking forward. Direction now lives in the shared animator state and the interval steps backward correctly." },
     ],
   },
   {

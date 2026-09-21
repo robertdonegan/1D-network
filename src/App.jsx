@@ -845,7 +845,8 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
               bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)}
               onUndockToolbox={() => { setToolboxFloat(true); setBottomPanelH(0); }} />
           )}
-          <GlobalAnimatorFooter animator={animator} />
+          <GlobalAnimatorFooter animator={animator}
+            onOpenPanel={(id) => { setBottomPanelView(id); setBottomPanelH((h) => (h > 0 ? h : REVEAL_OPEN_MIN)); }} />
         </div>
 
         {midPanelW > 0 && (
