@@ -15,6 +15,8 @@ const CHANGELOG = [
   {
     area: "Icons & panel switcher",
     items: [
+      { tag: "Improved", text: "The Minimise and Dock window-title-bar buttons now use the official mono-line Flood Icons, so they match the dock-window glyph instead of the old mismatched artwork." },
+      { tag: "Fixed", text: "The dock-window icon in the title bars (1D Weir unit, Long Section) was left with raw merge-conflict text in its SVG file, so it rendered distorted — it's now the correct mono dock-window Flood Icon." },
       { tag: "Improved", text: "The TUFLOW editor panel now uses the mono-line TUFLOW-tools Flood Icon in the panel switcher and header, matching the other mono panel glyphs; the coloured TUFLOW tools icon on the ribbon is unchanged." },
       { tag: "New", text: "Panel-switcher dropdown icons are Flood Icons: 1D Flow Lines recoloured brand blue, and Toolbox swapped to the mono toolbox glyph in brand blue." },
       { tag: "Improved", text: "Results ▸ 1D Results & 2D Results all show official Flood colour icons for every option." },
