@@ -16,7 +16,6 @@ import mediaPause from "./assets/pause.svg";
 import skipForwardFrame from "./assets/skip-forward-frame.svg";
 import fastForwardEnd from "./assets/fast-forward-end.svg";
 import cancel from "./assets/cancel.svg";
-import dockWindow from "./assets/dock-window.svg";
 import layers from "./assets/layers.svg";
 import keyDown from "./assets/key-down.svg";
 import keyUp from "./assets/key-up.svg";
@@ -38,6 +37,7 @@ import tuflowEstry1d from "./assets/tuflow-estry-1d.svg";
 import tuflowAddModel from "./assets/tuflow-add-model.svg";
 import tuflowImportLayers from "./assets/tuflow-import-layers.svg";
 import tuflowTools from "./assets/tuflow-tools.svg";
+import tuflowToolsMono from "./assets/tuflow-tools-mono.svg";
 import fm2d1d2dLinkGenerator from "./assets/fm2d-1d2d-link-generator.svg";
 import fm2d1dLevelLink from "./assets/fm2d-1d-level-link.svg";
 import fm2d1dFlowLink from "./assets/fm2d-1d-flow-link.svg";
@@ -405,16 +405,12 @@ import ellipsisVert from "./assets/ellipsis-vert.svg";
 import newWindow from "./assets/new-window.svg";
 
 export const A = {
-<<<<<<< HEAD
-  logo, search, add, check, minimise, dock, cancel, dockWindow, runFailed, layers,
-=======
-  logo, search, add, check, minimise, dock, dockWindow, tuflowLongSection, cancel, runFailed, layers,
+  logo, search, add, check, minimise, dock, cancel, dockWindow, tuflowLongSection, runFailed, layers,
   fastReverseStart, skipBackFrame, playBack, mediaPlay, mediaPause, skipForwardFrame, fastForwardEnd,
->>>>>>> cc9d905154164cf49a86da31bb583a5bbc612e6f
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
   filesFolder, arrowLeft, arrowRight,
   panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,
-  tuflowEstry1d, tuflowAddModel, tuflowImportLayers, tuflowTools, hydroCalcPoints, simLoad,
+  tuflowEstry1d, tuflowAddModel, tuflowImportLayers, tuflowTools, tuflowToolsMono, hydroCalcPoints, simLoad,
   fm2d1d2dLinkGenerator, fm2d1dLevelLink, fm2d1dFlowLink, fm2d1dWeirLink,
   fm2dTopoPolygon, fm2dTopoPolyline, fm2dTopoPoints, fm2dLoadShapefileTopo, fm2dLoadGroundElev, fm2dDefineTopo,
   fm2dRainfallPolygon, fm2dInfiltrationPolygon, fm2dLoadRainInfilShapefile,

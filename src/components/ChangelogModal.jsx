@@ -15,6 +15,7 @@ const CHANGELOG = [
   {
     area: "Icons & panel switcher",
     items: [
+      { tag: "Improved", text: "The TUFLOW editor panel now uses the mono-line TUFLOW-tools Flood Icon in the panel switcher and header, matching the other mono panel glyphs; the coloured TUFLOW tools icon on the ribbon is unchanged." },
       { tag: "New", text: "Panel-switcher dropdown icons are Flood Icons: 1D Flow Lines recoloured brand blue, and Toolbox swapped to the mono toolbox glyph in brand blue." },
       { tag: "Improved", text: "Results ▸ 1D Results & 2D Results all show official Flood colour icons for every option." },
       { tag: "Improved", text: "TUFLOW ▸ Topography menu icon updated to the Flood define-topo colour icon." },
@@ -123,6 +124,7 @@ area: "Panels & trees",
   {
     area: "Dialogs & menus",
     items: [
+      { tag: "Fixed", text: "A bad merge had left leftover conflict markers in the 1D Weir unit form, the Long Section window and the shared icon registry, and had dropped the assets/Long Section files entirely — the app wouldn't build. All three are restored and linked up again, keeping the newer \"Pop out / Minimise / Dock / Close\" title-bar buttons in both windows." },
       { tag: "Improved", text: "Help ▸ \"Dev – changelog\" is now \"Developer changelog\"." },
       { tag: "Improved", text: "Save dialog redesigned with clear danger / secondary / primary actions and a cancel icon." },
       { tag: "New", text: "Escape prompts to save when there are unsaved edits." },

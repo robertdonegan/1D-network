@@ -17,7 +17,7 @@ export const PANEL_VIEWS = {
   glossary: { icon: "panelGlossary", title: "1D Glossary" },
   swmmnetwork: { icon: "panelSwmmNetwork", title: "1D SWMM Network" },
   results2d: { icon: "results2dMono", title: "2D results", Body: ResultsViewerBody },
-  tuflow: { icon: "tuflowTools", title: "TUFLOW editor", Body: TuflowPanelBody },
+  tuflow: { icon: "tuflowToolsMono", title: "TUFLOW editor", Body: TuflowPanelBody },
   timesteps: { icon: "panelTimesteps", title: "Timesteps" },
   texteditor: { icon: "panelTextEditor", title: "Text editor" },
   diagnostics1d: { icon: "panelDiagnostics", title: "1D Diagnostics" },

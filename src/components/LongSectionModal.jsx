@@ -258,17 +258,11 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose, an
           </span>
           {[A.dockWindow, A.minimise, A.dock, A.cancel].map((ic, i) => (
             <button key={i} onClick={i === 3 ? onClose : undefined}
-<<<<<<< HEAD
-              title={["Maximise", "Minimise", "Restore down", "Close"][i]}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 4, border: "none", background: "transparent", cursor: "pointer" }}>
-              <Icon src={ic} size={12} />
-=======
               title={["Pop out", "Minimise", "Dock", "Close"][i]}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", borderRadius: 2 }}
               onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
               onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
               <Icon src={ic} size={12} style={{ filter: "brightness(0)", opacity: 0.55 }} />
->>>>>>> cc9d905154164cf49a86da31bb583a5bbc612e6f
             </button>
           ))}
         </div>
