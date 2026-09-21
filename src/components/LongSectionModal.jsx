@@ -316,11 +316,9 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose, an
                   {Y_TICKS.map((v) => (
                     <line key={v} x1={0} y1={sy(v)} x2={chartW} y2={sy(v)} stroke={COL.grid} vectorEffect="non-scaling-stroke" />
                   ))}
-                  {stations.map((s, i) => (
+                  {stations.map((s, i) => i !== displayIdx && (
                     <line key={s.n.id} x1={xPos[i]} y1={0} x2={xPos[i]} y2={PLOT_H}
-                      stroke={i === displayIdx ? "var(--text-primary)" : "#dfe3e8"}
-                      strokeWidth={i === displayIdx ? 1.5 : 1}
-                      strokeDasharray={i === displayIdx ? undefined : "3 3"}
+                      stroke="#dfe3e8" strokeWidth={1} strokeDasharray="3 3"
                       vectorEffect="non-scaling-stroke" />
                   ))}
                   {visible.bed && <path d={groundFill} fill="#f1f4f8" />}
@@ -330,6 +328,13 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose, an
                   {profile("right", "5 3")}
                   {profile("stage")}
                   {profile("bed")}
+                  {/* Active station's gridline — drawn last so it stays
+                      visible through the water/ground fills and profile
+                      lines instead of being painted over by them. */}
+                  {displayIdx >= 0 && displayIdx < count && (
+                    <line x1={xPos[displayIdx]} y1={0} x2={xPos[displayIdx]} y2={PLOT_H}
+                      stroke="var(--text-primary)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+                  )}
                   {act && (
                     <g>
                       {visible.left && <StationMarker shape="diamond" cx={actX} cy={sy(act.left)} color={COL.left} />}

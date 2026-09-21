@@ -3,7 +3,6 @@ import { A, Icon } from "../assets.jsx";
 import { ProjectPanelBody } from "./ProjectPanel.jsx";
 import { NetworkPanelBody } from "./NetworkPanel.jsx";
 import { FlowLinesPanelBody } from "./FlowLinesPanel.jsx";
-import { GlobalAnimatorBody } from "./GlobalAnimatorPanel.jsx";
 import { ToolboxPanelBody } from "./ToolboxPanel.jsx";
 import { TuflowPanelBody } from "./TuflowPanel.jsx";
 import { ResultsViewerBody } from "./ResultsViewer.jsx";
@@ -19,7 +18,6 @@ export const PANEL_VIEWS = {
   swmmnetwork: { icon: "panelSwmmNetwork", title: "1D SWMM Network" },
   results2d: { icon: "results2dMono", title: "2D results", Body: ResultsViewerBody },
   tuflow: { icon: "tuflowTools", title: "TUFLOW editor", Body: TuflowPanelBody },
-  globalanimator: { icon: "globalAnimatorIcon", title: "Global Animator", Body: GlobalAnimatorBody },
   timesteps: { icon: "panelTimesteps", title: "Timesteps" },
   texteditor: { icon: "panelTextEditor", title: "Text editor" },
   diagnostics1d: { icon: "panelDiagnostics", title: "1D Diagnostics" },
@@ -28,7 +26,7 @@ export const PANEL_VIEWS = {
 };
 const VIEW_ORDER = [
   "project", "network", "tuflow", "flowlines", "glossary", "swmmnetwork", "results2d",
-  "globalanimator", "timesteps", "texteditor", "diagnostics1d", "toolbox",
+  "timesteps", "texteditor", "diagnostics1d", "toolbox",
 ];
 
 function PanelSwitcher({ viewId, onChangeView }) {

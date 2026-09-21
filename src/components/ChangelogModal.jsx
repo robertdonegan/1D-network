@@ -91,6 +91,16 @@ area: "Panels & trees",
       { tag: "Fixed", text: "Long Section plot's active-station bed-level marker (a triangle) was missing entirely; all four station markers (left/right bank, stage, bed) are now sized consistently at 8px so none reads as stretched." },
       { tag: "Improved", text: "Long Section plot now fills the water body between the stage and bed lines with a shaded, subtly hatched gradient, and the selected station's gridline renders as a solid line instead of dashed, matching the latest design." },
       { tag: "New", text: "Right-click two or more selected 1D network units (on the map or in the 1D Network table) and pick \"Plot long section\": a Flood Modeller-style Long Section window opens along the stretch of network, showing the bed, stage and left/right bank levels, per-station markers and a live timestep readout." },
+      { tag: "Fixed", text: "Long Section plot's selected-station gridline was being painted over by the water/ground fill partway down, so it only appeared to reach the Stage line — it's now drawn last and runs the full height, through every marker down to Bed level." },
+    ],
+  },
+  {
+    area: "Global Animator",
+    items: [
+      { tag: "Improved", text: "Redesigned to match the latest spec: a 6-button connected transport strip (jump to start, step back, reverse play, forward play, step forward, jump to end — each reverse/forward play button doubles as a speed cycler, click the \"x1\" label) replaces the old 3-button-plus-speed-cycle row; a leading module icon, dropdown, layers and settings buttons, and a pop-out icon round out the header." },
+      { tag: "New", text: "A thin waveform track now sits under the timestep ruler, with small avatar pins marking temporal comments left by other users (hover for the note) — SoundCloud-style. Dummy content for now; there's no comment backend yet." },
+      { tag: "New", text: "An After Effects-style trim range on the scrub track: drag either handle to set an in/out range — playback now loops within it instead of the full run, and scrubbing outside it snaps back in." },
+      { tag: "Improved", text: "Global Animator is now a persistent panel docked under the map (like the old bottom-dock views), rather than one of the panel-switcher's swappable options — it's always visible instead of needing to be revealed and selected." },
     ],
   },
   {

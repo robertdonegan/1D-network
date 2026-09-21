@@ -8,6 +8,13 @@ import minimise from "./assets/minimise.svg";
 import dock from "./assets/dock.svg";
 import dockWindow from "./assets/dock-window.svg";
 import tuflowLongSection from "./assets/tuflow-long-section.svg";
+import fastReverseStart from "./assets/fast-reverse-start.svg";
+import skipBackFrame from "./assets/skip-back-frame.svg";
+import playBack from "./assets/play-back.svg";
+import mediaPlay from "./assets/play.svg";
+import mediaPause from "./assets/pause.svg";
+import skipForwardFrame from "./assets/skip-forward-frame.svg";
+import fastForwardEnd from "./assets/fast-forward-end.svg";
 import cancel from "./assets/cancel.svg";
 import layers from "./assets/layers.svg";
 import keyDown from "./assets/key-down.svg";
@@ -398,6 +405,7 @@ import newWindow from "./assets/new-window.svg";
 
 export const A = {
   logo, search, add, check, minimise, dock, dockWindow, tuflowLongSection, cancel, runFailed, layers,
+  fastReverseStart, skipBackFrame, playBack, mediaPlay, mediaPause, skipForwardFrame, fastForwardEnd,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
   filesFolder, arrowLeft, arrowRight,
   panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,

@@ -10,6 +10,7 @@ import AddLayerModal from "./components/AddLayerModal.jsx";
 import WeirModal from "./components/WeirModal.jsx";
 import LongSectionModal from "./components/LongSectionModal.jsx";
 import { useAnimator } from "./components/GlobalAnimatorPanel.jsx";
+import GlobalAnimatorFooter from "./components/GlobalAnimatorFooter.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
@@ -148,7 +149,6 @@ const MODE_LAYOUTS = {
   "Hydrology+": { right: { view: "network", width: 232 } },
   Results: {
     right: { view: "results2d", width: 232 },
-    bottom: { view: "globalanimator", height: 172 },
   },
 };
 
@@ -304,7 +304,7 @@ export default function App() {
   // Two more slots revealed by dragging the gaps around the canvas
   // (Blender-style area splitting) — both start closed (size 0).
   const [bottomPanelH, setBottomPanelH] = useState(0);
-  const [bottomPanelView, setBottomPanelView] = useState("globalanimator");
+  const [bottomPanelView, setBottomPanelView] = useState("timesteps");
   const [midPanelW, setMidPanelW] = useState(0);
   const [midPanelView, setMidPanelView] = useState("toolbox");
   // Toolbox > "Open Toolbox..." (OS menu) — floating/undocked window; see
@@ -336,9 +336,9 @@ export default function App() {
   // Long Section plot: node ids to plot, opened from the map right-click menu
   // or the 1D Network table's context menu on a multi-selection.
   const [longSectionIds, setLongSectionIds] = useState(null);
-  // Global Animator playhead — lifted here (rather than kept local to
-  // GlobalAnimatorBody) so other animated elements, like the Long Section
-  // plot's flow chevrons, can read the same timestep. See panelBodyProps.
+  // Global Animator playhead — lifted here (rather than kept local to the
+  // footer) so other animated elements, like the Long Section plot's flow
+  // chevrons, can read the same timestep. See GlobalAnimatorFooter below.
   const animator = useAnimator();
   // Mode-driven panels (Figma "Modes and ribbons" FMv8.0 spec): switching
   // modes also rewires the right dock (which panel + how wide) and optionally
@@ -783,9 +783,6 @@ export default function App() {
     onSetActiveLayer: setActiveLayerId, onToggleLayerVisibility: toggleLayerVisibility,
     onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
     onZoomToLayer: zoomToLayer,
-    currentStep: animator.currentStep, setCurrentStep: animator.setCurrentStep,
-    playing: animator.playing, setPlaying: animator.setPlaying,
-    speedIdx: animator.speedIdx, setSpeedIdx: animator.setSpeedIdx,
   };
   // Mode-driven right dock: `rightLayout` is undefined for modes with no
   // right panel (Home, Simulation, GIS views, Favourites) — hide the handle
@@ -848,6 +845,7 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
               bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)}
               onUndockToolbox={() => { setToolboxFloat(true); setBottomPanelH(0); }} />
           )}
+          <GlobalAnimatorFooter animator={animator} />
         </div>
 
         {midPanelW > 0 && (
