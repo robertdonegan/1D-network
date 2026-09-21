@@ -1,3 +1,42 @@
+/* ─── IBM Plex Sans webfonts ────────────────────────────────────────────────────
+   The design's one typeface. The app used to rely on the OS having it
+   installed, which is not guaranteed (e.g. a machine with only Medium/Bold
+   installed would render every weight-400 label at Medium — visibly bolder
+   than Figma). Self-host the 400/500/600/700 cuts the UI actually uses,
+   preferring a local installation where one exists. */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("IBM Plex Sans Regular"), local("IBMPlexSans-Regular"),
+    url("./assets/fonts/IBMPlexSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local("IBM Plex Sans Medium"), local("IBMPlexSans-Medium"),
+    url("./assets/fonts/IBMPlexSans-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local("IBM Plex Sans SemiBold"), local("IBMPlexSans-SemiBold"),
+    url("./assets/fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local("IBM Plex Sans Bold"), local("IBMPlexSans-Bold"),
+    url("./assets/fonts/IBMPlexSans-Bold.woff2") format("woff2");
+}
+
 /* ─── Exact Figma design tokens (from get_variable_defs) ─────────────────────── */
 :root {
   /* surface */

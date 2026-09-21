@@ -183,12 +183,10 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose }) 
           <span style={{ flex: "1 0 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)" }}>
             Long Section{count ? ` — ${count} units` : ""}
           </span>
-          {[A.minimise, A.dock, A.queryLay, A.cancel].map((ic, i) => (
+          {[A.dockWindow, A.minimise, A.dock, A.cancel].map((ic, i) => (
             <button key={i} onClick={i === 3 ? onClose : undefined}
-              title={["Minimise", "Maximise", "Help", "Close"][i]}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", borderRadius: 2 }}
-              onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-              onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}>
+              title={["Maximise", "Minimise", "Restore down", "Close"][i]}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 4, border: "none", background: "transparent", cursor: "pointer" }}>
               <Icon src={ic} size={12} />
             </button>
           ))}

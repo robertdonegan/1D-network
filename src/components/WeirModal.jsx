@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { A, Icon } from "../assets.jsx";
 import weirBroadCrested from "../assets/weir/weir-broad-crested.svg";
 import weirSharpCrested from "../assets/weir/weir-sharp-crested.svg";
@@ -57,18 +58,22 @@ const WEIR_ART = {
   general: weirGeneral,
   notional: weirNotional,
 };
-// Every dimension field's [left, top] position, pulled 1:1 from the Figma
-// "2D Weir diagrams" component set's per-variant layout — each field is a
-// single row (label immediately beside its value, never stacked), matching
-// the real drawing. Sharp Crested has no weir length field (its crest
-// breadth alone defines the notch), shown as a disabled "N/A", exactly as
-// the Figma Sharp variant does.
+// Every dimension field's [left, top] position, pulled from the Figma
+// "2D Weir diagrams" component set's per-variant layout and snugged a few
+// pixels clear of the green dimension line it annotates (measured against
+// the exported SVG's own dimension-arrow geometry, so each label sits
+// immediately next to its line rather than drifting away from it). Each
+// field is a single row (label immediately beside its value, never
+// stacked), matching the real drawing; none of them overhang the 800×253
+// illustration. Sharp Crested has no weir length field (its crest breadth
+// alone defines the notch), shown as a disabled "N/A", exactly as the
+// Figma Sharp variant does.
 const WEIR_LAYOUT = {
-  broad:    { crestElev: [319, 8], crestBreadth: [571, 8], weirLength: [321, 232], upInv: [36, 232], dsInv: [578, 232], p1: [96, 126],  p2: [612, 126] },
-  sharp:    { crestElev: [256, 8], crestBreadth: [459, 8], weirLength: null,       upInv: [36, 232], dsInv: [578, 232], p1: [257, 137], p2: [458, 137] },
-  crump:    { crestElev: [253, 8], crestBreadth: [549, 8], weirLength: [321, 232], upInv: [36, 232], dsInv: [578, 232], p1: [96, 126],  p2: [612, 126] },
-  general:  { crestElev: [319, 8], crestBreadth: [530, 8], weirLength: [320, 232], upInv: [36, 232], dsInv: [578, 232], p1: [140, 134], p2: [568, 134] },
-  notional: { crestElev: [319, 8], crestBreadth: [582, 8], weirLength: [321, 232], upInv: [36, 232], dsInv: [578, 232], p1: [69, 149],  p2: [639, 149] },
+  broad:    { crestElev: [319, 8], crestBreadth: [571, 8], weirLength: [321, 214], upInv: [20, 214],  dsInv: [596, 214], p1: [96, 126],  p2: [595, 126] },
+  sharp:    { crestElev: [256, 8], crestBreadth: [430, 8], weirLength: null,       upInv: [20, 214],  dsInv: [596, 214], p1: [257, 137], p2: [443, 137] },
+  crump:    { crestElev: [253, 8], crestBreadth: [466, 8], weirLength: [321, 214], upInv: [20, 214],  dsInv: [596, 214], p1: [96, 126],  p2: [595, 126] },
+  general:  { crestElev: [319, 8], crestBreadth: [530, 8], weirLength: [320, 214], upInv: [20, 214],  dsInv: [596, 214], p1: [140, 134], p2: [551, 134] },
+  notional: { crestElev: [319, 8], crestBreadth: [503, 8], weirLength: [321, 214], upInv: [20, 214],  dsInv: [596, 214], p1: [69, 149],  p2: [623, 149] },
 };
 const CALC_METHODS = ["Fixed", "Variable"];
 const CV_METHODS = ["Variable", "Fixed"];
@@ -93,7 +98,7 @@ function Field({ label, info, value, onChange, disabled, placeholder, tall, styl
     <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, ...style }}>
       <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
         {label}
-        {info && <Icon src={A.queryLay} size={14} />}
+        {info && <Icon src={A.queryLay} size={14} style={{ filter: "invert(0.694)" }} />}
       </span>
       {tall ? (
         <textarea value={value} onChange={(e) => onChange?.(e.target.value)} disabled={disabled} placeholder={placeholder} style={common} />
@@ -110,7 +115,7 @@ function Panel({ title, info, children, style }) {
     <div style={{ position: "relative", border: "1px solid var(--border-primary)", borderRadius: 4, padding: "26px 12px 12px", background: "var(--surface-1)", ...style }}>
       <div style={{ position: "absolute", top: -9, left: 12, display: "flex", alignItems: "center", gap: 4, background: "var(--surface-1)", padding: "0 4px", fontSize: "var(--fs-s)", fontWeight: 500, color: "var(--text-primary)" }}>
         {title}
-        {info && <Icon src={A.queryLay} size={12} />}
+        {info && <Icon src={A.queryLay} size={12} style={{ filter: "invert(0.6)" }} />}
       </div>
       {children}
     </div>
@@ -125,11 +130,43 @@ function Panel({ title, info, children, style }) {
 // `style` sizes the whole control (e.g. `{ flex: "1 0 0" }` to share a row
 // evenly with sibling Fields, same convention as Field's own `style` prop);
 // `width` only matters for the no-caption Weir-type select, where it's a
-// minWidth floor that the icon+text button can still grow past.
+// minWidth floor that the icon+text button can still grow past. The popup
+// renders in a document-level portal (like ContextMenu) so the form body's
+// overflow can't crop it behind the footer bar; it opens upward when there
+// is no room below the button, and closes on outside click or Escape.
 function Select({ label, value, icon, options, onChange, width, style }) {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const popRef = useRef(null);
+  const [pos, setPos] = useState(null);
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current, pop = popRef.current;
+    if (!open || !wrap || !pop) return;
+    const r = wrap.getBoundingClientRect();
+    const pad = 8;
+    const h = pop.offsetHeight;
+    const left = Math.max(pad, Math.min(r.left, window.innerWidth - r.width - pad));
+    const top = window.innerHeight - r.bottom < h + pad
+      ? Math.max(pad, r.top - h - pad)
+      : Math.min(r.bottom, window.innerHeight - h - pad);
+    setPos({ left, top, width: r.width });
+  }, [open, value, options]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
   const control = (
-    <div style={{ position: "relative", width: "100%", ...(label ? {} : { minWidth: width || 200 }) }}>
+    <div ref={wrapRef} style={{ width: "100%", ...(label ? {} : { minWidth: width || 200 }) }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{ height: 32, width: "100%", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 6, padding: "0 8px", background: "var(--surface-2)", border: "1px solid var(--border-primary)", borderRadius: 2, fontSize: 14, color: "var(--text-primary)", cursor: "pointer" }}
@@ -138,28 +175,41 @@ function Select({ label, value, icon, options, onChange, width, style }) {
         <span style={{ flex: "1 0 0", textAlign: "left", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
         <Icon src={A.keyDown} size={12} />
       </button>
-      {open && (
-        <div style={{ position: "absolute", top: 34, left: 0, background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2, boxShadow: "0 2px 10px 2px rgba(0,0,0,0.25)", zIndex: 5, minWidth: "100%" }}>
-          {options.map((o) => (
-            <div
-              key={o}
-              onMouseDown={() => { onChange?.(o); setOpen(false); }}
-              style={{ padding: "6px 10px", fontSize: 14, color: "var(--text-primary)", background: o === value ? "var(--surface-4)" : "transparent", cursor: "pointer", whiteSpace: "nowrap" }}
-              onMouseOver={(e) => { e.currentTarget.style.background = o === value ? "var(--surface-4)" : "var(--surface-3)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = o === value ? "var(--surface-4)" : "transparent"; }}
-            >
-              {o}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
-  if (!label) return <div style={style}>{control}</div>;
+
+  const popup = open && createPortal(
+    <div
+      ref={popRef}
+      style={{
+        position: "fixed", visibility: pos ? "visible" : "hidden",
+        ...(pos ? { left: pos.left, top: pos.top, width: pos.width } : {}),
+        zIndex: 2000, background: "var(--surface-1)", border: "1px solid var(--border-primary)",
+        borderRadius: 2, boxShadow: "0 2px 10px 2px rgba(0,0,0,0.25)",
+        maxHeight: "calc(100vh - 16px)", overflowY: "auto",
+      }}
+    >
+      {options.map((o) => (
+        <div
+          key={o}
+          onMouseDown={() => { onChange?.(o); setOpen(false); }}
+          style={{ padding: "6px 10px", fontSize: 14, color: "var(--text-primary)", background: o === value ? "var(--surface-4)" : "transparent", cursor: "pointer", whiteSpace: "nowrap" }}
+          onMouseOver={(e) => { e.currentTarget.style.background = o === value ? "var(--surface-4)" : "var(--surface-3)"; }}
+          onMouseOut={(e) => { e.currentTarget.style.background = o === value ? "var(--surface-4)" : "transparent"; }}
+        >
+          {o}
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+
+  if (!label) return <div style={style}>{control}{popup}</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, ...style }}>
       <span style={{ fontSize: 14, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{label}</span>
       {control}
+      {popup}
     </div>
   );
 }
@@ -174,7 +224,7 @@ function SecBtn({ text, icon, title, onClick, square, join = "none" }) {
       style={{
         height: 32, padding: square ? 8 : "0 12px", display: "flex", alignItems: "center", gap: 6,
         background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: radius,
-        cursor: "pointer", fontSize: 14, color: "var(--text-primary)", whiteSpace: "nowrap",
+        cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap",
         marginRight: join === "start" ? -1 : 0,
       }}
       onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
@@ -190,11 +240,11 @@ function GhostBtn({ text, icon, onClick }) {
   return (
     <button
       onClick={onClick}
-      style={{ height: 32, padding: "0 10px", display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-primary)", whiteSpace: "nowrap", borderRadius: 2 }}
+      style={{ height: 32, padding: "0 10px", display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--text-primary)", whiteSpace: "nowrap", borderRadius: 2 }}
       onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
       onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      {icon && <Icon src={A[icon]} size={16} />}
+      {icon && <Icon src={A[icon]} size={16} style={{ filter: "invert(0.4)" }} />}
       {text}
     </button>
   );
@@ -204,7 +254,7 @@ function PrimaryBtn({ text, onClick }) {
   return (
     <button
       onClick={onClick}
-      style={{ height: 32, padding: "0 20px", display: "flex", alignItems: "center", background: "var(--surface-brand)", border: "none", borderRadius: 2, cursor: "pointer", fontSize: 14, color: "var(--text-invert)", whiteSpace: "nowrap" }}
+      style={{ height: 32, padding: "0 20px", display: "flex", alignItems: "center", background: "var(--surface-brand)", border: "none", borderRadius: 2, cursor: "pointer", fontSize: 14, fontWeight: 500, color: "var(--text-invert)", whiteSpace: "nowrap" }}
       onMouseOver={(e) => (e.currentTarget.style.background = "var(--blue-700)")}
       onMouseOut={(e) => (e.currentTarget.style.background = "var(--surface-brand)")}
     >
@@ -232,7 +282,7 @@ function Dim({ label, value, onChange, info, style, row, fieldFirst, disabled })
   const labelEl = (
     <span style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 11, color: "var(--text-primary)", whiteSpace: "nowrap" }}>
       {label}
-      {info && <Icon src={A.queryLay} size={12} />}
+      {info && <Icon src={A.queryLay} size={12} style={{ filter: "invert(0.694)" }} />}
     </span>
   );
   return (
@@ -258,14 +308,14 @@ function WeirDiagram({ variant, dims, setDims }) {
       {layout.weirLength ? (
         <Dim label="Weir length" info row value={dims.length} onChange={set("length")} style={{ left: layout.weirLength[0], top: layout.weirLength[1] }} />
       ) : (
-        <Dim label="Weir length" info row disabled value="N/A" style={{ left: 321, top: 232 }} />
+        <Dim label="Weir length" info row disabled value="N/A" style={{ left: 321, top: 214 }} />
       )}
       <Dim label="(P1)" row value={dims.p1} onChange={set("p1")} style={{ left: layout.p1[0], top: layout.p1[1] }} />
       <Dim label="(P2)" row fieldFirst value={dims.p2} onChange={set("p2")} style={{ left: layout.p2[0], top: layout.p2[1] }} />
       <Dim label="Upstream invert" row fieldFirst value={dims.upInv} onChange={set("upInv")} style={{ left: layout.upInv[0], top: layout.upInv[1] }} />
       <Dim label="Downstream invert" row value={dims.dsInv} onChange={set("dsInv")} style={{ left: layout.dsInv[0], top: layout.dsInv[1] }} />
-      <div style={{ position: "absolute", left: 12, top: 160, transform: "rotate(-90deg)", transformOrigin: "0 0", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>M032</div>
-      <div style={{ position: "absolute", left: 784, top: 184, transform: "rotate(-90deg)", transformOrigin: "0 0", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>M031</div>
+      <div style={{ position: "absolute", left: 10, top: 125.5, transform: "translate(-50%, -50%) rotate(-90deg)", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>M032</div>
+      <div style={{ position: "absolute", left: 786, top: 125.5, transform: "translate(-50%, -50%) rotate(-90deg)", fontSize: 11, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>M031</div>
     </div>
   );
 }
@@ -314,7 +364,7 @@ export default function WeirModal({ draft, onConfirm, onClose }) {
       <div
         style={{
           background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
-          boxShadow: "0 2px 10px 2px rgba(0,0,0,0.25)", padding: 8, width: 1200,
+          boxShadow: "0 2px 10px 2px rgba(0,0,0,0.25)", padding: 8, width: 904,
           maxWidth: "calc(100vw - 48px)", maxHeight: "calc(100vh - 48px)",
           display: "flex", flexDirection: "column",
         }}
@@ -324,78 +374,75 @@ export default function WeirModal({ draft, onConfirm, onClose }) {
         <div style={{ display: "flex", alignItems: "center", gap: 4, height: 28, flexShrink: 0 }}>
           <Icon src={A.broadWeir} size={16} />
           <span style={{ flex: "1 0 0", fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)" }}>1D Weir unit</span>
-          {[A.minimise, A.dock, A.queryLay, A.cancel].map((ic, i) => (
+          {[A.dockWindow, A.minimise, A.dock, A.cancel].map((ic, i) => (
             <button
               key={i}
               onClick={i === 3 ? onClose : undefined}
-              title={["Minimise", "Maximise", "Help", "Close"][i]}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, border: "none", background: "transparent", cursor: "pointer", borderRadius: 2 }}
-              onMouseOver={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-              onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+              title={["Maximise", "Minimise", "Restore down", "Close"][i]}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 4, border: "none", background: "transparent", cursor: "pointer" }}
             >
               <Icon src={ic} size={12} />
             </button>
           ))}
         </div>
 
-        {/* form body */}
-        <div style={{ display: "flex", gap: 16, paddingTop: 12, overflowY: "auto" }}>
-          <Panel title="Node labels" style={{ width: 244, flexShrink: 0, alignSelf: "flex-start" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Field label="Weir name*" value={weirName} onChange={setWeirName} placeholder="Brisbane Weir" />
-              <Field label="Description*" value={description} onChange={setDescription} placeholder="Revised data for Notional Weir ds of Woodbury Bridge" />
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                <div style={{ flex: "1 0 0", minWidth: 0 }}>
-                  <Field label="X co-ordinates" value={x} disabled />
-                </div>
-                <div style={{ flex: "1 0 0", minWidth: 0 }}>
-                  <Field label="Y co-ordinates" value={y} disabled />
-                </div>
-                <SecBtn icon="generalEdit" title="Edit coordinates" square onClick={() => {}} />
+        {/* form body — Figma's final form (2988:39215) stacks three full-width
+            sections (Node labels, Weir type, Modular limit/Coefficient/
+            Exponent), not a Node-labels sidebar next to a Weir-type column. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 12, overflowY: "auto" }}>
+          <Panel title="Node labels" style={{ width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", gap: 16 }}>
+                <Field label="Weir name*" style={{ flex: "0 0 240px" }} value={weirName} onChange={setWeirName} placeholder="Brisbane Weir" />
+                <Field label="Description*" style={{ flex: "1 0 0" }} value={description} onChange={setDescription} placeholder="Revised data for Notional Weir ds of Woodbury Bridge" />
               </div>
-              <Field label="Upstream*" value={upstream} onChange={setUpstream} placeholder="M030" />
-              <Field label="Downstream*" value={downstream} onChange={setDownstream} placeholder="M031" />
-              <Field label="US remote" value={usRemote} onChange={setUsRemote} placeholder="M032" />
-              <Field label="DS remote" value={dsRemote} onChange={setDsRemote} placeholder="M033" />
-              <Field label="Changelog" info value={changeLog} onChange={setChangeLog} tall />
-              <div style={{ display: "flex", gap: 0 }}>
-                <SecBtn text="Add comment" join="start" onClick={() => {}} />
-                <SecBtn icon="history" title="History" join="end" square onClick={() => {}} />
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
+                <Field label="X co-ordinates" style={{ flex: "1 0 0" }} value={x} disabled />
+                <Field label="Y co-ordinates" style={{ flex: "1 0 0" }} value={y} disabled />
+                <Field label="Upstream*" style={{ flex: "1 0 0" }} value={upstream} onChange={setUpstream} placeholder="M030" />
+                <Field label="Downstream*" style={{ flex: "1 0 0" }} value={downstream} onChange={setDownstream} placeholder="M031" />
+                <Field label="US remote" style={{ flex: "1 0 0" }} value={usRemote} onChange={setUsRemote} placeholder="M032" />
+                <Field label="DS remote" style={{ flex: "1 0 0" }} value={dsRemote} onChange={setDsRemote} placeholder="M033" />
+                <SecBtn icon="edit" title="Edit coordinates" square onClick={() => {}} />
+              </div>
+              <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
+                <Field label="Changelog" info style={{ flex: "1 0 0" }} value={changeLog} onChange={setChangeLog} />
+                <div style={{ display: "flex", gap: 0 }}>
+                  <SecBtn text="Add comment" join="start" onClick={() => {}} />
+                  <SecBtn icon="history" title="History" join="end" square onClick={() => {}} />
+                </div>
               </div>
             </div>
           </Panel>
 
-          <div style={{ flex: "1 0 0", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
-            <Panel title="Weir type" style={{ alignSelf: "flex-start" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                <Select value={weirType} icon={WEIR_TYPE_ICON[weirType] ?? "broadWeir"} options={WEIR_TYPES} onChange={setWeirType} />
-                <WeirDiagram variant={WEIR_VARIANT[weirType] ?? "broad"} dims={dims} setDims={setDims} />
+          <Panel title="Weir type" style={{ width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+              <Select value={weirType} icon={WEIR_TYPE_ICON[weirType] ?? "broadWeir"} options={WEIR_TYPES} onChange={setWeirType} style={{ width: "100%" }} />
+              <WeirDiagram variant={WEIR_VARIANT[weirType] ?? "broad"} dims={dims} setDims={setDims} />
+            </div>
+          </Panel>
+
+          <div style={{ display: "flex", gap: 16 }}>
+            {/* Figma's final form: Modular limit holds only Calc. method +
+                Value if fixed, side by side; Calibration and Discharge sit
+                under Coefficient alongside Cv method + Velocity. */}
+            <Panel title="Modular limit" style={{ width: 256, alignSelf: "flex-start" }}>
+              <div style={{ display: "flex", gap: 16 }}>
+                <Select label="Calc. method" style={{ flex: "1 0 0" }} value={calcMethod} options={CALC_METHODS} onChange={setCalcMethod} />
+                <Field label="Value if fixed" style={{ flex: "1 0 0" }} value={valueIfFixed} onChange={setValueIfFixed} />
               </div>
             </Panel>
-
-            <div style={{ display: "flex", gap: 16 }}>
-              {/* Figma's final form (2988:39215): Modular limit holds only
-                  Calc. method + Value if fixed, side by side; Calibration
-                  and Discharge actually belong under Coefficient alongside
-                  Cv method + Velocity — the two panels were mixed up before. */}
-              <Panel title="Modular limit" style={{ width: 256, alignSelf: "flex-start" }}>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <Select label="Calc. method" style={{ flex: "1 0 0" }} value={calcMethod} options={CALC_METHODS} onChange={setCalcMethod} />
-                  <Field label="Value if fixed" style={{ flex: "1 0 0" }} value={valueIfFixed} onChange={setValueIfFixed} />
-                </div>
-              </Panel>
-              <Panel title="Coefficient" info style={{ flex: "1 0 0", alignSelf: "flex-start" }}>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <Field label="Calibration" style={{ flex: "1 0 0" }} value={calibration} onChange={setCalibration} />
-                  <Field label="Discharge" style={{ flex: "1 0 0" }} value={discharge} onChange={setDischarge} />
-                  <Select label="Cv method" style={{ flex: "1 0 0" }} value={cvMethod} options={CV_METHODS} onChange={setCvMethod} />
-                  <Field label="Velocity" style={{ flex: "1 0 0" }} value={velocity} onChange={setVelocity} />
-                </div>
-              </Panel>
-              <Panel title="Exponent" style={{ width: 144, alignSelf: "flex-start" }}>
-                <Field label="Exponent" disabled value="1.500" />
-              </Panel>
-            </div>
+            <Panel title="Coefficient" info style={{ flex: "1 0 0", alignSelf: "flex-start" }}>
+              <div style={{ display: "flex", gap: 16 }}>
+                <Field label="Calibration" style={{ flex: "1 0 0" }} value={calibration} onChange={setCalibration} />
+                <Field label="Discharge" style={{ flex: "1 0 0" }} value={discharge} onChange={setDischarge} />
+                <Select label="Cv method" style={{ flex: "1 0 0" }} value={cvMethod} options={CV_METHODS} onChange={setCvMethod} />
+                <Field label="Velocity" style={{ flex: "1 0 0" }} value={velocity} onChange={setVelocity} />
+              </div>
+            </Panel>
+            <Panel title="Exponent" style={{ width: 144, alignSelf: "flex-start" }}>
+              <Field label="Exponent" disabled value="1.500" />
+            </Panel>
           </div>
         </div>
 

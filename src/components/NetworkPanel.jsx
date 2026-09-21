@@ -132,7 +132,7 @@ export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSel
       items: [{
         label: "Plot long section",
         disabled: ids.length < 2,
-        disabledReason: ids.length < 2 ? "Ctrl/Cmd-click to select more units before plotting" : undefined,
+        disabledReason: ids.length < 2 ? "Shift/Ctrl/Cmd-click to select more units before plotting" : undefined,
         onClick: () => onOpenLongSection?.(ids),
       }],
     });
@@ -218,7 +218,19 @@ export function NetworkPanelBody({ nodes = [], edges = [], selected = [], setSel
               {!isCollapsed && g.rows.map(({ n, reaches }, i) => {
                 const subLabel = reaches.length === 0 ? "—" : reaches.length === 1 ? reaches[0].name : "Confluence";
                 return (
-                  <Row key={n.id} zebra={i % 2 === 1} selected={selected.includes(n.id)} onClick={(e) => setSelected(sel => e.ctrlKey || e.metaKey ? (sel.includes(n.id) ? sel.filter(id => id !== n.id) : [...sel, n.id]) : [n.id])} onContextMenu={(e) => onRowContext(e, n)} indent={12}>
+                  <Row key={n.id} zebra={i % 2 === 1} selected={selected.includes(n.id)} onClick={(e) => {
+                    // Same selection conventions as the canvas (GisCanvas):
+                    // Alt+click deselects just this unit; Shift/Ctrl/Cmd+click
+                    // add-or-toggle it; a plain click keeps an existing
+                    // multi-selection when one of its rows is clicked, and
+                    // otherwise replaces the selection.
+                    if (e.altKey) { setSelected((sel) => sel.filter((x) => x !== n.id)); return; }
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                      setSelected((sel) => (sel.includes(n.id) ? sel.filter((x) => x !== n.id) : [...sel, n.id]));
+                      return;
+                    }
+                    setSelected((sel) => (sel.includes(n.id) && sel.length > 1 ? sel : [n.id]));
+                  }} onContextMenu={(e) => onRowContext(e, n)} indent={12}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, width: 60, flexShrink: 0 }}>
                       <Icon src={A[n.icon]} size={12} />
                       <span style={{ ...cellStyle }}>{n.label}</span>

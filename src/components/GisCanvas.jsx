@@ -1123,6 +1123,7 @@ useEffect(() => {
   // selects the whole group and drags every member together.
   const groupBoxDown = (e, g) => {
     e.stopPropagation();
+    if (e.button !== 0) return;
     if (e.altKey) {
       setSelected((sel) => sel.filter((x) => !g.memberIds.includes(x)));
       return;
@@ -2042,6 +2043,11 @@ useEffect(() => {
     // receives clicks anywhere a node isn't; a node drop on top of another
     // merges them — see onUp.)
     e.stopPropagation();
+    // Only the primary button selects/drags. Right-clicks are handled by the
+    // node's contextmenu handler, and on macOS a Ctrl+click secondary click
+    // would otherwise fall into the toggle branch below and strip the
+    // right-clicked unit out of a multi-selection before its menu appears.
+    if (e.button !== 0) return;
     setSelectedVertex(null);
     // Alt+click deselects this specific unit (Keyboard Shortcuts spec —
     // "Deselect: Left-click, Alt+Left-click"). Ctrl/Cmd+click and

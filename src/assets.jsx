@@ -7,6 +7,7 @@ import check from "./assets/check.svg";
 import minimise from "./assets/minimise.svg";
 import dock from "./assets/dock.svg";
 import cancel from "./assets/cancel.svg";
+import dockWindow from "./assets/dock-window.svg";
 import layers from "./assets/layers.svg";
 import keyDown from "./assets/key-down.svg";
 import keyUp from "./assets/key-up.svg";
@@ -395,7 +396,7 @@ import ellipsisVert from "./assets/ellipsis-vert.svg";
 import newWindow from "./assets/new-window.svg";
 
 export const A = {
-  logo, search, add, check, minimise, dock, cancel, runFailed, layers,
+  logo, search, add, check, minimise, dock, cancel, dockWindow, runFailed, layers,
   keyDown, keyUp, refresh, userProfile, hierarchyLine, network, labelFilter,
   filesFolder, arrowLeft, arrowRight,
   panelGlossary, panelTimesteps, panelSwmmNetwork, panel2dResults, panelTextEditor, panelDiagnostics,

@@ -617,7 +617,7 @@ export default function OSWindow({ onBeginDrag, onOpenShortcuts, onOpenChangelog
           </div>
           {[A.minimise, A.dock, A.cancel].map((ic, i) => (
             <div key={i} style={{ width: 24, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "default" }}>
-              <Icon src={ic} size={12} />
+              <Icon src={ic} size={12} style={{ filter: "brightness(0) invert(1)" }} />
             </div>
           ))}
         </div>
