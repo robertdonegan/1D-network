@@ -9,6 +9,8 @@ import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import AddLayerModal from "./components/AddLayerModal.jsx";
 import WeirModal from "./components/WeirModal.jsx";
 import LongSectionModal from "./components/LongSectionModal.jsx";
+import { useAnimator } from "./components/GlobalAnimatorPanel.jsx";
+import GlobalAnimatorFooter from "./components/GlobalAnimatorFooter.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
 import { A, Icon } from "./assets.jsx";
 import { resolveReaches } from "./reaches.js";
@@ -147,7 +149,6 @@ const MODE_LAYOUTS = {
   "Hydrology+": { right: { view: "network", width: 232 } },
   Results: {
     right: { view: "results2d", width: 232 },
-    bottom: { view: "globalanimator", height: 172 },
   },
 };
 
@@ -303,7 +304,7 @@ export default function App() {
   // Two more slots revealed by dragging the gaps around the canvas
   // (Blender-style area splitting) — both start closed (size 0).
   const [bottomPanelH, setBottomPanelH] = useState(0);
-  const [bottomPanelView, setBottomPanelView] = useState("globalanimator");
+  const [bottomPanelView, setBottomPanelView] = useState("timesteps");
   const [midPanelW, setMidPanelW] = useState(0);
   const [midPanelView, setMidPanelView] = useState("toolbox");
   // Toolbox > "Open Toolbox..." (OS menu) — floating/undocked window; see
@@ -335,6 +336,10 @@ export default function App() {
   // Long Section plot: node ids to plot, opened from the map right-click menu
   // or the 1D Network table's context menu on a multi-selection.
   const [longSectionIds, setLongSectionIds] = useState(null);
+  // Global Animator playhead — lifted here (rather than kept local to the
+  // footer) so other animated elements, like the Long Section plot's flow
+  // chevrons, can read the same timestep. See GlobalAnimatorFooter below.
+  const animator = useAnimator();
   // Mode-driven panels (Figma "Modes and ribbons" FMv8.0 spec): switching
   // modes also rewires the right dock (which panel + how wide) and optionally
   // opens the bottom dock, matching what the Figma frame for each mode shows.
@@ -724,6 +729,13 @@ export default function App() {
         if (e.shiftKey) cycleBasemap();
         else toggleBasemap();
       }
+      // Play/Pause time-steps (Keyboard Shortcuts spec: Ctrl+Space) — drives
+      // the same Global Animator playhead the panel and Long Section plot
+      // share (see `animator` / `useAnimator()`).
+      if ((e.ctrlKey || e.metaKey) && e.code === "Space" && !isTyping(e)) {
+        e.preventDefault();
+        animator.setPlaying((p) => !p);
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -833,6 +845,8 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
               bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)}
               onUndockToolbox={() => { setToolboxFloat(true); setBottomPanelH(0); }} />
           )}
+          <GlobalAnimatorFooter animator={animator}
+            onOpenPanel={(id) => { setBottomPanelView(id); setBottomPanelH((h) => (h > 0 ? h : REVEAL_OPEN_MIN)); }} />
         </div>
 
         {midPanelW > 0 && (
@@ -889,7 +903,8 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
       )}
       {weirModal && <WeirModal draft={weirModal} onConfirm={confirmWeir} onClose={() => setWeirModal(null)} />}
       {longSectionIds && (
-        <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)} />
+        <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)}
+          animStep={animator.currentStep} animTotalSteps={animator.totalSteps} />
       )}
     </div>
   );
