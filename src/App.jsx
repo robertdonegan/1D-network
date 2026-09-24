@@ -9,6 +9,7 @@ import AnnotationSettings from "./components/AnnotationSettings.jsx";
 import AddLayerModal from "./components/AddLayerModal.jsx";
 import WeirModal from "./components/WeirModal.jsx";
 import LongSectionModal from "./components/LongSectionModal.jsx";
+import LayerPropertiesModal from "./components/LayerPropertiesModal.jsx";
 import { useAnimator } from "./components/GlobalAnimatorPanel.jsx";
 import GlobalAnimatorFooter from "./components/GlobalAnimatorFooter.jsx";
 import { ToolboxPanelBody } from "./components/ToolboxPanel.jsx";
@@ -312,6 +313,21 @@ export default function App() {
   // corner slot instead (`midPanelW`/`midPanelView`).
   const [toolboxFloat, setToolboxFloat] = useState(false);
   const [toolboxPos, setToolboxPos] = useState({ x: 420, y: 90 });
+  // Global Animator's "pop out" button (its own header, not the OS menu) —
+  // same floating/draggable pattern as FloatingToolbox above, but there's
+  // no separate docked instance to leave behind: undocking just removes the
+  // bar from the canvas column's flow and floats it on top of the UI.
+  const [animatorFloat, setAnimatorFloat] = useState(false);
+  const [animatorPos, setAnimatorPos] = useState({ x: 420, y: 460 });
+  const onAnimatorDragStart = (e) => {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const origin = animatorPos;
+    const onMove = (ev) => setAnimatorPos({ x: origin.x + (ev.clientX - startX), y: origin.y + (ev.clientY - startY) });
+    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
   const [nodes, setNodes] = useState(INIT_NODES);
   const [edges, setEdges] = useState(INIT_EDGES);
   // Vector polygon layers (Live Edit phase 3) — any number of user-created
@@ -387,6 +403,36 @@ export default function App() {
     setActiveLayerId((cur) => (cur === id ? (layers.find((l) => l.id !== id)?.id ?? "demo-shapefile") : cur));
   };
   const toggleLayerVisibility = (id) => setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, visible: l.visible === false } : l)));
+  // Dummy DTM depth raster — Results panel ▸ Raster ▸ Depth toggles this on
+  // over the demo network's extent (see GisCanvas's `depthBBox`/
+  // `depthDataUrl`); its colour ramp is editable via the same Layer
+  // Properties ▸ Symbology flow the Layers panel uses (see
+  // `applyLayerProperties` below).
+  const [depthLayerOn, setDepthLayerOn] = useState(false);
+  const [depthLayerRamp, setDepthLayerRamp] = useState(null);
+  // Layer Properties modal (right-click ▸ Properties on a Layers-panel layer
+  // or a 2D result row) — `layerPropsTarget` carries enough context to build
+  // the modal's title and seed its preview; `kind` tells Apply where to
+  // write the result back. Only the "Depth" result has a real colour slot
+  // (the dummy raster above) — other results still just close the modal.
+  const [layerPropsTarget, setLayerPropsTarget] = useState(null);
+  const openLayerProperties = (target) => {
+    if (target.kind === "result") {
+      setLayerPropsTarget(target.id === "Depth" ? { ...target, ramp: depthLayerRamp, min: 0, max: 1 } : target);
+      return;
+    }
+    setLayerPropsTarget({ kind: "layer", id: target.id, title: target.name, color: target.color, description: target.description, min: 0, max: 1 });
+  };
+  const applyLayerProperties = (payload) => {
+    if (layerPropsTarget?.kind === "result" && layerPropsTarget.id === "Depth") {
+      setDepthLayerRamp(payload.ramp);
+      return;
+    }
+    if (layerPropsTarget?.kind !== "layer") return;
+    setLayers((ls) => ls.map((l) => (l.id === layerPropsTarget.id
+      ? { ...l, name: payload.name, description: payload.description, opacity: payload.opacity, color: payload.color, ramp: payload.ramp }
+      : l)));
+  };
   // Shared with NetworkPanel so a row click selects the node on the canvas.
   // Array of node ids — supports multi-select (Ctrl+click, box-select).
   const [selected, setSelected] = useState([]);
@@ -782,7 +828,8 @@ export default function App() {
     polygons, layers, activeLayerId, tab: projectTab, setTab: setProjectTab,
     onSetActiveLayer: setActiveLayerId, onToggleLayerVisibility: toggleLayerVisibility,
     onDeleteLayer: deleteLayer, onAddLayer: () => setAddLayerModalOpen(true),
-    onZoomToLayer: zoomToLayer,
+    onZoomToLayer: zoomToLayer, onOpenLayerProperties: openLayerProperties,
+    depthLayerOn, onToggleDepthLayer: () => setDepthLayerOn((v) => !v),
   };
   // Mode-driven right dock: `rightLayout` is undefined for modes with no
   // right panel (Home, Simulation, GIS views, Favourites) — hide the handle
@@ -845,8 +892,11 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
               bodyProps={panelBodyProps} onClose={() => setBottomPanelH(0)}
               onUndockToolbox={() => { setToolboxFloat(true); setBottomPanelH(0); }} />
           )}
-          <GlobalAnimatorFooter animator={animator}
-            onOpenPanel={(id) => { setBottomPanelView(id); setBottomPanelH((h) => (h > 0 ? h : REVEAL_OPEN_MIN)); }} />
+          {!animatorFloat && (
+            <GlobalAnimatorFooter animator={animator}
+              onOpenPanel={(id) => { setBottomPanelView(id); setBottomPanelH((h) => (h > 0 ? h : REVEAL_OPEN_MIN)); }}
+              onUndock={() => setAnimatorFloat(true)} />
+          )}
         </div>
 
         {midPanelW > 0 && (
@@ -894,6 +944,13 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
           onClose={() => setToolboxFloat(false)}
         />
       )}
+      {animatorFloat && (
+        <div style={{ position: "fixed", left: animatorPos.x, top: animatorPos.y, width: 900, zIndex: 200 }}>
+          <GlobalAnimatorFooter animator={animator}
+            onOpenPanel={(id) => { setBottomPanelView(id); setBottomPanelH((h) => (h > 0 ? h : REVEAL_OPEN_MIN)); }}
+            floating onDock={() => setAnimatorFloat(false)} onDragStart={onAnimatorDragStart} />
+        </div>
+      )}
       {showAnnotationSettings && (
         <AnnotationSettings
           style={annotationStyle}
@@ -902,6 +959,9 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
         />
       )}
       {weirModal && <WeirModal draft={weirModal} onConfirm={confirmWeir} onClose={() => setWeirModal(null)} />}
+      {layerPropsTarget && (
+        <LayerPropertiesModal target={layerPropsTarget} onApply={applyLayerProperties} onClose={() => setLayerPropsTarget(null)} />
+      )}
       {longSectionIds && (
         <LongSectionModal nodeIds={longSectionIds} nodes={nodes} onClose={() => setLongSectionIds(null)}
           animStep={animator.currentStep} animTotalSteps={animator.totalSteps} />

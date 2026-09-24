@@ -13,12 +13,14 @@ import { METERS_PER_WORLD_UNIT } from "./OsmBasemap.jsx";
 //
 // The water body's diagonal hatch doubles as a flow-direction indicator,
 // driven by the Global Animator's playhead (App.jsx lifts that state via
-// `useAnimator()` so it's shared, not local to the panel): resting/slack
-// flow reads as vertical "|" chevrons, a rising storm tilts them forward
-// into a steeper "/" as flow quickens, and a reach seeded as tidal/coastal
-// can reverse past vertical into "\". See `reachFlow` below. The same pulse
-// also raises the Stage line itself — bed and banks stay fixed, but stage
-// surges past whichever bank is higher at the peak, then eases back down.
+// `useAnimator()` so it's shared, not local to the panel): a channel is
+// never truly still, so even "resting" flow keeps a gentle forward tilt
+// (MIN_TILT_DEG floor) rather than reading as a vertical "|"; a rising storm
+// tilts the chevrons further forward into a steeper "/" as flow quickens,
+// and a reach seeded as tidal/coastal can reverse past vertical into "\".
+// See `reachFlow` below. The same pulse also raises the Stage line itself —
+// bed and banks stay fixed, but stage surges past whichever bank is higher
+// at the peak, then eases back down.
 
 const Y_MIN = 5.0, Y_MAX = 13.5; // Elevation (m AD) axis
 const PLOT_H = 300;              // series area height
@@ -62,6 +64,7 @@ function stationStats(n, i) {
 // jittered by the seed), while ~1 in 5 are treated as tidal/coastal and
 // oscillate instead, so they can swing past vertical into reverse flow.
 const MAX_TILT_DEG = 32;
+const MIN_TILT_DEG = 6; // baseline tilt — a channel always carries some flow, so hatch never reads as vertical
 const STAGE_OVERTOP_MARGIN = 0.3; // m the flood clears the higher bank by, at peak flow
 function reachFlow(stations, step, totalSteps) {
   if (!stations.length) return 0;
@@ -157,7 +160,7 @@ export default function LongSectionModal({ nodeIds = [], nodes = [], onClose, an
 
   const rawStations = useMemo(() => buildStations(nodeIds, nodes), [nodeIds, nodes]);
   const flow = useMemo(() => reachFlow(rawStations, animStep, animTotalSteps), [rawStations, animStep, animTotalSteps]);
-  const hatchTiltDeg = flow * MAX_TILT_DEG;
+  const hatchTiltDeg = (flow >= 0 ? 1 : -1) * Math.max(MIN_TILT_DEG, Math.abs(flow) * MAX_TILT_DEG);
   // Stage rises and falls with the same storm pulse driving the flow
   // chevrons — surging past both banks at the peak (flood overtopping),
   // easing back to its resting level as flow subsides. Bed/banks stay put;

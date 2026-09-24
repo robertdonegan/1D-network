@@ -158,7 +158,7 @@ function MenuToggle({ label, checked, onClick }) {
   );
 }
 
-export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
+export default function GlobalAnimatorFooter({ animator, onOpenPanel, floating, onUndock, onDock, onDragStart }) {
   const {
     currentStep, seekTo, playing, direction, play, speedIdx, setSpeedIdx, totalSteps,
     trimStart, trimEnd, setTrimStart, setTrimEnd, loop, setLoop,
@@ -172,7 +172,10 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
   // View options that live only in the footer (the animator itself only
   // cares about the playhead). `loop` is the exception — it's owned by
   // useAnimator so playback can actually honour it.
-  const [showWaveform, setShowWaveform] = useState(true);
+  // Off by default — the Figma spec (fm-v8.0-anim-player) doesn't show a
+  // waveform, just a flat tick line under the ruler (see the track render
+  // below). Kept behind the existing settings toggle so it can come back.
+  const [showWaveform, setShowWaveform] = useState(false);
   const [showComments, setShowComments] = useState(true);
   const [showRulerLabels, setShowRulerLabels] = useState(true);
   const [layers, setLayers] = useState(ANIMATED_LAYERS);
@@ -213,6 +216,7 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
     <div style={{
       flexShrink: 0, background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 4,
       padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6,
+      boxShadow: floating ? "0 8px 24px rgba(0,0,0,0.2)" : "none",
       // The bar is the last thing in the canvas column, so without this its
       // upward comment-pin tooltips paint *under* the map panel above and
       // get clipped by it. A stacking context on the bar keeps them on top.
@@ -221,9 +225,12 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, height: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 0 0", minWidth: 0 }}>
-          <PanelSwitcher icon={A.globalAnimatorIcon} iconStyle={{ filter: "brightness(0)" }} openUp
+          <PanelSwitcher icon={A.globalAnimatorIcon} openUp
             onSelect={onOpenPanel} title="Open a panel below the map" />
-          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)", whiteSpace: "nowrap" }}>Global Animator</span>
+          <span
+            onMouseDown={floating ? onDragStart : undefined}
+            style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary-selected)", whiteSpace: "nowrap", cursor: floating ? "grab" : "default" }}
+          >Global Animator</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center" }}>
@@ -270,7 +277,7 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
             title="Animator settings"
             trigger={
               <div style={{ display: "flex", alignItems: "center", height: 24, padding: "4px 8px", background: "var(--surface-1)", border: "1px solid var(--border-primary)", borderRadius: 2 }}>
-                <Icon src={A.settingsOutline} size={16} style={{ filter: "brightness(0)" }} />
+                <Icon src={A.settingsOutline} size={16} style={{ filter: "grayscale(1)" }} />
               </div>
             }
           >
@@ -291,9 +298,15 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
           <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
             {fmtHours(currentStep - 1)}/{fmtHours(totalSteps)}
           </span>
-          <button title="Pop out (not yet available)" style={{ display: "flex", alignItems: "center", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
-            <Icon src={A.newWindow} size={12} />
-          </button>
+          {floating ? (
+            <button onClick={onDock} title="Dock back into the layout" style={{ display: "flex", alignItems: "center", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
+              <Icon src={A.dock} size={12} />
+            </button>
+          ) : (
+            <button onClick={onUndock} title="Undock into a floating window" style={{ display: "flex", alignItems: "center", border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
+              <Icon src={A.newWindow} size={12} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -308,11 +321,18 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
             : <span style={{ fontSize: 9, color: "var(--text-tertiary)" }}>&nbsp;</span>}
         </div>
 
-        {/* Waveform + comment pins */}
-        <div onMouseDown={onScrubDown} style={{ position: "relative", height: showWaveform || showComments ? 16 : 2, display: "flex", alignItems: "flex-end", gap: 1, cursor: "pointer" }}>
-          {showWaveform && waveform.current.map((v, i) => (
-            <div key={i} style={{ flex: "1 0 0", height: `${v * 100}%`, background: i + 1 <= currentStep ? "#55c7ff" : "#cfe4fb", borderRadius: 1 }} />
-          ))}
+        {/* Waveform (optional) over a flat tick line (fm-v8.0-anim-player's
+            permanent baseline under the ruler) + comment pins */}
+        <div onMouseDown={onScrubDown} style={{ position: "relative", height: 10, display: "flex", alignItems: "flex-end", gap: 1, cursor: "pointer" }}>
+          {showWaveform
+            ? waveform.current.map((v, i) => (
+              <div key={i} style={{ flex: "1 0 0", height: `${v * 100}%`, background: i + 1 <= currentStep ? "#55c7ff" : "#cfe4fb", borderRadius: 1 }} />
+            ))
+            : Array.from({ length: totalSteps }, (_, i) => (
+              <div key={i} style={{ flex: "1 0 0", display: "flex", justifyContent: "center" }}>
+                <div style={{ width: 1, height: i % 2 === 0 ? 10 : 5, background: "var(--border-primary)" }} />
+              </div>
+            ))}
           {showComments && COMMENTS.map((c, i) => (
             <div key={i}
               onMouseEnter={() => setHoveredPin(i)}
@@ -348,9 +368,9 @@ export default function GlobalAnimatorFooter({ animator, onOpenPanel }) {
         <div style={{ position: "relative", height: 8, marginTop: 6, background: "var(--surface-4)", borderRadius: 8 }}>
           <div style={{ position: "absolute", left: pct(trimStart), right: `${100 - parseFloat(pct(trimEnd))}%`, top: 0, bottom: 0, background: "var(--interface-blue-500, #55c7ff)", borderRadius: 4 }} />
           <div onMouseDown={onTrimHandleDown("start")} title="Drag to trim start"
-            style={{ position: "absolute", left: pct(trimStart), top: 0, bottom: 0, width: 4, transform: "translateX(-50%)", background: "var(--surface-brand)", borderRadius: 2, cursor: "ew-resize" }} />
+            style={{ position: "absolute", left: pct(trimStart), top: 0, bottom: 0, width: 4, background: "var(--surface-brand)", cursor: "ew-resize" }} />
           <div onMouseDown={onTrimHandleDown("end")} title="Drag to trim end"
-            style={{ position: "absolute", left: pct(trimEnd), top: 0, bottom: 0, width: 4, transform: "translateX(-50%)", background: "var(--surface-brand)", borderRadius: 2, cursor: "ew-resize" }} />
+            style={{ position: "absolute", left: pct(trimEnd), top: 0, bottom: 0, width: 4, transform: "translateX(-100%)", background: "var(--surface-brand)", cursor: "ew-resize" }} />
         </div>
 
         {/* Playhead — numbered flag + needle spanning ruler/waveform/trim */}

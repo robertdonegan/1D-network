@@ -1,6 +1,7 @@
 import { useState, useRef, Fragment } from "react";
 import { A, Icon } from "../assets.jsx";
 import ContextMenu from "./ContextMenu.jsx";
+import { rampCss } from "./LayerPropertiesModal.jsx";
 
 function SearchField({ placeholder }) {
   return (
@@ -182,7 +183,7 @@ function Toggle({ on, onClick }) {
 //   Hover    neutral-500 fill, black text
 //   Select   neutral-500 fill + 2px brand border, Medium black text
 //   Hide     greyed raster icon, --text-tertiary label, empty badge
-function LayerRow({ color, label, sublabel, active, hidden, expanded, onClick, onContextMenu, onToggleExpand, onToggleVisibility }) {
+function LayerRow({ color, ramp, label, sublabel, active, hidden, expanded, onClick, onContextMenu, onToggleExpand, onToggleVisibility }) {
   const [hover, setHover] = useState(false);
   return (
     <div style={{ flexShrink: 0 }}>
@@ -231,7 +232,7 @@ function LayerRow({ color, label, sublabel, active, hidden, expanded, onClick, o
         <div style={{ display: "flex", alignItems: "center", gap: 4, paddingLeft: 16, height: 28 }}>
           <div style={{
             width: 56, height: 12, borderRadius: 2, border: "1px solid var(--border-primary)", flexShrink: 0,
-            background: `linear-gradient(90deg, ${color} 0%, ${color} 100%)`,
+            background: ramp ? rampCss(ramp.stops) : `linear-gradient(90deg, ${color} 0%, ${color} 100%)`,
           }} />
           <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {sublabel}
@@ -305,7 +306,7 @@ function SimRow({ name, active, iefs, on, expanded, onToggleExpand, onToggle }) 
 // `polygonLayerVisible`/`setPolygonLayerVisible` were the old single-layer
 // toggle — superseded by per-layer visibility on `layers` now that any
 // number of layers can exist side by side.
-export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onToggleLayerVisibility, onDeleteLayer, onAddLayer, onZoomToLayer, polygons, tab: tabProp, setTab: setTabProp }) {
+export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onToggleLayerVisibility, onDeleteLayer, onAddLayer, onZoomToLayer, onOpenLayerProperties, polygons, tab: tabProp, setTab: setTabProp }) {
   const [tabState, setTabState] = useState("components");
   // Height of the Simulation block above the Components section — the grabber
   // between them drags to resize it, exactly like NetworkPanel's divider above
@@ -394,7 +395,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
     { label: "Zoom to layer", onClick: () => onZoomToLayer?.(layerMenu.layer.id) },
     { label: "Export", onClick: () => exportLayer(layerMenu.layer) },
     { label: "Show attributes", onClick: () => {} },
-    { label: "Properties", onClick: () => {} },
+    { label: "Properties", onClick: () => onOpenLayerProperties?.(layerMenu.layer) },
   ] : [];
 
   return (
@@ -456,6 +457,7 @@ export function ProjectPanelBody({ layers, activeLayerId, onSetActiveLayer, onTo
             <LayerRow
               key={l.id}
               color={l.color}
+              ramp={l.ramp}
               label={l.name}
               sublabel={`${count} feature${count === 1 ? "" : "s"}${active ? " · active for drawing" : ""}`}
               active={active}

@@ -227,6 +227,10 @@ import editMoveVertex from "./assets/edit-move-vertex.svg";
 import editDeleteVertex from "./assets/edit-delete-vertex.svg";
 import editRotateShape from "./assets/edit-rotate-shape.svg";
 import editReverseShape from "./assets/edit-reverse-shape.svg";
+import layersAddAbove from "./assets/layers-add-above.svg";
+import layersAddBelow from "./assets/layers-add-below.svg";
+import reversePath from "./assets/reverse-path.svg";
+import rampRemove from "./assets/ramp-remove.svg";
 import editDeleteShape from "./assets/edit-delete-shape.svg";
 import editSnapLine from "./assets/edit-snap-line.svg";
 import editSnapPointLine from "./assets/edit-snap-point-line.svg";
@@ -451,6 +455,7 @@ export const A = {
   rectangleSelect, ellipticalSelect, freeformSelect, measureTool, pointQuery, pan, zoomTool, edit, editStop, northStar, comment,
   editPenTool, editAddVertex, editMovePolygon, editSnapPoint, editLayers, editViewAttribute, editSave, editSaveAs,
   editUndo, editRedo, editRevert, editMoveVertex, editDeleteVertex, editRotateShape, editReverseShape, editDeleteShape,
+  layersAddAbove, layersAddBelow, reversePath, rampRemove,
   editSnapLine, editSnapPointLine, editSnapMapGrid, editTraceLine, editSnapSettings,
   placeholder,
   homeLoadFile, homeExpand, homeAddBookmark, homeNote, homeMarker, homeAddGis,

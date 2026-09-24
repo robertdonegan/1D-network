@@ -13,6 +13,7 @@ import ContextMenu from "./ContextMenu.jsx";
 import EditToolbar from "./EditToolbar.jsx";
 import SaveModal from "./SaveModal.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import { sampleRamp, hexToRgb, makeNoiseGrid, terrainHeight, PRESET_RAMPS } from "./LayerPropertiesModal.jsx";
 import { PulsePreview, editValue } from "./FlowLinesPanel.jsx";
 import { FLOW_LABEL_METRICS } from "../flowMock.js";
 import polygonClipping from "polygon-clipping";
@@ -384,8 +385,50 @@ export default function GisCanvas({
   setPolygons,
   layers,
   activeLayerId,
+  depthLayerOn,
+  depthLayerRamp,
 }) {
   const showBasemap = !!BASEMAP_SOURCES[basemap];
+
+  // Dummy DTM depth raster (Results panel ▸ Raster ▸ Depth) — a fake
+  // heightfield covering the demo network's extent, coloured live from
+  // whatever ramp the Layer Properties ▸ Symbology tab has set (see
+  // App.jsx's `depthLayerRamp`). Same terrain generator LayerPropertiesModal
+  // uses for its own preview swatch, just rendered full-size onto the map.
+  const depthBBox = useMemo(() => {
+    if (!nodes?.length) return null;
+    const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const padX = (maxX - minX) * 0.35 || 200, padY = (maxY - minY) * 0.35 || 200;
+    return { x: minX - padX, y: minY - padY, w: (maxX - minX) + 2 * padX, h: (maxY - minY) + 2 * padY };
+  }, [nodes]);
+  const depthFineGrid = useMemo(() => makeNoiseGrid("upton-depth-dtm", "fine", 6), []);
+  const depthSeed = useMemo(() => (k) => {
+    let x = 2166136261;
+    const s = `upton-depth-dtm-${k}`;
+    for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619);
+    return (x >>> 0) / 4294967295;
+  }, []);
+  const depthDataUrl = useMemo(() => {
+    if (!depthLayerOn) return null;
+    const stops = depthLayerRamp?.stops || PRESET_RAMPS[0].stops;
+    const res = 160;
+    const canvas = document.createElement("canvas");
+    canvas.width = res; canvas.height = res;
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(res, res);
+    for (let y = 0; y < res; y++) {
+      for (let x = 0; x < res; x++) {
+        const h = terrainHeight(x / (res - 1), y / (res - 1), depthSeed, depthFineGrid);
+        const [r, g, b] = hexToRgb(sampleRamp(stops, h));
+        const i = (y * res + x) * 4;
+        img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 222;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas.toDataURL();
+  }, [depthLayerOn, depthLayerRamp, depthFineGrid, depthSeed]);
   const [hovered, setHovered] = useState(null);
   const [dragNode, setDragNode] = useState(null);
   const [dragVertex, setDragVertex] = useState(null);
@@ -2920,6 +2963,23 @@ useEffect(() => {
           />
         )}
 
+        {/* Dummy DTM depth raster — sits above the basemap, below every
+            vector layer (network/polygons/annotations), like a real raster
+            result would. The <g> transform replicates `toScreen` exactly
+            (translate∘rotate∘scale) so the image pans/zooms/rotates with
+            everything else instead of needing per-pixel reprojection. */}
+        {depthLayerOn && depthDataUrl && depthBBox && (
+          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+            <g transform={`translate(${view.tx},${view.ty}) rotate(${view.rotation || 0}) scale(${view.scale})`}>
+              <image
+                href={depthDataUrl}
+                x={depthBBox.x} y={depthBBox.y} width={depthBBox.w} height={depthBBox.h}
+                preserveAspectRatio="none" opacity={0.85}
+              />
+            </g>
+          </svg>
+        )}
+
         {/* Left tool rail — hugged to the map's left edge (FM v8.0 GIS
             toolbar sits flush against the perimeter). */}
         <div
@@ -3287,14 +3347,16 @@ useEffect(() => {
               const movable = liveEdit && (dragShape || railSelectable);
               const inspectable = liveEdit && polySubTool === "viewAttribute";
               const color = layerById(poly.layerId)?.color || "var(--orange-900)";
+              const layerOpacity = (layerById(poly.layerId)?.opacity ?? 100) / 100;
               return (
                 <g key={poly.id}>
                   <path
                     d={pathD}
                     fillRule="evenodd"
                     fill="var(--orange-100)"
-                    fillOpacity={isSel ? 0.6 : 0.35}
+                    fillOpacity={(isSel ? 0.6 : 0.35) * layerOpacity}
                     stroke={isSel ? "var(--orange-900)" : color}
+                    strokeOpacity={layerOpacity}
                     strokeWidth={isSel ? 2.5 : 1.5}
                     style={{
                       pointerEvents: liveEdit && (shapeToolActive || railSelectable) || inspectable ? "all" : "none",

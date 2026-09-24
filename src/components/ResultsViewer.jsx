@@ -2,6 +2,7 @@ import { useState } from "react";
 import { A, Icon } from "../assets.jsx";
 import { ResultsCell } from "./ResultsCell.jsx";
 import { ContextSection } from "./ContextSection.jsx";
+import ContextMenu from "./ContextMenu.jsx";
 
 //  2D results viewer panel — the Results-mode right hand dock (Figma
 //  fm-v8.0-TUFLOW-viewer, FMv8.2-TUFLOW-Solver 4002:12463, pulled live via the
@@ -89,7 +90,7 @@ function SectionHead({ label }) {
 // variant instead — the rows stay listed (nothing collapses out of view),
 // they just grey out and stop responding to hover/click, matching what the
 // header's own checkmark toggles off.
-function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex = -1, groupVisible = true }) {
+function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex = -1, groupVisible = true, onOpenMenu }) {
   return (
     <>
       {labels.map((label, i) => (
@@ -101,6 +102,7 @@ function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex =
           showMax={Boolean(withMax)}
           defaultSelected={i === selectedIndex}
           property1={groupVisible ? undefined : "Disabled"}
+          onOpenMenu={onOpenMenu ? (e) => onOpenMenu(e, label, source) : undefined}
         />
       ))}
     </>
@@ -109,8 +111,17 @@ function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex =
 
 // FM-context-section group bars (Raster / Vector / Check / Logs) use the
 // reusable ContextSection component — see ContextSection.jsx.
-export function ResultsViewerBody() {
+export function ResultsViewerBody({ onOpenLayerProperties }) {
   const [viewStatusHeight, setViewStatusHeight] = useState(VIEW_STATUS_DEFAULT_HEIGHT);
+  // Right-click (or the row's "⋮" on hover) on a Raster/Vector result opens
+  // the same Layer Properties modal the Layers panel uses — see App.jsx's
+  // `onOpenLayerProperties`. Only these two groups carry real per-result
+  // symbology (Check/Logs rows don't render a colour ramp on the map).
+  const [resultMenu, setResultMenu] = useState(null); // { x, y, label, source }
+  const openResultMenu = (e, label, source) => setResultMenu({ x: e.clientX, y: e.clientY, label, source });
+  const resultMenuItems = resultMenu ? [
+    { label: "Properties", onClick: () => onOpenLayerProperties?.({ kind: "result", id: resultMenu.label, title: resultMenu.label }) },
+  ] : [];
   // Whether each Raster/Vector/Check/Logs group is switched on — the
   // FM-context-section component's own two variants (Default = checked/on,
   // Collapse = unchecked/off) exist to drive this. Clicking a group header
@@ -152,9 +163,10 @@ export function ResultsViewerBody() {
           withMax
           selectedIndex={0}
           groupVisible={isVisible("Raster")}
+          onOpenMenu={openResultMenu}
         />
         <ContextSection label="Vector" height={24} property1={isVisible("Vector") ? "Default" : "Collapse"} onToggle={() => toggleGroup("Vector")} />
-        <ResultCells labels={["Velocity arrows", "Vector velocity"]} source={A.fm2dLine} withMax groupVisible={isVisible("Vector")} />
+        <ResultCells labels={["Velocity arrows", "Vector velocity"]} source={A.fm2dLine} withMax groupVisible={isVisible("Vector")} onOpenMenu={openResultMenu} />
         <ContextSection label="Check" height={24} property1={isVisible("Check") ? "Default" : "Collapse"} onToggle={() => toggleGroup("Check")} />
         <ResultCells
           labels={["1D to 2D check R", "bcc check R", "DEM Z", "DEM Zmin", "dom check R", "po check R"]}
@@ -164,6 +176,9 @@ export function ResultsViewerBody() {
         <ContextSection label="Logs" height={24} property1={isVisible("Logs") ? "Default" : "Collapse"} onToggle={() => toggleGroup("Logs")} />
         <ResultCells labels={["Messages"]} source={A.diagnosticsMono} withMax groupVisible={isVisible("Logs")} />
       </div>
+      {resultMenu && (
+        <ContextMenu x={resultMenu.x} y={resultMenu.y} items={resultMenuItems} onClose={() => setResultMenu(null)} />
+      )}
     </div>
   );
 }

@@ -38,6 +38,7 @@ export function ResultsCell({
   icon = null,
   label = LONG_TEXT,
   defaultSelected = false,
+  onOpenMenu,
 }) {
   const [sel, setSel] = useState(defaultSelected ? "Selected" : null); // null | "Selected" | "Selected Max"
   const [hover, setHover] = useState(false);
@@ -136,7 +137,7 @@ export function ResultsCell({
           onMouseLeave={() => setMaxHover(false)}
         />
       )}
-      <FmMoreIcon property1={revealMore ? "Hover" : "Default"} />
+      <FmMoreIcon property1={revealMore ? "Hover" : "Default"} onClick={onOpenMenu ? (e) => onOpenMenu(e) : undefined} />
     </div>
   );
 
@@ -145,6 +146,7 @@ export function ResultsCell({
       role="button"
       tabIndex={disabled ? -1 : 0}
       onClick={toggleSelect}
+      onContextMenu={onOpenMenu && !disabled ? (e) => { e.preventDefault(); onOpenMenu(e); } : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onMouseDown={() => { pointerFocusRef.current = true; }}
