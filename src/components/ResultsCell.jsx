@@ -39,6 +39,7 @@ export function ResultsCell({
   label = LONG_TEXT,
   defaultSelected = false,
   onOpenMenu,
+  onToggle,
 }) {
   const [sel, setSel] = useState(defaultSelected ? "Selected" : null); // null | "Selected" | "Selected Max"
   const [hover, setHover] = useState(false);
@@ -89,8 +90,10 @@ export function ResultsCell({
   };
 
   const toggleSelect = (e) => {
-    if (controlled || disabled) return;
+    if (disabled) return;
     e.stopPropagation();
+    if (onToggle) { onToggle(); return; }
+    if (controlled) return;
     setSel(sel === "Selected" || sel === "Selected Max" ? null : "Selected");
   };
 

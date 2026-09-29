@@ -391,17 +391,21 @@ export default function GisCanvas({
   const showBasemap = !!BASEMAP_SOURCES[basemap];
 
   // Dummy DTM depth raster (Results panel ▸ Raster ▸ Depth) — a fake
-  // heightfield covering the demo network's extent, coloured live from
-  // whatever ramp the Layer Properties ▸ Symbology tab has set (see
-  // App.jsx's `depthLayerRamp`). Same terrain generator LayerPropertiesModal
-  // uses for its own preview swatch, just rendered full-size onto the map.
+  // heightfield coloured live from whatever ramp the Layer Properties ▸
+  // Symbology tab has set (see App.jsx's `depthLayerRamp`). Same terrain
+  // generator LayerPropertiesModal uses for its own preview swatch, just
+  // rendered full-size onto the map. A real LIDAR/DTM survey tile set always
+  // covers a lot more than just the reaches someone happened to draw — see
+  // the DEFRA "Survey Data Download" tool — so the tile extends well past
+  // the modelled network on every side, not just hugging it.
   const depthBBox = useMemo(() => {
     if (!nodes?.length) return null;
     const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const padX = (maxX - minX) * 0.35 || 200, padY = (maxY - minY) * 0.35 || 200;
-    return { x: minX - padX, y: minY - padY, w: (maxX - minX) + 2 * padX, h: (maxY - minY) + 2 * padY };
+    const rangeX = (maxX - minX) || 400, rangeY = (maxY - minY) || 400;
+    const padX = rangeX * 1.5, padY = rangeY * 1.5;
+    return { x: minX - padX, y: minY - padY, w: rangeX + 2 * padX, h: rangeY + 2 * padY };
   }, [nodes]);
   const depthFineGrid = useMemo(() => makeNoiseGrid("upton-depth-dtm", "fine", 6), []);
   const depthSeed = useMemo(() => (k) => {
@@ -410,25 +414,79 @@ export default function GisCanvas({
     for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619);
     return (x >>> 0) / 4294967295;
   }, []);
+  // Real DTM tiles read as a blocky pixel grid at their native cell size
+  // (classically 1m/2m for LIDAR, but Defra's coarser Composite DTM is
+  // 10m) — each canvas pixel below is one grid cell, and `imageRendering:
+  // pixelated` on the <image> (see the render below) stops the browser
+  // from smoothing them back into a blur on upscale. `cellWorld` is a
+  // single value shared by both axes so cells come out square regardless
+  // of the tile's aspect ratio — clamping resX/resY independently (as an
+  // earlier version did) let a non-square bbox end up with a different
+  // cell size per axis, i.e. rectangles. Cell count is capped per axis —
+  // both so the fill loop stays fast on a large tile, and so the blocks
+  // stay chunky enough to actually read as "pixelated" at a normal
+  // zoomed-out map view; past the cap, cells quietly get coarser than a
+  // true 10m rather than the grid growing unbounded.
+  const CELL_METRES = 10;
+  const MAX_CELLS_PER_AXIS = 256;
   const depthDataUrl = useMemo(() => {
-    if (!depthLayerOn) return null;
+    if (!depthLayerOn || !depthBBox) return null;
     const stops = depthLayerRamp?.stops || PRESET_RAMPS[0].stops;
-    const res = 160;
+    // Symbology's step table (colour/value/label/on, one per band, built
+    // from Min/Max + Ramp intervals) is what "Graduated" rendering means —
+    // classify each cell into a band instead of sampling the continuous
+    // gradient, so editing a step's colour, unticking it, or changing the
+    // interval count actually shows up on the map. Steps run band 0 = Max
+    // down to band N-1 = Min (see LayerPropertiesModal's buildSteps), at
+    // the same fractional spacing as `h`, so the nearest band by fraction
+    // is the correct classification — Min/Max only relabels the values
+    // shown in the table, it doesn't shift which cells land in which band.
+    const steps = depthLayerRamp?.steps;
+    const targetCellWorld = CELL_METRES / METERS_PER_WORLD_UNIT;
+    const rawResX = depthBBox.w / targetCellWorld, rawResY = depthBBox.h / targetCellWorld;
+    const growth = Math.max(1, rawResX / MAX_CELLS_PER_AXIS, rawResY / MAX_CELLS_PER_AXIS);
+    const cellWorld = targetCellWorld * growth;
+    const resX = Math.max(8, Math.round(depthBBox.w / cellWorld));
+    const resY = Math.max(8, Math.round(depthBBox.h / cellWorld));
+    // terrainHeight's raw output doesn't reliably span the full 0..1 range
+    // (the slope/valley/noise mix realistically tops out well short of 1) —
+    // sample every cell once first and contrast-stretch against the actual
+    // min/max achieved, the same way a real DTM's colour ramp is stretched
+    // to the layer's true data range rather than a nominal 0..1. Without
+    // this, the ramp's outer stops/bands never appear on the map at all.
+    const raw = new Float32Array(resX * resY);
+    let minH = Infinity, maxH = -Infinity;
+    for (let y = 0; y < resY; y++) {
+      for (let x = 0; x < resX; x++) {
+        const h = terrainHeight(x / (resX - 1), y / (resY - 1), depthSeed, depthFineGrid);
+        raw[y * resX + x] = h;
+        if (h < minH) minH = h;
+        if (h > maxH) maxH = h;
+      }
+    }
+    const span = (maxH - minH) || 1;
     const canvas = document.createElement("canvas");
-    canvas.width = res; canvas.height = res;
+    canvas.width = resX; canvas.height = resY;
     const ctx = canvas.getContext("2d");
-    const img = ctx.createImageData(res, res);
-    for (let y = 0; y < res; y++) {
-      for (let x = 0; x < res; x++) {
-        const h = terrainHeight(x / (res - 1), y / (res - 1), depthSeed, depthFineGrid);
-        const [r, g, b] = hexToRgb(sampleRamp(stops, h));
-        const i = (y * res + x) * 4;
-        img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = 222;
+    const img = ctx.createImageData(resX, resY);
+    for (let y = 0; y < resY; y++) {
+      for (let x = 0; x < resX; x++) {
+        const h = (raw[y * resX + x] - minH) / span;
+        let r, g, b, a = 222;
+        if (steps && steps.length > 1) {
+          const band = steps[Math.min(steps.length - 1, Math.max(0, Math.round((1 - h) * (steps.length - 1))))];
+          if (band.on === false) { r = g = b = a = 0; }
+          else [r, g, b] = hexToRgb(band.color);
+        } else {
+          [r, g, b] = hexToRgb(sampleRamp(stops, h));
+        }
+        const i = (y * resX + x) * 4;
+        img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b; img.data[i + 3] = a;
       }
     }
     ctx.putImageData(img, 0, 0);
     return canvas.toDataURL();
-  }, [depthLayerOn, depthLayerRamp, depthFineGrid, depthSeed]);
+  }, [depthLayerOn, depthLayerRamp, depthBBox, depthFineGrid, depthSeed]);
   const [hovered, setHovered] = useState(null);
   const [dragNode, setDragNode] = useState(null);
   const [dragVertex, setDragVertex] = useState(null);
@@ -2975,6 +3033,7 @@ useEffect(() => {
                 href={depthDataUrl}
                 x={depthBBox.x} y={depthBBox.y} width={depthBBox.w} height={depthBBox.h}
                 preserveAspectRatio="none" opacity={0.85}
+                style={{ imageRendering: "pixelated" }}
               />
             </g>
           </svg>

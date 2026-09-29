@@ -884,6 +884,7 @@ ribbonDrag={ribbonDrag} onConsumeRibbonDrag={() => setRibbonDrag(null)}
             flowWidgetOpen={flowWidgetOpen} setFlowWidgetOpen={setFlowWidgetOpen}
             onOpenFlowLinesPanel={() => setRightView("flowlines")}
             polygons={polygons} setPolygons={setPolygons} layers={layers} activeLayerId={activeLayerId}
+            depthLayerOn={depthLayerOn} depthLayerRamp={depthLayerRamp}
           />
           <CornerRevealGrip width={midPanelW} setWidth={setMidPanelW} />
           <BottomRevealHandle height={bottomPanelH} setHeight={setBottomPanelH} />

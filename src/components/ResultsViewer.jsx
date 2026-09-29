@@ -90,28 +90,36 @@ function SectionHead({ label }) {
 // variant instead — the rows stay listed (nothing collapses out of view),
 // they just grey out and stop responding to hover/click, matching what the
 // header's own checkmark toggles off.
-function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex = -1, groupVisible = true, onOpenMenu }) {
+// `controlledLabel`/`controlledOn`/`onToggleControlled` let ONE row in the
+// group (currently just Raster's "Depth") be driven by real app state
+// instead of the cell's own local click-to-select — see the dummy DTM
+// raster this wires to a real map layer in GisCanvas.jsx/App.jsx.
+function ResultCells({ labels, source, withMax, showIcon = true, selectedIndex = -1, groupVisible = true, onOpenMenu, controlledLabel, controlledOn, onToggleControlled }) {
   return (
     <>
-      {labels.map((label, i) => (
-        <ResultsCell
-          key={label}
-          label={label}
-          icon={source}
-          showIcon={showIcon}
-          showMax={Boolean(withMax)}
-          defaultSelected={i === selectedIndex}
-          property1={groupVisible ? undefined : "Disabled"}
-          onOpenMenu={onOpenMenu ? (e) => onOpenMenu(e, label, source) : undefined}
-        />
-      ))}
+      {labels.map((label, i) => {
+        const isControlled = groupVisible && label === controlledLabel;
+        return (
+          <ResultsCell
+            key={label}
+            label={label}
+            icon={source}
+            showIcon={showIcon}
+            showMax={Boolean(withMax)}
+            defaultSelected={i === selectedIndex}
+            property1={!groupVisible ? "Disabled" : isControlled ? (controlledOn ? "Selected" : "Default") : undefined}
+            onToggle={isControlled ? onToggleControlled : undefined}
+            onOpenMenu={onOpenMenu ? (e) => onOpenMenu(e, label, source) : undefined}
+          />
+        );
+      })}
     </>
   );
 }
 
 // FM-context-section group bars (Raster / Vector / Check / Logs) use the
 // reusable ContextSection component — see ContextSection.jsx.
-export function ResultsViewerBody({ onOpenLayerProperties }) {
+export function ResultsViewerBody({ onOpenLayerProperties, depthLayerOn, onToggleDepthLayer }) {
   const [viewStatusHeight, setViewStatusHeight] = useState(VIEW_STATUS_DEFAULT_HEIGHT);
   // Right-click (or the row's "⋮" on hover) on a Raster/Vector result opens
   // the same Layer Properties modal the Layers panel uses — see App.jsx's
@@ -161,9 +169,9 @@ export function ResultsViewerBody({ onOpenLayerProperties }) {
           labels={["Depth", "Bed elevation", "Velocity", "Water level", "z0", "z0 max", "Time of Peak h"]}
           source={A.raster}
           withMax
-          selectedIndex={0}
           groupVisible={isVisible("Raster")}
           onOpenMenu={openResultMenu}
+          controlledLabel="Depth" controlledOn={depthLayerOn} onToggleControlled={onToggleDepthLayer}
         />
         <ContextSection label="Vector" height={24} property1={isVisible("Vector") ? "Default" : "Collapse"} onToggle={() => toggleGroup("Vector")} />
         <ResultCells labels={["Velocity arrows", "Vector velocity"]} source={A.fm2dLine} withMax groupVisible={isVisible("Vector")} onOpenMenu={openResultMenu} />
